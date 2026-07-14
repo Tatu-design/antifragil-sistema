@@ -21,3 +21,25 @@ integración externa (Calendar, Notion, Sheets, etc.), comprobar primero si ya
 existe un conector/MCP disponible y autorizado en el entorno que resuelva el
 problema sin necesidad de código ni credenciales propias. Priorizar usar lo que
 ya está conectado antes de construir infraestructura nueva.
+
+## 2026-07-14 — Retipear eventos a mano hizo perder una sesión real en el resumen
+
+**Qué pasó:** Al probar el flujo del Hito 0 con datos reales, en vez de pasar
+el array de eventos que devolvió el conector de Google Calendar tal cual al
+script de clasificación, lo retipeé a mano como una lista corta de títulos.
+En esa transcripción manual se perdió una sesión real de "Pt Felipe y Javi"
+(la del 15 de julio), y el resumen mostró 2 sesiones en vez de 3. Fernando lo
+detectó porque conocía el dato real.
+
+**Por qué pasó:** Se introdujo un paso manual (retipear/condensar la lista de
+eventos de memoria) entre la fuente de verdad (el conector) y el script
+determinista. Ese paso manual es exactamente el tipo de eslabón donde un
+humano —o una IA reconstruyendo datos de memoria— puede perder información
+sin darse cuenta.
+
+**Qué se hace distinto a partir de ahora:** Nunca reconstruir de memoria una
+lista de eventos/títulos para pasarla a un script. El array de eventos debe
+ir del conector al script de clasificación sin transcripción manual
+intermedia (guardarlo en un archivo o pasarlo directo). Si en algún punto no
+es posible evitar un paso manual, decirlo explícitamente y pedir que el
+usuario verifique el resultado antes de darlo por bueno.

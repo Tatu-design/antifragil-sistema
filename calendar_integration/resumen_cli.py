@@ -1,9 +1,13 @@
-"""CLI que clasifica títulos de eventos de Google Calendar y devuelve un resumen.
+"""CLI que clasifica eventos de Google Calendar y devuelve un resumen.
 
-Uso: se le pasa por stdin una lista JSON de títulos de eventos (strings), y
-devuelve por stdout el resumen en JSON. Pensado para ser invocado desde el
-skill `resumen-semanal`, que obtiene los eventos reales a través del conector
-de Google Calendar ya autorizado (no hace falta ninguna credencial propia).
+Uso: se le pasa por stdin, tal cual, el array `events` que devuelve el
+conector de Google Calendar (cada objeto con su campo "summary" original) y
+devuelve por stdout el resumen en JSON.
+
+Importante: este script debe recibir el JSON exacto que devuelve el conector
+(guardado en un archivo o redirigido directamente), nunca una lista de
+títulos retipeada a mano — retipear a mano puede perder eventos por error
+humano, como ya pasó una vez (ver .claude/skills/lessons-learned/log.md).
 """
 
 import json
@@ -13,8 +17,7 @@ from calendar_integration.summary import resumir_semana
 
 
 def main() -> None:
-    titulos = json.loads(sys.stdin.read())
-    eventos = [{"summary": titulo} for titulo in titulos]
+    eventos = json.loads(sys.stdin.read())
     resumen = resumir_semana(eventos)
 
     salida = {

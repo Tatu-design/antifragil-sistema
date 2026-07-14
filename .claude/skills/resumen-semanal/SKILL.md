@@ -25,15 +25,21 @@ Si no especifica semana, se usa la semana actual (lunes a domingo).
      `Europe/Madrid`
    - `timeZone`: `Europe/Madrid`
    - `orderBy`: `startTime`
-3. Extraer el campo `summary` (título) de cada evento devuelto. Los eventos
-   eliminados ya no aparecen en la respuesta del conector, así que no hace
-   falta filtrarlos aparte.
-4. Clasificar los títulos de forma determinista con el script del proyecto
-   (no reinventar la clasificación "a ojo"): pasar la lista de títulos como
-   JSON por stdin a
+3. Los eventos eliminados ya no aparecen en la respuesta del conector, así
+   que no hace falta filtrarlos aparte.
+4. Clasificar de forma determinista con el script del proyecto (no
+   reinventar la clasificación "a ojo"): guardar el array `events` que
+   devolvió el conector **tal cual, sin retipearlo ni condensarlo a mano**
+   en un archivo, y pasarlo por stdin a
    `python -m calendar_integration.resumen_cli`
    ejecutado desde la raíz del proyecto. Devuelve un JSON con
    `sesiones_pt`, `crossfit_lidomare`, `crossfit_kids` y `no_reconocidos`.
+
+   **Nunca reconstruir la lista de títulos de memoria.** Ya pasó una vez que
+   al retipear a mano se perdió una sesión real (ver
+   `.claude/skills/lessons-learned/log.md`, entrada 2026-07-14). El array
+   completo de eventos debe pasar del conector al script sin transcripción
+   manual intermedia.
 5. Presentar a Fernando:
    - Tabla de sesiones de PT por cliente
    - Nº de clases de CrossFit Lidomare y CrossFit Kids
