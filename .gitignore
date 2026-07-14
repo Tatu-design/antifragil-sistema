@@ -4,11 +4,6 @@ node_modules/
 *.log
 .DS_Store
 
-# Credenciales de Google Calendar — nunca se suben al repositorio
-credentials.json
-token.json
-calendar_config.json
-
 # Entorno virtual de Python
 .venv/
 venv/
