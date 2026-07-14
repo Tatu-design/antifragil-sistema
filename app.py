@@ -10,14 +10,26 @@ import streamlit as st
 
 from calendar_integration.auth import get_calendar_service
 from calendar_integration.client import get_events_for_week, get_week_range
+from calendar_integration.config import cargar_calendar_id, guardar_calendar_id
 from calendar_integration.summary import resumir_semana
 
 st.set_page_config(page_title="Antifrágil — Resumen semanal", page_icon="🏋️")
 st.title("Resumen semanal de entrenamientos")
 
+calendar_id = st.text_input(
+    "ID de tu calendario (normalmente tu email de Google)",
+    value=cargar_calendar_id(),
+    help="Lo encuentras en Google Calendar → Configuración → tu calendario → 'Integrar calendario' → 'ID de calendario'.",
+)
+
 dia = st.date_input("Elige cualquier día de la semana que quieras revisar", value=datetime.now().date())
 
 if st.button("Cargar semana"):
+    if not calendar_id:
+        st.error("Falta el ID de tu calendario.")
+        st.stop()
+    guardar_calendar_id(calendar_id)
+
     try:
         service = get_calendar_service()
     except FileNotFoundError as error:
@@ -27,7 +39,7 @@ if st.button("Cargar semana"):
     inicio, fin = get_week_range(datetime.combine(dia, datetime.min.time()))
     st.caption(f"Semana del {inicio.date()} al {fin.date()}")
 
-    eventos = get_events_for_week(service, datetime.combine(dia, datetime.min.time()))
+    eventos = get_events_for_week(service, datetime.combine(dia, datetime.min.time()), calendar_id)
     resumen = resumir_semana(eventos)
 
     st.subheader("Entrenamiento personal")

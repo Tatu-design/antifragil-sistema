@@ -1,23 +1,22 @@
-"""Autenticación contra Google Calendar.
+"""Autenticación contra Google Calendar mediante una cuenta de servicio.
 
-Requiere un archivo `credentials.json` (descargado desde Google Cloud Console,
-ver docs/CONFIGURAR_GOOGLE_CALENDAR.md) en la raíz del proyecto. La primera vez
-que se ejecuta, abre el navegador para que Fernando autorice el acceso; a partir
-de ahí queda guardado en `token.json` y no se vuelve a pedir.
+Una cuenta de servicio es una credencial de Google sin una persona detrás:
+no requiere iniciar sesión en un navegador ni caduca cada pocos días, a
+diferencia del login normal de usuario. Requiere un archivo `credentials.json`
+(la "llave" de la cuenta de servicio, ver docs/CONFIGURAR_GOOGLE_CALENDAR.md)
+en la raíz del proyecto, y que Fernando comparta su calendario con el email
+de esa cuenta de servicio.
 """
 
 from pathlib import Path
 
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
+from google.oauth2 import service_account
 from googleapiclient.discovery import build
 
 SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 CREDENTIALS_PATH = ROOT_DIR / "credentials.json"
-TOKEN_PATH = ROOT_DIR / "token.json"
 
 
 def get_calendar_service():
@@ -28,18 +27,7 @@ def get_calendar_service():
             "Sigue docs/CONFIGURAR_GOOGLE_CALENDAR.md para obtenerlo."
         )
 
-    creds = None
-    if TOKEN_PATH.exists():
-        creds = Credentials.from_authorized_user_file(str(TOKEN_PATH), SCOPES)
-
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            flow = InstalledAppFlow.from_client_secrets_file(
-                str(CREDENTIALS_PATH), SCOPES
-            )
-            creds = flow.run_local_server(port=0)
-        TOKEN_PATH.write_text(creds.to_json())
-
+    creds = service_account.Credentials.from_service_account_file(
+        str(CREDENTIALS_PATH), scopes=SCOPES
+    )
     return build("calendar", "v3", credentials=creds)

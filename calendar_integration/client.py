@@ -16,8 +16,13 @@ def get_week_range(any_day_in_week: datetime) -> tuple[datetime, datetime]:
     return start, end
 
 
-def get_events_for_week(service, any_day_in_week: datetime, calendar_id: str = "primary") -> list[dict]:
-    """Devuelve los eventos de la semana (lunes-domingo) que contiene any_day_in_week."""
+def get_events_for_week(service, any_day_in_week: datetime, calendar_id: str) -> list[dict]:
+    """Devuelve los eventos de la semana (lunes-domingo) que contiene any_day_in_week.
+
+    calendar_id es el ID del calendario de Fernando (normalmente su email de
+    Google) — la cuenta de servicio no tiene calendario propio, así que no
+    existe un valor "primary" por defecto: hay que indicar siempre cuál leer.
+    """
     start, end = get_week_range(any_day_in_week)
 
     result = (

@@ -7,6 +7,7 @@ node_modules/
 # Credenciales de Google Calendar — nunca se suben al repositorio
 credentials.json
 token.json
+calendar_config.json
 
 # Entorno virtual de Python
 .venv/
