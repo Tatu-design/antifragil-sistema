@@ -17,6 +17,14 @@
   Calendar + programas + Excel en un solo flujo, con modo "previsualizar"
   (no escribe) y modo "aplicar" (solo tras confirmación explícita de
   Fernando). Probado de punta a punta con datos reales.
+- Paso 4 construido: cálculo económico semanal/mensual (`economia/`) —
+  facturación por sesiones hechas (no por pagos recibidos), desglosada por
+  tarifa, con horas totales y precio medio por hora, replicando la lógica
+  de la hoja de cálculo que ya usaba Fernando. Se guarda en
+  `datos/facturacion.xlsx`, consultable por semana o por mes
+  (`economia/cli.py`). CrossFit Kids se factura por mensualidad: se cuenta
+  en sesiones pero su importe se reparte hacia atrás sobre las semanas del
+  mes en cuanto Fernando indica la facturación mensual total.
 
 ## Stack técnico (decidido 2026-07-14, revisado el mismo día)
 
@@ -96,27 +104,33 @@ antifragil/
   calendar_integration/
     parser.py        # clasifica un título de evento (PT/CrossFit Lidomare/Kids)
     summary.py        # agrupa eventos clasificados en un resumen semanal
-    resumen_cli.py     # CLI: recibe el array de eventos por stdin, devuelve resumen JSON
+    semana.py           # calcula el rango lunes-domingo de una fecha
+    resumen_cli.py       # CLI: recibe el array de eventos por stdin, devuelve resumen JSON
   programas/
     logica.py          # descuento y renovación de un programa individual
     procesar.py         # combina el resumen semanal con los programas actuales
   clientes/
     generar_plantilla.py  # crea datos/clientes.xlsx con formato (una sola vez)
     repositorio.py         # lee/escribe datos/clientes.xlsx
+  economia/
+    calculo.py           # facturación/horas/precio medio, desglosado por tarifa
+    registro.py            # lee/escribe datos/facturacion.xlsx (histórico semanal/mensual)
+    cli.py                  # consultas + registro de la facturación mensual de Kids
   cierre_semanal/
-    cli.py                  # une Calendar + programas + Excel (previsualizar / aplicar)
+    cli.py                  # une Calendar + programas + economía (previsualizar / aplicar)
   datos/
     clientes.xlsx           # base de datos real, con formato (nunca en Git)
     clientes.example.csv     # plantilla de ejemplo (estructura de columnas), sí versionada
+    facturacion.xlsx          # registro económico real (nunca en Git)
   .claude/skills/resumen-semanal/SKILL.md   # paso 1: solo resumen de Calendar
-  .claude/skills/cierre-semanal/SKILL.md     # paso 3: flujo completo con confirmación
+  .claude/skills/cierre-semanal/SKILL.md     # pasos 3+4: flujo completo con confirmación
 ```
 
-`calendar_integration/` y `programas/` contienen solo lógica pura (sin
-credenciales, sin llamadas de red). `clientes/` sí toca disco, pero es un
-archivo local del propio proyecto, no un servicio externo — la obtención de
-eventos reales de Calendar la hacen los skills a través del conector ya
-autorizado.
+`calendar_integration/`, `programas/` y `economia/calculo.py` contienen solo
+lógica pura (sin credenciales, sin llamadas de red). `clientes/` y
+`economia/registro.py` sí tocan disco, pero son archivos locales del propio
+proyecto, no un servicio externo — la obtención de eventos reales de
+Calendar la hacen los skills a través del conector ya autorizado.
 
 ### Regla de negocio de `programas/logica.py` (confirmada por Fernando, 2026-07-15)
 
@@ -137,17 +151,19 @@ una vez. Orden acordado:
 3. Unir el paso 1 y el paso 2 en un solo skill semanal (`cierre-semanal`):
    leer Calendar, calcular, mostrar resumen y esperar confirmación de
    Fernando antes de escribir en `datos/clientes.xlsx`. ✅
-4. Resumen económico semanal/mensual — probablemente también como archivo
-   local en vez de Google Sheets, a decidir cuando llegue el momento.
+4. Resumen económico semanal/mensual (`economia/`), como archivo local
+   (`datos/facturacion.xlsx`) en vez de Google Sheets — mismo motivo que la
+   base de datos de clientes (ver decisión del 2026-07-15 sobre Sheets). ✅
 
-Cada paso debe verse funcionando antes de empezar el siguiente.
+Cada paso debe verse funcionando antes de empezar el siguiente. La V1 según
+el orden original está completa; quedan ajustes y pulido según el uso real.
 
 ## Próximos pasos técnicos pendientes de decidir
 
-- Fernando debe rellenar `datos/clientes.xlsx` con tarifa, tipo de programa,
-  sesiones totales y restantes de sus clientes actuales
-- Construir el skill del paso 3 (unir Calendar + programas + confirmación)
-- Decidir el formato del resumen económico del paso 4
+- Probar el flujo `cierre-semanal` completo (incluyendo `aplicar`) con una
+  semana real y confirmación de Fernando
+- Cuando termine julio 2026, registrar la facturación mensual de CrossFit
+  Kids con `economia/cli.py kids`
 
 ## Principios de arquitectura (de SYSTEM_VISION.md)
 

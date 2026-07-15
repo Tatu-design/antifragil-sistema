@@ -96,6 +96,19 @@ def cargar_programas(ruta: Path = RUTA_POR_DEFECTO) -> tuple[dict[str, dict], li
     return programas, incompletos
 
 
+def cargar_tarifas(ruta: Path = RUTA_POR_DEFECTO) -> dict[str, float]:
+    """Devuelve {cliente: tarifa} para los clientes con tarifa numérica ya
+    calculada — usado por `economia.calculo` para la facturación semanal."""
+    clientes = leer_clientes(ruta)
+    tarifas: dict[str, float] = {}
+    for nombre, fila in clientes.items():
+        try:
+            tarifas[nombre] = float(fila["tarifa"])
+        except (TypeError, ValueError):
+            continue
+    return tarifas
+
+
 def _asegurar_validaciones(wb) -> None:
     """Repone los desplegables si no están (openpyxl no lee el formato
     "extendido" en el que Excel a veces reescribe las validaciones al
