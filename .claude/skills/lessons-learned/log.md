@@ -64,3 +64,24 @@ operaciones de escritura existen realmente para ese conector en concreto —
 disponible, preferir una alternativa simple bajo control total (como un
 archivo local) antes que montar una autenticación propia solo para poder
 escribir.
+
+## 2026-07-15 — Intenté derivar la tarifa del color del evento, cuando el dato ya vive en la base de datos
+
+**Qué pasó:** Fernando compartió un documento detallado de tarifas donde se
+menciona que los colores de Google Calendar identifican la tarifa. Empecé a
+diseñar cómo mapear los colores exactos de Google (Uva, Albahaca, Plátano...)
+a las tarifas de Fernando, e iba a pedirle que confirmara ese mapeo color por
+color. Fernando aclaró que no hace falta: el color es solo orientativo para
+él en su propio calendario; el sistema debe relacionar el nombre del cliente
+detectado en Calendar con la tarifa que ya está guardada en
+`datos/clientes.xlsx` — que es justo lo que `programas/procesar.py` ya hace.
+
+**Por qué pasó:** Al leer el documento de tarifas asumí que había que extraer
+un dato (la tarifa) de una señal secundaria (el color) en vez de comprobar
+primero si ese dato ya existía en la fuente de verdad que ya se había
+construido (el Excel de clientes).
+
+**Qué se hace distinto a partir de ahora:** Antes de diseñar cómo extraer un
+dato desde una fuente nueva (colores, texto libre, etc.), comprobar si ese
+dato ya vive en una fuente de verdad existente y más simple. No añadir una
+vía de lectura adicional para algo que ya se resuelve con lo que hay.

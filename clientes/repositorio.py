@@ -1,11 +1,18 @@
 """Lectura y escritura de la base de datos de clientes.
 
 Es un archivo Excel local (`datos/clientes.xlsx`, con formato — ver
-`clientes/generar_plantilla.py`) que Fernando edita a mano (crear clientes,
-cambiar tarifa o tipo de programa) y que este módulo lee y actualiza tras
-cada resumen semanal. No depende de ningún conector ni credencial: es un
-archivo del propio ordenador. Al escribir solo se cambian valores de celda,
-nunca el formato, así que el aspecto del Excel no se pierde.
+`clientes/generar_plantilla.py`) que Fernando edita a mano (elige el
+programa de un desplegable; tarifa y sesiones totales se calculan solas) y
+que este módulo lee y actualiza tras cada resumen semanal. No depende de
+ningún conector ni credencial: es un archivo del propio ordenador. Al
+escribir solo se cambian valores de celda, nunca el formato, así que el
+aspecto del Excel no se pierde.
+
+Importante: la tarifa y las sesiones totales son fórmulas de Excel, no
+valores fijos. Este módulo lee el archivo con `data_only=True`, que devuelve
+el último valor calculado por Excel — por eso Fernando debe **guardar el
+archivo (Ctrl+S) después de elegir un programa** para que el sistema pueda
+leer esos números.
 """
 
 from pathlib import Path

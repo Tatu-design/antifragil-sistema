@@ -62,6 +62,21 @@ Sí/No para "pendiente de pago" y resaltado en rojo/verde). Al escribir las
 actualizaciones semanales solo se cambian valores de celda, nunca el
 formato, así que el aspecto no se pierde con el uso.
 
+Fernando compartió después las tarifas reales de Antifrágil (ver
+`docs/TARIFAS.md`). Se añadió una segunda hoja "Programas" con los 7
+programas reales (tarifa + sesiones totales) y un desplegable en "Tipo de
+programa" que autorrellena la tarifa y las sesiones totales mediante
+`VLOOKUP`. Si Fernando cambia un precio, solo edita la hoja "Programas" —
+no hace falta tocar código. Los colores de los eventos de Calendar son solo
+orientativos para Fernando; el sistema relaciona tarifa/programa únicamente
+por nombre de cliente contra este Excel, nunca por color (ver lección en el
+log del 2026-07-15).
+
+Nota técnica: tarifa y sesiones totales son fórmulas, no valores fijos —
+Fernando debe guardar el archivo (Ctrl+S) tras elegir un programa para que
+`clientes/repositorio.py` (que lee con `data_only=True`) pueda ver el
+resultado calculado.
+
 ## Estructura de carpetas
 
 ```
