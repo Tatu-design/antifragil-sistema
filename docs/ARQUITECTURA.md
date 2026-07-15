@@ -13,6 +13,10 @@
   desplegables, filtros) generado por `clientes/generar_plantilla.py` y
   leído/escrito por `clientes/repositorio.py`. Probado de punta a punta con
   datos de ejemplo.
+- Paso 3 construido: skill `cierre-semanal` (`cierre_semanal/cli.py`) une
+  Calendar + programas + Excel en un solo flujo, con modo "previsualizar"
+  (no escribe) y modo "aplicar" (solo tras confirmación explícita de
+  Fernando). Probado de punta a punta con datos reales.
 
 ## Stack técnico (decidido 2026-07-14, revisado el mismo día)
 
@@ -99,10 +103,13 @@ antifragil/
   clientes/
     generar_plantilla.py  # crea datos/clientes.xlsx con formato (una sola vez)
     repositorio.py         # lee/escribe datos/clientes.xlsx
+  cierre_semanal/
+    cli.py                  # une Calendar + programas + Excel (previsualizar / aplicar)
   datos/
     clientes.xlsx           # base de datos real, con formato (nunca en Git)
     clientes.example.csv     # plantilla de ejemplo (estructura de columnas), sí versionada
-  .claude/skills/resumen-semanal/SKILL.md   # orquesta el flujo del paso 1
+  .claude/skills/resumen-semanal/SKILL.md   # paso 1: solo resumen de Calendar
+  .claude/skills/cierre-semanal/SKILL.md     # paso 3: flujo completo con confirmación
 ```
 
 `calendar_integration/` y `programas/` contienen solo lógica pura (sin
@@ -127,9 +134,9 @@ una vez. Orden acordado:
    (PT, CrossFit Lidomare, CrossFit Kids). Sin escritura en ningún sitio todavía. ✅
 2. Lógica de programas (descuento, aviso, renovación) + base de datos de
    clientes en `datos/clientes.xlsx`, en vez de Notion (ver decisión arriba). ✅
-3. Unir el paso 1 y el paso 2 en un solo skill semanal: leer Calendar,
-   calcular, mostrar resumen y esperar confirmación de Fernando antes de
-   escribir en `datos/clientes.xlsx`.
+3. Unir el paso 1 y el paso 2 en un solo skill semanal (`cierre-semanal`):
+   leer Calendar, calcular, mostrar resumen y esperar confirmación de
+   Fernando antes de escribir en `datos/clientes.xlsx`. ✅
 4. Resumen económico semanal/mensual — probablemente también como archivo
    local en vez de Google Sheets, a decidir cuando llegue el momento.
 

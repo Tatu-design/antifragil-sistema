@@ -13,3 +13,4 @@ __pycache__/
 # Datos reales de clientes — nunca se suben al repositorio
 datos/clientes.csv
 datos/clientes.xlsx
+datos/~$*

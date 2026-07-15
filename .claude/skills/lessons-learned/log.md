@@ -111,3 +111,30 @@ repetidos del mismo archivo con openpyxl en una misma sesión de trabajo
 abrir y guardar el Excel en Excel de verdad (Ctrl+S) después de cualquier
 cambio hecho por el sistema, para que las fórmulas queden recalculadas y
 cacheadas.
+
+## 2026-07-15 — `stdin`/`stdout` no son UTF-8 por defecto en este Windows, y corrompían nombres con tildes
+
+**Qué pasó:** Al construir `cierre_semanal/cli.py` (que cruza los nombres
+detectados en Calendar contra los nombres del Excel), "Rocío" aparecía
+sistemáticamente como "sin programa" aunque su fila en el Excel estaba
+completa. Al investigar, `sys.stdin.encoding` resultó ser `cp1252`, no
+UTF-8: al leer el JSON de eventos por `stdin` (redirigido con `<` desde un
+archivo UTF-8), la "í" (dos bytes en UTF-8: `0xC3 0xAD`) se decodificaba mal
+como dos caracteres distintos en cp1252, generando un "Rocío" con bytes
+distintos al leído por `openpyxl` (que sí usa UTF-8 correctamente) — dos
+strings que se ven idénticos al imprimirlos pero que no son iguales para
+Python. Los nombres sin tildes (Nikki, Ana, Paquito...) nunca mostraron el
+problema, lo que lo hizo parecer al principio una condición de carrera.
+
+**Por qué pasó:** Se asumió que `sys.stdin.read()`/`print()` usan UTF-8 por
+defecto. En este Windows no es así — dependen de la página de códigos de la
+consola.
+
+**Qué se hace distinto a partir de ahora:** Todo script que lea o escriba
+texto por `stdin`/`stdout` debe forzar explícitamente
+`sys.stdin.reconfigure(encoding="utf-8")` /
+`sys.stdout.reconfigure(encoding="utf-8")` al principio de `main()`. Si un
+cruce de nombres falla de forma que "no debería poder fallar" (los datos
+están ahí, están bien escritos), sospechar primero de la codificación en
+los bordes de entrada/salida antes de asumir un error de lógica o una
+condición de carrera.

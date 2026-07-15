@@ -17,6 +17,12 @@ from calendar_integration.summary import resumir_semana
 
 
 def main() -> None:
+    # En Windows, stdin/stdout no siempre son UTF-8 por defecto (cp1252),
+    # lo que corrompe nombres con tildes como "Rocío" — ver lección del
+    # 2026-07-15 en el log.
+    sys.stdin.reconfigure(encoding="utf-8")
+    sys.stdout.reconfigure(encoding="utf-8")
+
     eventos = json.loads(sys.stdin.read())
     resumen = resumir_semana(eventos)
 
