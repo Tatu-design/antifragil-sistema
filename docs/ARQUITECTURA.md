@@ -5,8 +5,12 @@
 
 ## Estado actual
 
-Paso 1 construido: resumen semanal de sesiones vía skill `resumen-semanal`.
-Solo lectura, no escribe todavía en ningún sitio.
+- Paso 1 construido: resumen semanal de sesiones vía skill `resumen-semanal`.
+  Solo lectura, no escribe todavía en ningún sitio.
+- Paso 2 en construcción: lógica de descuento/renovación de programas
+  (`programas/logica.py`, `programas/procesar.py`). Probada con datos de
+  ejemplo. Aún no conectada a datos reales porque eso requiere el paso 3
+  (Notion), pendiente de que Fernando autorice ese conector.
 
 ## Stack técnico (decidido 2026-07-14, revisado el mismo día)
 
@@ -32,13 +36,24 @@ antifragil/
   calendar_integration/
     parser.py        # clasifica un título de evento (PT/CrossFit Lidomare/Kids)
     summary.py        # agrupa eventos clasificados en un resumen semanal
-    resumen_cli.py     # CLI: recibe títulos por stdin, devuelve resumen JSON
-  .claude/skills/resumen-semanal/SKILL.md   # orquesta el flujo completo
+    resumen_cli.py     # CLI: recibe el array de eventos por stdin, devuelve resumen JSON
+  programas/
+    logica.py          # descuento y renovación de un programa individual
+    procesar.py         # combina el resumen semanal con los programas actuales
+  .claude/skills/resumen-semanal/SKILL.md   # orquesta el flujo del paso 1
 ```
 
-`calendar_integration/` contiene solo lógica pura (sin credenciales, sin
-llamadas de red) — la obtención de los eventos reales la hace el skill a
-través del conector ya autorizado.
+`calendar_integration/` y `programas/` contienen solo lógica pura (sin
+credenciales, sin llamadas de red) — la obtención de datos reales (Calendar,
+y más adelante Notion) la hacen los skills a través de los conectores ya
+autorizados.
+
+### Regla de negocio de `programas/logica.py` (confirmada por Fernando, 2026-07-15)
+
+Al agotarse un bono a mitad de semana, se renueva automáticamente con el
+mismo número de sesiones y las sesiones "de más" de esa semana cuentan ya
+contra el bono nuevo (no se pierden ni se regalan). El bono nuevo queda
+marcado como pendiente de pago.
 
 ## Orden de construcción de la V1 (decidido 2026-07-14)
 
