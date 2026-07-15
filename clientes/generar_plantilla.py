@@ -42,7 +42,7 @@ COLUMNAS = [
     ("Tipo de programa", 22),
     ("Tarifa (€)", 14),
     ("Sesiones totales", 16),
-    ("Sesiones restantes", 18),
+    ("Sesiones llevadas", 18),
     ("Pendiente de pago", 18),
 ]
 

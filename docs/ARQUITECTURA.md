@@ -73,9 +73,17 @@ por nombre de cliente contra este Excel, nunca por color (ver lección en el
 log del 2026-07-15).
 
 Nota técnica: tarifa y sesiones totales son fórmulas, no valores fijos —
-Fernando debe guardar el archivo (Ctrl+S) tras elegir un programa para que
+Fernando debe guardar el archivo (Ctrl+S) tras elegir un programa (o tras
+cualquier cambio hecho por el sistema) para que Excel las recalcule y
 `clientes/repositorio.py` (que lee con `data_only=True`) pueda ver el
-resultado calculado.
+resultado. Ver lección del 2026-07-15 sobre por qué esto es necesario.
+
+Fernando también pidió (2026-07-15) anotar las **sesiones llevadas**
+(consumidas del bono actual) en vez de las que quedan — le resulta más
+natural. La columna E del Excel se llama "Sesiones llevadas";
+`clientes/repositorio.py` convierte a "restantes" (`sesiones_totales -
+sesiones_llevadas`) solo para alimentar `programas/procesar.py`, cuya
+lógica interna no cambió.
 
 ## Estructura de carpetas
 

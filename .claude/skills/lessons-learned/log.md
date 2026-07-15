@@ -85,3 +85,29 @@ construido (el Excel de clientes).
 dato desde una fuente nueva (colores, texto libre, etc.), comprobar si ese
 dato ya vive en una fuente de verdad existente y más simple. No añadir una
 vía de lectura adicional para algo que ya se resuelve con lo que hay.
+
+## 2026-07-15 — Abrir y guardar el Excel con openpyxl borra los valores ya calculados de las fórmulas, y a veces también los desplegables
+
+**Qué pasó:** Al renombrar una columna y reponer un desplegable con
+`load_workbook` + `wb.save()` (sin `data_only`), se perdieron dos cosas sin
+querer: (1) el desplegable de "Tipo de programa" — Excel a veces lo guarda
+en un formato "extendido" que openpyxl no lee y descarta con un aviso
+("Data Validation extension is not supported and will be removed"); y (2)
+los valores ya calculados de las fórmulas de tarifa/sesiones (openpyxl solo
+conserva el texto de la fórmula, no el resultado cacheado, así que hasta que
+Excel no la recalcule y guarde de nuevo, `data_only=True` devuelve `None`).
+
+**Por qué pasó:** No se tuvo en cuenta que openpyxl no es un motor de
+cálculo de Excel: cualquier apertura+guardado con esta librería es
+potencialmente destructivo para fórmulas y para validaciones en formato
+extendido, aunque el archivo "se vea bien" al inspeccionarlo con la propia
+librería.
+
+**Qué se hace distinto a partir de ahora:** `clientes/repositorio.py` ahora
+repone los desplegables automáticamente antes de cada guardado
+(`_asegurar_validaciones`). Además: evitar guardados innecesarios o
+repetidos del mismo archivo con openpyxl en una misma sesión de trabajo
+(agrupar los cambios en un solo guardado), y avisar a Fernando de que debe
+abrir y guardar el Excel en Excel de verdad (Ctrl+S) después de cualquier
+cambio hecho por el sistema, para que las fórmulas queden recalculadas y
+cacheadas.
