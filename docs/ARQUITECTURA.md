@@ -7,10 +7,10 @@
 
 - Paso 1 construido: resumen semanal de sesiones vía skill `resumen-semanal`.
   Solo lectura, no escribe todavía en ningún sitio.
-- Paso 2 en construcción: lógica de descuento/renovación de programas
-  (`programas/logica.py`, `programas/procesar.py`). Probada con datos de
-  ejemplo. Aún no conectada a datos reales porque eso requiere el paso 3
-  (Notion), pendiente de que Fernando autorice ese conector.
+- Paso 2 construido: lógica de descuento/renovación de programas
+  (`programas/logica.py`, `programas/procesar.py`) y base de datos de
+  clientes en `datos/clientes.csv` (`clientes/repositorio.py`). Probado de
+  punta a punta con datos de ejemplo.
 
 ## Stack técnico (decidido 2026-07-14, revisado el mismo día)
 
@@ -23,11 +23,34 @@ calendario directamente a través de ese conector, ya autorizado.
 | Lectura de Calendar | Conector `claude.ai Google Calendar` (ya autorizado) | Ya existe y funciona; construir una autenticación propia (OAuth/cuenta de servicio) habría sido complejidad innecesaria — ver lección en `.claude/skills/lessons-learned/log.md` |
 | Clasificación de sesiones | Python puro, sin dependencias externas (`calendar_integration/parser.py`, `summary.py`) | Lógica determinista (no "a ojo" por IA) para que el conteo de sesiones sea siempre reproducible |
 | Interfaz | Conversación con Claude Code (skill `resumen-semanal`) | No hace falta una app aparte: Fernando pide el resumen y Claude lo genera usando el conector + el script de clasificación |
-| Notion / Google Sheets (pasos futuros) | Conectores de claude.ai (Notion pendiente de autorizar por Fernando) | Misma lógica: usar lo ya conectado en vez de construir autenticación propia |
-| Base de datos interna | Aún no decidida | Se decide en el paso 2, cuando haga falta guardar el estado de los programas (sesiones restantes, renovaciones) |
+| Base de datos de clientes/programas | Archivo local `datos/clientes.csv` (`clientes/repositorio.py`) | Ver decisión del 2026-07-15 más abajo |
 
 Se descartó Streamlit + SQLite + cuenta de servicio de Google Cloud (construido
 y luego eliminado el mismo día) porque duplicaba algo que ya existía.
+
+### Decisión: CSV local en vez de Notion o Google Sheets (2026-07-15)
+
+El plan original (`SYSTEM_VISION.md`) usaba Notion para clientes/programas y
+Google Sheets para el resumen económico. Se cambió por lo siguiente:
+
+- **Notion**: el conector de Notion de claude.ai no está disponible en este
+  proyecto (ni siquiera en estado "pendiente de autorizar" — no está dado de
+  alta). Fernando confirmó que tampoco lleva hoy sus clientes en Notion de
+  verdad, así que no hay datos que migrar.
+- **Google Sheets**: el conector de Google Drive ya disponible puede *crear*
+  y *leer* archivos, pero no tiene ninguna herramienta para actualizar una
+  hoja ya existente (ni añadir filas, ni editar celdas). Automatizar la
+  escritura habría requerido montar de nuevo una autenticación propia contra
+  la API de Google Sheets — la misma complejidad que ya se descartó una vez
+  para Calendar (ver lección en el log).
+- Fernando indicó que no necesita que sea en la nube, solo que sea "operativo,
+  efectivo y eficiente", y que él mismo rellena los datos a mano (son pocos
+  clientes).
+
+Se optó por un **archivo CSV local** (`datos/clientes.csv`), que Fernando edita
+directamente abriéndolo en Excel, y que Claude lee y escribe directamente como
+cualquier archivo del proyecto — sin conectores, sin credenciales, sin
+configuración adicional. Es la opción más simple que cumple el objetivo.
 
 ## Estructura de carpetas
 
@@ -40,13 +63,19 @@ antifragil/
   programas/
     logica.py          # descuento y renovación de un programa individual
     procesar.py         # combina el resumen semanal con los programas actuales
+  clientes/
+    repositorio.py       # lee/escribe datos/clientes.csv
+  datos/
+    clientes.csv          # base de datos real — Fernando la edita en Excel (nunca en Git)
+    clientes.example.csv   # plantilla de ejemplo, sí versionada
   .claude/skills/resumen-semanal/SKILL.md   # orquesta el flujo del paso 1
 ```
 
 `calendar_integration/` y `programas/` contienen solo lógica pura (sin
-credenciales, sin llamadas de red) — la obtención de datos reales (Calendar,
-y más adelante Notion) la hacen los skills a través de los conectores ya
-autorizados.
+credenciales, sin llamadas de red). `clientes/` sí toca disco, pero es un
+archivo local del propio proyecto, no un servicio externo — la obtención de
+eventos reales de Calendar la hacen los skills a través del conector ya
+autorizado.
 
 ### Regla de negocio de `programas/logica.py` (confirmada por Fernando, 2026-07-15)
 
@@ -55,32 +84,36 @@ mismo número de sesiones y las sesiones "de más" de esa semana cuentan ya
 contra el bono nuevo (no se pierden ni se regalan). El bono nuevo queda
 marcado como pendiente de pago.
 
-## Orden de construcción de la V1 (decidido 2026-07-14)
+## Orden de construcción de la V1 (decidido 2026-07-14, ajustado 2026-07-15)
 
 Fernando confirmó que la V1 se construye en pasos pequeños y verificables, no de
 una vez. Orden acordado:
 
 1. Leer Google Calendar y mostrar en pantalla las sesiones detectadas por cliente
-   (PT, CrossFit Lidomare, CrossFit Kids). Sin escritura en ningún sitio todavía.
-2. Añadir la lógica de programas: descuento de sesiones, aviso de "queda una
-   sesión", renovación automática al llegar a cero.
-3. Conectar Notion (con confirmación previa de Fernando antes de escribir).
-4. Conectar Google Sheets (resumen económico semanal/mensual).
+   (PT, CrossFit Lidomare, CrossFit Kids). Sin escritura en ningún sitio todavía. ✅
+2. Lógica de programas (descuento, aviso, renovación) + base de datos de
+   clientes en `datos/clientes.csv`, en vez de Notion (ver decisión arriba). ✅
+3. Unir el paso 1 y el paso 2 en un solo skill semanal: leer Calendar,
+   calcular, mostrar resumen y esperar confirmación de Fernando antes de
+   escribir en `datos/clientes.csv`.
+4. Resumen económico semanal/mensual — probablemente también como archivo
+   local en vez de Google Sheets, a decidir cuando llegue el momento.
 
 Cada paso debe verse funcionando antes de empezar el siguiente.
 
 ## Próximos pasos técnicos pendientes de decidir
 
-- Diseño de la base de datos interna (clientes, programas, sesiones, pagos) —
-  necesaria para el paso 2 (lógica de programas y renovaciones)
-- Confirmar si el conector de Google Sheets/Drive ya está autorizado o hace
-  falta que Fernando lo conecte, cuando lleguemos al paso 4
-- Fernando debe autorizar el conector de Notion cuando lleguemos al paso 3
+- Fernando debe rellenar `datos/clientes.csv` con tarifa, tipo de programa,
+  sesiones totales y restantes de sus clientes actuales
+- Construir el skill del paso 3 (unir Calendar + programas + confirmación)
+- Decidir el formato del resumen económico del paso 4
 
 ## Principios de arquitectura (de SYSTEM_VISION.md)
 
-- Módulos independientes: Google Calendar, Notion, Google Sheets, base de datos
-  interna e interfaz no deben mezclarse en una sola pieza de código.
-- Ninguna escritura en Notion o Google Sheets sin confirmación previa del usuario.
+- Módulos independientes: Calendar, base de datos de clientes, resumen
+  económico e interfaz no deben mezclarse en una sola pieza de código.
+- Ninguna escritura en la base de datos de clientes sin confirmación previa
+  del usuario (antes era "Notion o Sheets"; el principio es el mismo,
+  cambió solo dónde vive el dato — ver decisión del 2026-07-15).
 - Diseñada para escalar a futuros módulos (fisioterapia, nutrición, psicología,
   finanzas, etc.) sin rehacer la base.

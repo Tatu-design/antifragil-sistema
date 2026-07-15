@@ -43,3 +43,24 @@ ir del conector al script de clasificación sin transcripción manual
 intermedia (guardarlo en un archivo o pasarlo directo). Si en algún punto no
 es posible evitar un paso manual, decirlo explícitamente y pedir que el
 usuario verifique el resultado antes de darlo por bueno.
+
+## 2026-07-15 — El conector de Google Drive no permite escribir/actualizar archivos existentes
+
+**Qué pasó:** Al planear guardar la base de datos de clientes en Google
+Sheets, se comprobó qué herramientas ofrece el conector de Google Drive ya
+disponible. Solo permite crear archivos nuevos (`create_file`), copiarlos
+(`copy_file`) y leer contenido (`read_file_content`, `download_file_content`)
+— no hay ninguna herramienta para actualizar celdas o filas de una hoja ya
+existente.
+
+**Por qué pasó:** Se asumió que "ya hay un conector de Google conectado"
+significaba que se podía leer y escribir igual que con Calendar, sin
+comprobar qué operaciones concretas expone cada conector.
+
+**Qué se hace distinto a partir de ahora:** Antes de diseñar un flujo que
+necesite escribir datos, comprobar explícitamente (con ToolSearch) qué
+operaciones de escritura existen realmente para ese conector en concreto —
+"está conectado" no implica "se puede escribir ahí". Si la escritura no está
+disponible, preferir una alternativa simple bajo control total (como un
+archivo local) antes que montar una autenticación propia solo para poder
+escribir.
