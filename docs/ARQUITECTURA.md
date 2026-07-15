@@ -9,8 +9,10 @@
   Solo lectura, no escribe todavía en ningún sitio.
 - Paso 2 construido: lógica de descuento/renovación de programas
   (`programas/logica.py`, `programas/procesar.py`) y base de datos de
-  clientes en `datos/clientes.csv` (`clientes/repositorio.py`). Probado de
-  punta a punta con datos de ejemplo.
+  clientes en `datos/clientes.xlsx`, un Excel con formato (colores,
+  desplegables, filtros) generado por `clientes/generar_plantilla.py` y
+  leído/escrito por `clientes/repositorio.py`. Probado de punta a punta con
+  datos de ejemplo.
 
 ## Stack técnico (decidido 2026-07-14, revisado el mismo día)
 
@@ -23,7 +25,7 @@ calendario directamente a través de ese conector, ya autorizado.
 | Lectura de Calendar | Conector `claude.ai Google Calendar` (ya autorizado) | Ya existe y funciona; construir una autenticación propia (OAuth/cuenta de servicio) habría sido complejidad innecesaria — ver lección en `.claude/skills/lessons-learned/log.md` |
 | Clasificación de sesiones | Python puro, sin dependencias externas (`calendar_integration/parser.py`, `summary.py`) | Lógica determinista (no "a ojo" por IA) para que el conteo de sesiones sea siempre reproducible |
 | Interfaz | Conversación con Claude Code (skill `resumen-semanal`) | No hace falta una app aparte: Fernando pide el resumen y Claude lo genera usando el conector + el script de clasificación |
-| Base de datos de clientes/programas | Archivo local `datos/clientes.csv` (`clientes/repositorio.py`) | Ver decisión del 2026-07-15 más abajo |
+| Base de datos de clientes/programas | Excel local `datos/clientes.xlsx`, con formato (`clientes/repositorio.py`, `openpyxl`) | Ver decisión del 2026-07-15 más abajo — Fernando pidió explícitamente que fuera "bonito y profesional", no un CSV plano |
 
 Se descartó Streamlit + SQLite + cuenta de servicio de Google Cloud (construido
 y luego eliminado el mismo día) porque duplicaba algo que ya existía.
@@ -47,10 +49,18 @@ Google Sheets para el resumen económico. Se cambió por lo siguiente:
   efectivo y eficiente", y que él mismo rellena los datos a mano (son pocos
   clientes).
 
-Se optó por un **archivo CSV local** (`datos/clientes.csv`), que Fernando edita
-directamente abriéndolo en Excel, y que Claude lee y escribe directamente como
-cualquier archivo del proyecto — sin conectores, sin credenciales, sin
-configuración adicional. Es la opción más simple que cumple el objetivo.
+Se optó por un **archivo Excel local** (`datos/clientes.xlsx`), que Fernando
+edita directamente abriéndolo en Excel, y que Claude lee y escribe
+directamente como cualquier archivo del proyecto — sin conectores, sin
+credenciales, sin configuración adicional. Es la opción más simple que
+cumple el objetivo.
+
+Primera versión: se generó como CSV plano, pero Fernando pidió un Excel
+"bonito y profesional" para rellenar los datos a gusto. Se regeneró como
+`.xlsx` con `openpyxl` (título, colores, cabecera fija, filtro, desplegable
+Sí/No para "pendiente de pago" y resaltado en rojo/verde). Al escribir las
+actualizaciones semanales solo se cambian valores de celda, nunca el
+formato, así que el aspecto no se pierde con el uso.
 
 ## Estructura de carpetas
 
@@ -64,10 +74,11 @@ antifragil/
     logica.py          # descuento y renovación de un programa individual
     procesar.py         # combina el resumen semanal con los programas actuales
   clientes/
-    repositorio.py       # lee/escribe datos/clientes.csv
+    generar_plantilla.py  # crea datos/clientes.xlsx con formato (una sola vez)
+    repositorio.py         # lee/escribe datos/clientes.xlsx
   datos/
-    clientes.csv          # base de datos real — Fernando la edita en Excel (nunca en Git)
-    clientes.example.csv   # plantilla de ejemplo, sí versionada
+    clientes.xlsx           # base de datos real, con formato (nunca en Git)
+    clientes.example.csv     # plantilla de ejemplo (estructura de columnas), sí versionada
   .claude/skills/resumen-semanal/SKILL.md   # orquesta el flujo del paso 1
 ```
 
@@ -92,10 +103,10 @@ una vez. Orden acordado:
 1. Leer Google Calendar y mostrar en pantalla las sesiones detectadas por cliente
    (PT, CrossFit Lidomare, CrossFit Kids). Sin escritura en ningún sitio todavía. ✅
 2. Lógica de programas (descuento, aviso, renovación) + base de datos de
-   clientes en `datos/clientes.csv`, en vez de Notion (ver decisión arriba). ✅
+   clientes en `datos/clientes.xlsx`, en vez de Notion (ver decisión arriba). ✅
 3. Unir el paso 1 y el paso 2 en un solo skill semanal: leer Calendar,
    calcular, mostrar resumen y esperar confirmación de Fernando antes de
-   escribir en `datos/clientes.csv`.
+   escribir en `datos/clientes.xlsx`.
 4. Resumen económico semanal/mensual — probablemente también como archivo
    local en vez de Google Sheets, a decidir cuando llegue el momento.
 
@@ -103,7 +114,7 @@ Cada paso debe verse funcionando antes de empezar el siguiente.
 
 ## Próximos pasos técnicos pendientes de decidir
 
-- Fernando debe rellenar `datos/clientes.csv` con tarifa, tipo de programa,
+- Fernando debe rellenar `datos/clientes.xlsx` con tarifa, tipo de programa,
   sesiones totales y restantes de sus clientes actuales
 - Construir el skill del paso 3 (unir Calendar + programas + confirmación)
 - Decidir el formato del resumen económico del paso 4
