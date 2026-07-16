@@ -27,12 +27,21 @@
   mes en cuanto Fernando indica la facturación mensual total.
 - Dashboard móvil (2026-07-16): página privada publicada como Artifact de
   Claude (no requiere servidor propio) mostrando el resumen semanal/mensual
-  para verlo cómodo desde el móvil:
+  y el estado de cada cliente, para verlo cómodo desde el móvil:
   https://claude.ai/code/artifact/eab83d88-cb41-41a3-8040-d5915d5a7079 —
   **no se actualiza sola**; hay que republicar el mismo archivo después de
   cada cierre semanal para que refleje los datos nuevos. Fuente:
-  `dashboard.html` (se regenera con los datos de `datos/facturacion.xlsx`,
-  no vive en el repositorio de código porque son datos, no lógica).
+  `dashboard.html` (se regenera con los datos de `datos/clientes.xlsx` y
+  `datos/facturacion.xlsx`, no vive en el repositorio de código porque son
+  datos, no lógica). Es **de solo lectura**: Fernando pidió poder editar
+  también desde la web sin tocar el Excel, y se decidió no hacerlo — un
+  Artifact no puede escribir en un archivo del ordenador de Fernando; para
+  eso haría falta un servidor y una base de datos reales, que es justo la
+  complejidad que `SYSTEM_VISION.md` pide evitar en esta fase. Fernando
+  sigue pidiendo los cambios por chat y Claude actualiza el Excel — el
+  Excel pasa a ser "el cuaderno de Claude", no algo que Fernando necesite
+  abrir. La idea de dar acceso a los propios clientes a su perfil queda
+  aparcada como módulo futuro (requeriría cuentas de usuario reales).
 
 ## Stack técnico (decidido 2026-07-14, revisado el mismo día)
 
