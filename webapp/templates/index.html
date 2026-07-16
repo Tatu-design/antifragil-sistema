@@ -8,8 +8,13 @@
 </head>
 <body>
   <div class="page">
-    <h1>Antifrágil · Clientes</h1>
-    <p class="subtitulo">Vista en directo desde datos/clientes.xlsx</p>
+    <div class="cabecera-pagina">
+      <div>
+        <h1>Antifrágil · Clientes</h1>
+        <p class="subtitulo">Vista en directo desde datos/clientes.xlsx</p>
+      </div>
+      <a class="boton-nuevo" href="{{ url_for('nuevo') }}">+ Nuevo</a>
+    </div>
 
     {% if guardado %}
     <div class="aviso-guardado">✔ Guardado: {{ guardado }}</div>
@@ -29,7 +34,7 @@
         <div class="programa">{{ cliente.tipo_programa or "sin programa asignado" }}</div>
         {% if cliente.sesiones_totales %}
         <div class="meta">
-          {{ cliente.sesiones_llevadas }} de {{ cliente.sesiones_totales }} sesiones
+          {{ cliente.sesiones_completadas }} de {{ cliente.sesiones_totales }} sesiones
           · quedan {{ cliente.sesiones_restantes }}
         </div>
         {% else %}

@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>No se pudo guardar — Antifrágil</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+  <div class="page">
+    <a class="volver" href="{{ url_for('inicio') }}">← Volver</a>
+    <h1>No se pudo guardar</h1>
+    <div class="aviso-error">{{ mensaje }}</div>
+  </div>
+</body>
+</html>

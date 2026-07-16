@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Nuevo cliente — Antifrágil</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+  <div class="page">
+    <a class="volver" href="{{ url_for('inicio') }}">← Volver</a>
+    <h1>Nuevo cliente</h1>
+
+    {% if error %}
+    <div class="aviso-error">{{ error }}</div>
+    {% endif %}
+
+    <form class="formulario" method="post" action="{{ url_for('confirmar_nuevo') }}">
+      <label class="campo">
+        <span>Nombre</span>
+        <input type="text" name="nombre" required autofocus />
+      </label>
+
+      <label class="campo">
+        <span>Tipo de programa</span>
+        <select name="tipo_programa" required>
+          {% for tipo in tipos_programa %}
+          <option value="{{ tipo }}">{{ tipo }}</option>
+          {% endfor %}
+        </select>
+      </label>
+
+      <label class="campo">
+        <span>Sesiones completadas</span>
+        <input type="number" name="sesiones_completadas" value="0" min="0" required />
+      </label>
+
+      <label class="campo-check">
+        <input type="checkbox" name="pendiente_pago" />
+        <span>Pendiente de pago</span>
+      </label>
+
+      <button type="submit" class="boton">Revisar y crear</button>
+    </form>
+  </div>
+</body>
+</html>

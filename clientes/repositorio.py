@@ -45,10 +45,10 @@ def _tabla_programas(wb) -> dict[str, tuple]:
 
 def leer_clientes(ruta: Path = RUTA_POR_DEFECTO) -> dict[str, dict]:
     """Devuelve {cliente: {fila, tipo_programa, tarifa, sesiones_totales,
-    sesiones_llevadas, pendiente_pago}} tal cual está en el Excel.
+    sesiones_completadas, pendiente_pago}} tal cual está en el Excel.
 
-    Fernando anota las sesiones "llevadas" (consumidas del bono actual), no
-    las que le quedan — así lo pidió el 2026-07-15. `a_programa` hace la
+    Fernando anota las sesiones "completadas" (consumidas del bono actual),
+    no las que le quedan — así lo pidió el 2026-07-15. `a_programa` hace la
     conversión a "restantes" para la lógica de `programas`.
 
     Tarifa y sesiones totales son fórmulas en el Excel (VLOOKUP contra la
@@ -80,7 +80,7 @@ def leer_clientes(ruta: Path = RUTA_POR_DEFECTO) -> dict[str, dict]:
             "tipo_programa": tipo_programa,
             "tarifa": tarifa,
             "sesiones_totales": sesiones_totales,
-            "sesiones_llevadas": hoja[f"E{fila}"].value,
+            "sesiones_completadas": hoja[f"E{fila}"].value,
             "pendiente_pago": hoja[f"F{fila}"].value,
         }
         fila += 1
@@ -90,7 +90,7 @@ def leer_clientes(ruta: Path = RUTA_POR_DEFECTO) -> dict[str, dict]:
 
 def a_programa(fila: dict) -> dict | None:
     """Convierte una fila en el formato que espera `programas.procesar`
-    (que trabaja en "sesiones restantes", no "llevadas").
+    (que trabaja en "sesiones restantes", no "completadas").
 
     Devuelve None si al cliente le faltan datos por rellenar (tarifa,
     sesiones totales, etc.) — así se puede avisar a Fernando en vez de
@@ -98,9 +98,9 @@ def a_programa(fila: dict) -> dict | None:
     """
     try:
         sesiones_totales = int(fila["sesiones_totales"])
-        sesiones_llevadas = int(fila["sesiones_llevadas"])
+        sesiones_completadas = int(fila["sesiones_completadas"])
         return {
-            "sesiones_restantes": sesiones_totales - sesiones_llevadas,
+            "sesiones_restantes": sesiones_totales - sesiones_completadas,
             "sesiones_totales": sesiones_totales,
             "pendiente_pago": str(fila["pendiente_pago"]).strip().lower() in ("sí", "si"),
         }
@@ -170,21 +170,88 @@ def _asegurar_validaciones(wb) -> None:
         validacion.add(f"F{PRIMERA_FILA_DATOS}:F{ULTIMA_FILA_CON_HUECO}")
 
 
+def listar_tipos_programa(ruta: Path = RUTA_POR_DEFECTO) -> list[str]:
+    """Nombres de programa disponibles (hoja "Programas"), para rellenar el
+    desplegable de la web app — la misma lista que usa el Excel."""
+    wb = load_workbook(ruta, data_only=True)
+    return list(_tabla_programas(wb).keys())
+
+
+def _primera_fila_libre(hoja) -> int:
+    fila = PRIMERA_FILA_DATOS
+    while hoja[f"A{fila}"].value:
+        fila += 1
+    if fila > ULTIMA_FILA_CON_HUECO:
+        raise ValueError(
+            "No quedan filas preparadas en el Excel para un cliente nuevo. "
+            "Pídele a Claude que amplíe la plantilla."
+        )
+    return fila
+
+
+def crear_cliente(
+    nombre: str,
+    tipo_programa: str,
+    sesiones_completadas: int,
+    pendiente_pago: bool,
+    ruta: Path = RUTA_POR_DEFECTO,
+) -> None:
+    """Da de alta un cliente nuevo en la siguiente fila libre (ya preparada
+    con el desplegable y las fórmulas de tarifa/sesiones — ver
+    `clientes/generar_plantilla.py`)."""
+    nombre = nombre.strip()
+    if not nombre:
+        raise ValueError("El nombre del cliente no puede estar vacío")
+
+    clientes = leer_clientes(ruta)
+    if nombre in clientes:
+        raise ValueError(f"Ya existe un cliente llamado '{nombre}'")
+
+    wb = load_workbook(ruta)
+    hoja = wb[HOJA]
+    fila = _primera_fila_libre(hoja)
+
+    hoja[f"A{fila}"] = nombre
+    hoja[f"B{fila}"] = tipo_programa
+    hoja[f"E{fila}"] = sesiones_completadas
+    hoja[f"F{fila}"] = "Sí" if pendiente_pago else "No"
+
+    _asegurar_validaciones(wb)
+    wb.save(ruta)
+
+
 def actualizar_cliente(
-    nombre: str, sesiones_llevadas: int, pendiente_pago: bool, ruta: Path = RUTA_POR_DEFECTO
+    nombre: str,
+    nuevo_nombre: str,
+    tipo_programa: str,
+    sesiones_completadas: int,
+    pendiente_pago: bool,
+    ruta: Path = RUTA_POR_DEFECTO,
 ) -> None:
     """Edición manual de un cliente concreto (usada por la web app):
-    escribe sesiones llevadas y pendiente de pago directamente, sin pasar
-    por la lógica de renovación de `programas.procesar` — es una
-    corrección puntual, no un cierre semanal."""
+    escribe nombre, tipo de programa, sesiones completadas y pendiente de
+    pago directamente, sin pasar por la lógica de renovación de
+    `programas.procesar` — es una corrección puntual, no un cierre semanal.
+
+    Si `nuevo_nombre` es distinto de `nombre`, cambia también el nombre del
+    cliente (ver aviso en la web: hay que renombrar igual las sesiones en
+    Google Calendar, si no dejarían de reconocerse)."""
+    nuevo_nombre = nuevo_nombre.strip()
+    if not nuevo_nombre:
+        raise ValueError("El nombre del cliente no puede estar vacío")
+
     clientes = leer_clientes(ruta)
     if nombre not in clientes:
         raise ValueError(f"No existe el cliente '{nombre}'")
+    if nuevo_nombre != nombre and nuevo_nombre in clientes:
+        raise ValueError(f"Ya existe un cliente llamado '{nuevo_nombre}'")
 
     fila = clientes[nombre]["fila"]
     wb = load_workbook(ruta)
     hoja = wb[HOJA]
-    hoja[f"E{fila}"] = sesiones_llevadas
+    hoja[f"A{fila}"] = nuevo_nombre
+    hoja[f"B{fila}"] = tipo_programa
+    hoja[f"E{fila}"] = sesiones_completadas
     hoja[f"F{fila}"] = "Sí" if pendiente_pago else "No"
 
     _asegurar_validaciones(wb)
@@ -194,10 +261,10 @@ def actualizar_cliente(
 def aplicar_actualizaciones(
     resultados: dict[str, ActualizacionPrograma], ruta: Path = RUTA_POR_DEFECTO
 ) -> None:
-    """Escribe en el Excel las sesiones llevadas y el pendiente de pago ya
-    calculados (convirtiendo de "restantes" a "llevadas"). Solo se llama
-    después de que Fernando confirme el resumen. Solo se tocan valores de
-    celda: el formato del Excel no cambia."""
+    """Escribe en el Excel las sesiones completadas y el pendiente de pago
+    ya calculados (convirtiendo de "restantes" a "completadas"). Solo se
+    llama después de que Fernando confirme el resumen. Solo se tocan
+    valores de celda: el formato del Excel no cambia."""
     clientes = leer_clientes(ruta)
     wb = load_workbook(ruta)
     hoja = wb[HOJA]

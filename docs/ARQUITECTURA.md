@@ -112,12 +112,12 @@ sin intervención de Fernando. Sigue siendo buena idea que abra y guarde el
 Excel de vez en cuando para que el propio archivo se vea correcto si lo
 abre él.
 
-Fernando también pidió (2026-07-15) anotar las **sesiones llevadas**
-(consumidas del bono actual) en vez de las que quedan — le resulta más
-natural. La columna E del Excel se llama "Sesiones llevadas";
-`clientes/repositorio.py` convierte a "restantes" (`sesiones_totales -
-sesiones_llevadas`) solo para alimentar `programas/procesar.py`, cuya
-lógica interna no cambió.
+Fernando también pidió (2026-07-15) anotar las sesiones consumidas del bono
+actual en vez de las que quedan — le resulta más natural. La columna E del
+Excel se llama **"Sesiones completadas"** (renombrada así el 2026-07-16;
+antes se llamó "Sesiones llevadas"). `clientes/repositorio.py` convierte a
+"restantes" (`sesiones_totales - sesiones_completadas`) solo para alimentar
+`programas/procesar.py`, cuya lógica interna no cambió.
 
 ## Estructura de carpetas
 

@@ -9,13 +9,26 @@
 <body>
   <div class="page">
     <a class="volver" href="{{ url_for('inicio') }}">← Volver</a>
-    <h1>Editar · {{ nombre }}</h1>
-    <p class="subtitulo">{{ cliente.tipo_programa }}</p>
+    <h1>Editar cliente</h1>
 
     <form class="formulario" method="post" action="{{ url_for('confirmar', nombre=nombre) }}">
       <label class="campo">
-        <span>Sesiones llevadas (de {{ cliente.sesiones_totales }})</span>
-        <input type="number" name="sesiones_llevadas" value="{{ cliente.sesiones_llevadas }}" min="0" required />
+        <span>Nombre</span>
+        <input type="text" name="nombre" value="{{ nombre }}" required />
+      </label>
+
+      <label class="campo">
+        <span>Tipo de programa</span>
+        <select name="tipo_programa" required>
+          {% for tipo in tipos_programa %}
+          <option value="{{ tipo }}" {% if tipo == cliente.tipo_programa %}selected{% endif %}>{{ tipo }}</option>
+          {% endfor %}
+        </select>
+      </label>
+
+      <label class="campo">
+        <span>Sesiones completadas (de {{ cliente.sesiones_totales }})</span>
+        <input type="number" name="sesiones_completadas" value="{{ cliente.sesiones_completadas }}" min="0" required />
       </label>
 
       <label class="campo-check">
@@ -25,6 +38,8 @@
 
       <button type="submit" class="boton">Revisar cambios</button>
     </form>
+
+    <p class="aviso-texto">Si cambias el nombre, recuerda renombrar igual las sesiones en Google Calendar — si no, el sistema dejará de reconocerlas.</p>
   </div>
 </body>
 </html>

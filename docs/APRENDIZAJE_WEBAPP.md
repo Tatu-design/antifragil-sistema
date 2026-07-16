@@ -17,9 +17,11 @@ en su propia rama (`feat/webapp-flask`) y con su propio ritmo.
 1. **✅ Hecho (2026-07-16):** web app local de solo lectura. Muestra los
    clientes de `datos/clientes.xlsx` en una página web sencilla, corriendo
    en el propio ordenador de Fernando.
-2. **✅ Hecho (2026-07-16):** edición desde la web (sesiones llevadas,
-   pendiente de pago), con pantalla de confirmación "antes → después" antes
-   de guardar — nunca se escribe directamente desde el formulario.
+2. **✅ Hecho (2026-07-16):** crear clientes nuevos y editar nombre, tipo de
+   programa, sesiones completadas y pendiente de pago, todo desde la web
+   (Fernando ya no necesita abrir el Excel para el día a día). Pantalla de
+   confirmación "antes → después" antes de guardar — nunca se escribe
+   directamente desde el formulario.
 3. Poner la web accesible desde internet (aprender qué es "alojar" una app,
    con sus costes y responsabilidades).
 4. Cuentas de acceso por cliente (aprender autenticación — cada cliente ve
@@ -78,15 +80,29 @@ ninguna ventana visible:
 Para desactivar el arranque automático: borrar ese archivo `.vbs` de la
 carpeta de Inicio.
 
-## Cómo funciona el paso 2 (edición)
+## Cómo funciona el paso 2 (crear y editar)
 
-Flujo en tres pantallas, para nunca guardar sin querer:
+Mismo flujo en tres pantallas para ambos casos, para nunca guardar sin querer:
 
-1. `/cliente/<nombre>/editar` — formulario con los valores actuales.
-2. Al enviarlo, `/cliente/<nombre>/confirmar` — muestra "antes → después" y
-   **todavía no ha guardado nada**.
-3. Solo al pulsar "Confirmar y guardar" se llama a
-   `clientes.repositorio.actualizar_cliente()`, que escribe en el Excel.
+- **Crear**: `/cliente/nuevo` (formulario vacío) → `/cliente/nuevo/confirmar`
+  (revisar, nada guardado aún) → `/cliente/nuevo/guardar` (llama a
+  `clientes.repositorio.crear_cliente()`).
+- **Editar**: `/cliente/<nombre>/editar` (formulario con los valores
+  actuales: nombre, tipo de programa, sesiones completadas, pendiente de
+  pago) → `/cliente/<nombre>/confirmar` (antes → después) →
+  `/cliente/<nombre>/guardar` (llama a `clientes.repositorio.actualizar_cliente()`).
+
+El nombre del cliente también se puede cambiar desde el editor — la web
+avisa de que hay que renombrar igual las sesiones en Google Calendar, o el
+sistema dejaría de reconocerlas (el nombre es la clave que cruza Calendar
+con el Excel).
+
+**Errores manejados con mensajes claros** (antes daban un error genérico
+de servidor):
+- Excel abierto al intentar guardar (`PermissionError`) → aviso pidiendo
+  cerrarlo.
+- Nombre repetido o vacío al crear/renombrar (`ValueError`) → aviso
+  explicando el motivo.
 
 Al probarlo se descubrió que guardar desde la web (con `openpyxl`) borra el
 valor calculado de tarifa/sesiones de **todos** los clientes, no solo del
@@ -95,6 +111,10 @@ editado — es una limitación conocida de esa librería. Se arregló en
 recalcula en Python contra la hoja "Programas", así que no hace falta
 reabrir el Excel para que el sistema siga funcionando bien (ver log de
 lecciones aprendidas, 2026-07-16).
+
+**Terminología (2026-07-16):** "sesiones llevadas" pasó a llamarse
+**"sesiones completadas"** en todo el proyecto (código, Excel, web) a
+petición de Fernando.
 
 ## Reglas de este proyecto
 

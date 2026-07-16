@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Confirmar cliente nuevo — Antifrágil</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+  <div class="page">
+    <a class="volver" href="{{ url_for('nuevo') }}">← Volver</a>
+    <h1>Confirmar cliente nuevo</h1>
+    <p class="subtitulo">Todavía no se ha guardado nada. Revisa:</p>
+
+    <div class="lista comparativa">
+      <div class="fila"><span class="etiqueta">Nombre</span><span class="despues">{{ nombre }}</span></div>
+      <div class="fila"><span class="etiqueta">Tipo de programa</span><span class="despues">{{ tipo_programa }}</span></div>
+      <div class="fila"><span class="etiqueta">Sesiones completadas</span><span class="despues">{{ sesiones_completadas }}</span></div>
+      <div class="fila"><span class="etiqueta">Pendiente de pago</span><span class="despues">{{ "Sí" if pendiente_pago else "No" }}</span></div>
+    </div>
+
+    <p class="aviso-texto">Recuerda que en Google Calendar las sesiones de este cliente deben escribirse exactamente como "PT {{ nombre }}" para que el sistema las reconozca.</p>
+
+    <form method="post" action="{{ url_for('guardar_nuevo') }}">
+      <input type="hidden" name="nombre" value="{{ nombre }}" />
+      <input type="hidden" name="tipo_programa" value="{{ tipo_programa }}" />
+      <input type="hidden" name="sesiones_completadas" value="{{ sesiones_completadas }}" />
+      <input type="hidden" name="pendiente_pago" value="{{ 'si' if pendiente_pago else 'no' }}" />
+      <button type="submit" class="boton">Confirmar y crear</button>
+    </form>
+  </div>
+</body>
+</html>

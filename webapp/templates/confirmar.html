@@ -9,15 +9,27 @@
 <body>
   <div class="page">
     <a class="volver" href="{{ url_for('editar', nombre=nombre) }}">← Volver a editar</a>
-    <h1>Confirmar · {{ nombre }}</h1>
-    <p class="subtitulo">Todavía no se ha guardado nada. Revisa el cambio:</p>
+    <h1>Confirmar cambios</h1>
+    <p class="subtitulo">Todavía no se ha guardado nada. Revisa:</p>
 
     <div class="lista comparativa">
       <div class="fila">
-        <span class="etiqueta">Sesiones llevadas</span>
-        <span class="antes">{{ antes.sesiones_llevadas }}</span>
+        <span class="etiqueta">Nombre</span>
+        <span class="antes">{{ antes.nombre }}</span>
         <span class="flecha">→</span>
-        <span class="despues">{{ despues.sesiones_llevadas }}</span>
+        <span class="despues">{{ despues.nombre }}</span>
+      </div>
+      <div class="fila">
+        <span class="etiqueta">Tipo de programa</span>
+        <span class="antes">{{ antes.tipo_programa }}</span>
+        <span class="flecha">→</span>
+        <span class="despues">{{ despues.tipo_programa }}</span>
+      </div>
+      <div class="fila">
+        <span class="etiqueta">Sesiones completadas</span>
+        <span class="antes">{{ antes.sesiones_completadas }}</span>
+        <span class="flecha">→</span>
+        <span class="despues">{{ despues.sesiones_completadas }}</span>
       </div>
       <div class="fila">
         <span class="etiqueta">Pendiente de pago</span>
@@ -27,8 +39,14 @@
       </div>
     </div>
 
+    {% if antes.nombre != despues.nombre %}
+    <p class="aviso-texto">⚠ Vas a cambiar el nombre. Recuerda renombrar también las sesiones en Google Calendar.</p>
+    {% endif %}
+
     <form method="post" action="{{ url_for('guardar', nombre=nombre) }}">
-      <input type="hidden" name="sesiones_llevadas" value="{{ despues.sesiones_llevadas }}" />
+      <input type="hidden" name="nombre" value="{{ despues.nombre }}" />
+      <input type="hidden" name="tipo_programa" value="{{ despues.tipo_programa }}" />
+      <input type="hidden" name="sesiones_completadas" value="{{ despues.sesiones_completadas }}" />
       <input type="hidden" name="pendiente_pago" value="{{ 'si' if despues.pendiente_pago else 'no' }}" />
       <button type="submit" class="boton">Confirmar y guardar</button>
     </form>

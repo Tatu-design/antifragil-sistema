@@ -29,7 +29,7 @@ regla de seguridad no negociable del proyecto.
    hoy). Esto NO escribe nada — solo calcula, usando los datos actuales de
    `datos/clientes.xlsx`.
 5. Presentar el resultado a Fernando en una tabla clara:
-   - Por cliente: sesiones consumidas esta semana, sesiones llevadas
+   - Por cliente: sesiones consumidas esta semana, sesiones completadas
      nuevas, si se renueva el bono, si queda pendiente de pago, aviso de
      "última sesión".
    - Económico: facturación total, horas totales y precio medio por hora
@@ -41,7 +41,7 @@ regla de seguridad no negociable del proyecto.
      ninguna fila del Excel — pedir revisión (puede ser un alias distinto,
      un cliente nuevo sin dar de alta, o un error de escritura).
    - `incompletos_datos`: clientes del Excel a los que les falta tipo de
-     programa o sesiones llevadas.
+     programa o sesiones completadas.
 6. **Esperar la confirmación explícita de Fernando** antes de continuar.
    Si hay `sin_programa` o `incompletos_datos`, dejarlo claro y no asumir
    nada por él.
