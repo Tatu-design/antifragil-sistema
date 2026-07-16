@@ -95,4 +95,8 @@ def guardar(nombre):
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    # debug=False a propósito: esta app va a quedar arrancada de forma
+    # permanente (tarea de Windows), y el modo de depuración de Flask deja
+    # accesible una consola que podría ejecutar código arbitrario si algún
+    # día la app fuera visible desde la red — ver docs/APRENDIZAJE_WEBAPP.md.
+    app.run(debug=False)

@@ -54,6 +54,30 @@ Luego abre `http://127.0.0.1:5000/` en el navegador de tu propio ordenador.
 De momento **no es accesible desde el móvil** — corre solo en tu máquina
 (eso es precisamente el milestone 3).
 
+### Arranque automático (2026-07-16)
+
+Fernando pidió no depender de pedirle a Claude que la encienda cada vez.
+Se configuró para que arranque sola al iniciar sesión en Windows, sin
+ninguna ventana visible:
+
+- Archivo: `C:\Users\usuario\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\antifragil_webapp.vbs`
+  (fuera del repositorio de código a propósito — es configuración de este
+  ordenador concreto, no del proyecto).
+- Ejecuta `pythonw.exe -m webapp.app` (la variante de Python sin consola)
+  con el directorio de trabajo puesto en la carpeta del proyecto.
+- **Por qué la carpeta de Inicio y no el Programador de tareas de
+  Windows:** se intentó primero con `Register-ScheduledTask`/`schtasks`,
+  pero el entorno donde Claude ejecuta comandos no tiene permiso para crear
+  tareas programadas ("Acceso denegado"). Colocar un script en la carpeta
+  de Inicio logra el mismo resultado (arrancar algo al iniciar sesión) sin
+  necesitar esos permisos.
+- Por el mismo motivo se cambió `app.run(debug=True)` a `debug=False` en
+  `webapp/app.py`: el modo de depuración de Flask no es seguro para algo
+  que va a quedar corriendo de forma permanente.
+
+Para desactivar el arranque automático: borrar ese archivo `.vbs` de la
+carpeta de Inicio.
+
 ## Cómo funciona el paso 2 (edición)
 
 Flujo en tres pantallas, para nunca guardar sin querer:
