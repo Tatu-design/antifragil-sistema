@@ -25,6 +25,14 @@
   (`economia/cli.py`). CrossFit Kids se factura por mensualidad: se cuenta
   en sesiones pero su importe se reparte hacia atrás sobre las semanas del
   mes en cuanto Fernando indica la facturación mensual total.
+- Dashboard móvil (2026-07-16): página privada publicada como Artifact de
+  Claude (no requiere servidor propio) mostrando el resumen semanal/mensual
+  para verlo cómodo desde el móvil:
+  https://claude.ai/code/artifact/eab83d88-cb41-41a3-8040-d5915d5a7079 —
+  **no se actualiza sola**; hay que republicar el mismo archivo después de
+  cada cierre semanal para que refleje los datos nuevos. Fuente:
+  `dashboard.html` (se regenera con los datos de `datos/facturacion.xlsx`,
+  no vive en el repositorio de código porque son datos, no lógica).
 
 ## Stack técnico (decidido 2026-07-14, revisado el mismo día)
 
