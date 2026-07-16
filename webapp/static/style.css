@@ -1,0 +1,95 @@
+:root {
+  --paper: #f5f2ea;
+  --paper-raised: #ffffff;
+  --ink: #1c2321;
+  --ink-soft: #55605c;
+  --line: #ded8c8;
+  --accent: #1f6f63;
+  --accent-soft: #dcede9;
+  --warn: #a4732c;
+  --warn-soft: #f3e6d1;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+.page {
+  max-width: 30rem;
+  margin: 0 auto;
+  padding: 1.75rem 1.25rem 3rem;
+}
+
+h1 {
+  font-size: 1.25rem;
+  margin: 0 0 0.15rem;
+}
+
+.subtitulo {
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+  margin: 0 0 1.5rem;
+}
+
+.lista {
+  background: var(--paper-raised);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 0.25rem 1.25rem;
+}
+
+.fila {
+  padding: 0.85rem 0;
+}
+
+.fila + .fila {
+  border-top: 1px solid var(--line);
+}
+
+.cabecera {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.nombre {
+  font-weight: 700;
+  font-size: 0.9375rem;
+}
+
+.pill {
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  padding: 0.25em 0.6em;
+  border-radius: 999px;
+}
+
+.pill.pendiente {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+.pill.aldia {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.programa {
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+  margin-top: 0.15rem;
+}
+
+.meta {
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+  margin-top: 0.35rem;
+  font-variant-numeric: tabular-nums;
+}

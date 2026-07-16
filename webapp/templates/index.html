@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Antifrágil — Clientes</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+  <div class="page">
+    <h1>Antifrágil · Clientes</h1>
+    <p class="subtitulo">Vista en directo desde datos/clientes.xlsx</p>
+
+    <div class="lista">
+      {% for cliente in clientes %}
+      <div class="fila">
+        <div class="cabecera">
+          <span class="nombre">{{ cliente.nombre }}</span>
+          {% if cliente.pendiente_pago %}
+            <span class="pill pendiente">Pendiente</span>
+          {% else %}
+            <span class="pill aldia">Al día</span>
+          {% endif %}
+        </div>
+        <div class="programa">{{ cliente.tipo_programa or "sin programa asignado" }}</div>
+        {% if cliente.sesiones_totales %}
+        <div class="meta">
+          {{ cliente.sesiones_llevadas }} de {{ cliente.sesiones_totales }} sesiones
+          · quedan {{ cliente.sesiones_restantes }}
+        </div>
+        {% else %}
+        <div class="meta">Faltan datos por rellenar en el Excel</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</body>
+</html>
