@@ -101,11 +101,16 @@ orientativos para Fernando; el sistema relaciona tarifa/programa únicamente
 por nombre de cliente contra este Excel, nunca por color (ver lección en el
 log del 2026-07-15).
 
-Nota técnica: tarifa y sesiones totales son fórmulas, no valores fijos —
-Fernando debe guardar el archivo (Ctrl+S) tras elegir un programa (o tras
-cualquier cambio hecho por el sistema) para que Excel las recalcule y
-`clientes/repositorio.py` (que lee con `data_only=True`) pueda ver el
-resultado. Ver lección del 2026-07-15 sobre por qué esto es necesario.
+Nota técnica: tarifa y sesiones totales son fórmulas, no valores fijos.
+Cualquier escritura por código (openpyxl) borra el valor cacheado de
+**todas** las fórmulas del libro, no solo las tocadas — se detectó al
+probar la edición desde la web app (2026-07-16). Para no depender de que
+Fernando reabra Excel y pulse Ctrl+S cada vez, `leer_clientes()` recalcula
+tarifa/sesiones_totales en Python contra la hoja "Programas" (valores
+literales) cuando el valor cacheado viene vacío — el sistema funciona igual
+sin intervención de Fernando. Sigue siendo buena idea que abra y guarde el
+Excel de vez en cuando para que el propio archivo se vea correcto si lo
+abre él.
 
 Fernando también pidió (2026-07-15) anotar las **sesiones llevadas**
 (consumidas del bono actual) en vez de las que quedan — le resulta más

@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Editar {{ nombre }} — Antifrágil</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+  <div class="page">
+    <a class="volver" href="{{ url_for('inicio') }}">← Volver</a>
+    <h1>Editar · {{ nombre }}</h1>
+    <p class="subtitulo">{{ cliente.tipo_programa }}</p>
+
+    <form class="formulario" method="post" action="{{ url_for('confirmar', nombre=nombre) }}">
+      <label class="campo">
+        <span>Sesiones llevadas (de {{ cliente.sesiones_totales }})</span>
+        <input type="number" name="sesiones_llevadas" value="{{ cliente.sesiones_llevadas }}" min="0" required />
+      </label>
+
+      <label class="campo-check">
+        <input type="checkbox" name="pendiente_pago" {% if pendiente_pago %}checked{% endif %} />
+        <span>Pendiente de pago</span>
+      </label>
+
+      <button type="submit" class="boton">Revisar cambios</button>
+    </form>
+  </div>
+</body>
+</html>

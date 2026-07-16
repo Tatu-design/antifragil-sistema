@@ -11,6 +11,10 @@
     <h1>Antifrágil · Clientes</h1>
     <p class="subtitulo">Vista en directo desde datos/clientes.xlsx</p>
 
+    {% if guardado %}
+    <div class="aviso-guardado">✔ Guardado: {{ guardado }}</div>
+    {% endif %}
+
     <div class="lista">
       {% for cliente in clientes %}
       <div class="fila">
@@ -31,6 +35,7 @@
         {% else %}
         <div class="meta">Faltan datos por rellenar en el Excel</div>
         {% endif %}
+        <a class="editar" href="{{ url_for('editar', nombre=cliente.nombre) }}">Editar →</a>
       </div>
       {% endfor %}
     </div>

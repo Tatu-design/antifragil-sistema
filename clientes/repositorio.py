@@ -29,6 +29,20 @@ PRIMERA_FILA_DATOS = 3
 ULTIMA_FILA_CON_HUECO = 30
 
 
+def _tabla_programas(wb) -> dict[str, tuple]:
+    """Lee la hoja "Programas" (valores literales, nunca fórmulas) como
+    {nombre_programa: (tarifa, sesiones_totales)} — sirve de respaldo
+    cuando el valor calculado de la fórmula en "Clientes" no está
+    disponible (ver más abajo)."""
+    hoja = wb[HOJA_PROGRAMAS]
+    tabla: dict[str, tuple] = {}
+    fila = 3
+    while hoja[f"A{fila}"].value:
+        tabla[hoja[f"A{fila}"].value] = (hoja[f"B{fila}"].value, hoja[f"C{fila}"].value)
+        fila += 1
+    return tabla
+
+
 def leer_clientes(ruta: Path = RUTA_POR_DEFECTO) -> dict[str, dict]:
     """Devuelve {cliente: {fila, tipo_programa, tarifa, sesiones_totales,
     sesiones_llevadas, pendiente_pago}} tal cual está en el Excel.
@@ -36,18 +50,36 @@ def leer_clientes(ruta: Path = RUTA_POR_DEFECTO) -> dict[str, dict]:
     Fernando anota las sesiones "llevadas" (consumidas del bono actual), no
     las que le quedan — así lo pidió el 2026-07-15. `a_programa` hace la
     conversión a "restantes" para la lógica de `programas`.
+
+    Tarifa y sesiones totales son fórmulas en el Excel (VLOOKUP contra la
+    hoja "Programas"); si Excel no ha recalculado y guardado el archivo
+    (por ejemplo, justo después de que este mismo código haya escrito algo),
+    el valor cacheado puede venir vacío. En ese caso se recalcula aquí
+    mismo, en Python, contra la misma hoja "Programas" — así no dependemos
+    de que Fernando reabra el Excel y pulse Ctrl+S para que el sistema siga
+    funcionando (lección del 2026-07-15/2026-07-16).
     """
     wb = load_workbook(ruta, data_only=True)
     hoja = wb[HOJA]
+    tabla_programas = _tabla_programas(wb)
 
     clientes: dict[str, dict] = {}
     fila = PRIMERA_FILA_DATOS
     while hoja[f"A{fila}"].value:
+        tipo_programa = hoja[f"B{fila}"].value
+        tarifa = hoja[f"C{fila}"].value
+        sesiones_totales = hoja[f"D{fila}"].value
+
+        if (tarifa is None or sesiones_totales is None) and tipo_programa in tabla_programas:
+            tarifa_respaldo, sesiones_respaldo = tabla_programas[tipo_programa]
+            tarifa = tarifa if tarifa is not None else tarifa_respaldo
+            sesiones_totales = sesiones_totales if sesiones_totales is not None else sesiones_respaldo
+
         clientes[hoja[f"A{fila}"].value] = {
             "fila": fila,
-            "tipo_programa": hoja[f"B{fila}"].value,
-            "tarifa": hoja[f"C{fila}"].value,
-            "sesiones_totales": hoja[f"D{fila}"].value,
+            "tipo_programa": tipo_programa,
+            "tarifa": tarifa,
+            "sesiones_totales": sesiones_totales,
             "sesiones_llevadas": hoja[f"E{fila}"].value,
             "pendiente_pago": hoja[f"F{fila}"].value,
         }
@@ -136,6 +168,27 @@ def _asegurar_validaciones(wb) -> None:
         validacion = DataValidation(type="list", formula1='"Sí,No"', allow_blank=False)
         hoja.add_data_validation(validacion)
         validacion.add(f"F{PRIMERA_FILA_DATOS}:F{ULTIMA_FILA_CON_HUECO}")
+
+
+def actualizar_cliente(
+    nombre: str, sesiones_llevadas: int, pendiente_pago: bool, ruta: Path = RUTA_POR_DEFECTO
+) -> None:
+    """Edición manual de un cliente concreto (usada por la web app):
+    escribe sesiones llevadas y pendiente de pago directamente, sin pasar
+    por la lógica de renovación de `programas.procesar` — es una
+    corrección puntual, no un cierre semanal."""
+    clientes = leer_clientes(ruta)
+    if nombre not in clientes:
+        raise ValueError(f"No existe el cliente '{nombre}'")
+
+    fila = clientes[nombre]["fila"]
+    wb = load_workbook(ruta)
+    hoja = wb[HOJA]
+    hoja[f"E{fila}"] = sesiones_llevadas
+    hoja[f"F{fila}"] = "Sí" if pendiente_pago else "No"
+
+    _asegurar_validaciones(wb)
+    wb.save(ruta)
 
 
 def aplicar_actualizaciones(

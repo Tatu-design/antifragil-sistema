@@ -17,8 +17,9 @@ en su propia rama (`feat/webapp-flask`) y con su propio ritmo.
 1. **✅ Hecho (2026-07-16):** web app local de solo lectura. Muestra los
    clientes de `datos/clientes.xlsx` en una página web sencilla, corriendo
    en el propio ordenador de Fernando.
-2. Añadir edición: formularios para cambiar sesiones/pagos desde la web
-   (aprender inputs, formularios, y cómo guardar datos con seguridad).
+2. **✅ Hecho (2026-07-16):** edición desde la web (sesiones llevadas,
+   pendiente de pago), con pantalla de confirmación "antes → después" antes
+   de guardar — nunca se escribe directamente desde el formulario.
 3. Poner la web accesible desde internet (aprender qué es "alojar" una app,
    con sus costes y responsabilidades).
 4. Cuentas de acceso por cliente (aprender autenticación — cada cliente ve
@@ -53,10 +54,28 @@ Luego abre `http://127.0.0.1:5000/` en el navegador de tu propio ordenador.
 De momento **no es accesible desde el móvil** — corre solo en tu máquina
 (eso es precisamente el milestone 3).
 
+## Cómo funciona el paso 2 (edición)
+
+Flujo en tres pantallas, para nunca guardar sin querer:
+
+1. `/cliente/<nombre>/editar` — formulario con los valores actuales.
+2. Al enviarlo, `/cliente/<nombre>/confirmar` — muestra "antes → después" y
+   **todavía no ha guardado nada**.
+3. Solo al pulsar "Confirmar y guardar" se llama a
+   `clientes.repositorio.actualizar_cliente()`, que escribe en el Excel.
+
+Al probarlo se descubrió que guardar desde la web (con `openpyxl`) borra el
+valor calculado de tarifa/sesiones de **todos** los clientes, no solo del
+editado — es una limitación conocida de esa librería. Se arregló en
+`clientes/repositorio.py`: si el valor calculado no está disponible, se
+recalcula en Python contra la hoja "Programas", así que no hace falta
+reabrir el Excel para que el sistema siga funcionando bien (ver log de
+lecciones aprendidas, 2026-07-16).
+
 ## Reglas de este proyecto
 
 - No toca el flujo real del negocio (Calendar, cierre semanal, dashboard) —
-  es de solo lectura sobre los mismos archivos.
-- Cuando se llegue al paso de escritura (milestone 2), aplican las mismas
-  reglas de seguridad que el resto del proyecto: nunca guardar cambios sin
-  una confirmación clara del usuario.
+  comparte solo la lectura/escritura de `datos/clientes.xlsx` a través del
+  mismo `clientes/repositorio.py`.
+- Ninguna escritura sin pantalla de confirmación previa — misma regla de
+  seguridad que el resto del proyecto.

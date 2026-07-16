@@ -138,3 +138,27 @@ cruce de nombres falla de forma que "no debería poder fallar" (los datos
 están ahí, están bien escritos), sospechar primero de la codificación en
 los bordes de entrada/salida antes de asumir un error de lógica o una
 condición de carrera.
+
+## 2026-07-16 — Guardar desde la web app borró tarifa/sesiones de todos los clientes, no solo del editado
+
+**Qué pasó:** Al probar de punta a punta el primer formulario de edición de
+la web app (paso 2 del proyecto de aprendizaje Flask), tras guardar el
+cambio de un cliente, `leer_clientes()` devolvió `tarifa` y
+`sesiones_totales` en `None` para **todos** los clientes, no solo el
+editado. Ya se sabía (lección del 2026-07-15) que openpyxl borra el valor
+cacheado de las fórmulas al guardar, pero hasta ahora ese problema era
+puntual (una escritura ocasional desde el cierre semanal); con la web app
+la escritura pasa a ser mucho más frecuente, así que la fricción de "avisa
+a Fernando que reabra Excel" se volvía real y constante.
+
+**Por qué pasó:** Se aceptó la limitación de openpyxl como algo a
+comunicar, en vez de preguntarse si se podía evitar por completo.
+
+**Qué se hace distinto a partir de ahora:** `leer_clientes()` ahora
+recalcula tarifa/sesiones_totales en Python (contra la hoja "Programas",
+que son valores literales, no fórmulas) cuando el valor cacheado del Excel
+viene vacío — el sistema deja de depender de que Fernando reabra y guarde
+el Excel. Lección general: cuando una limitación de una librería se puede
+evitar recalculando el resultado por nuestra cuenta con datos que ya
+tenemos, hacerlo — no limitarse a documentar la limitación y pedirle al
+usuario que la compense a mano.
