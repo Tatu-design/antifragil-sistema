@@ -251,3 +251,81 @@ h1 {
   padding: 0.65rem 0.9rem;
   margin-bottom: 1rem;
 }
+
+.nav {
+  display: flex;
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 0.75rem;
+}
+
+.nav a {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--ink-soft);
+  text-decoration: none;
+}
+
+.nav a.activo {
+  color: var(--accent);
+}
+
+.cabecera-seccion {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 1rem 1.25rem 0.5rem;
+  font-size: 0.9375rem;
+  font-weight: 700;
+}
+
+.fecha-seccion {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.metricas {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+  padding: 0.5rem 1.25rem 1.25rem;
+}
+
+.metricas .metrica {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.metricas .label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.metricas .valor {
+  font-family: ui-monospace, "SF Mono", "Roboto Mono", Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.nota {
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+  padding: 0 1.25rem 1rem;
+  margin: 0;
+}
+
+.empty {
+  color: var(--ink-soft);
+  font-size: 0.8125rem;
+  padding: 0.5rem 1.25rem 1.25rem;
+  margin: 0;
+}

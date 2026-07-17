@@ -13,9 +13,13 @@ desde un formulario — antes se muestra una pantalla de "vas a guardar esto"
 y solo al confirmar se escribe en datos/clientes.xlsx.
 """
 
+from datetime import datetime
+
 from flask import Flask, redirect, render_template, request, url_for
 
+from calendar_integration.semana import get_week_range
 from clientes.repositorio import actualizar_cliente, crear_cliente, leer_clientes, listar_tipos_programa
+from economia.registro import obtener_mes, obtener_semana
 
 app = Flask(__name__)
 
@@ -166,6 +170,17 @@ def guardar(nombre):
         return render_template("error.html", mensaje=str(error)), 400
 
     return redirect(url_for("inicio", guardado=request.form["nombre"]))
+
+
+@app.route("/economia")
+def economia():
+    lunes_semana_actual, _ = get_week_range(datetime.now())
+    fecha = lunes_semana_actual.date()
+
+    semana = obtener_semana(fecha.isoformat())
+    mes = obtener_mes(fecha.year, fecha.month)
+
+    return render_template("economia.html", semana=semana, mes=mes, fecha_semana=fecha)
 
 
 if __name__ == "__main__":

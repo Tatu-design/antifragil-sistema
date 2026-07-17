@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Antifrágil — Economía</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+  <div class="page">
+    <nav class="nav">
+      <a href="{{ url_for('inicio') }}">Clientes</a>
+      <a href="{{ url_for('economia') }}" class="activo">Economía</a>
+    </nav>
+
+    <h1>Economía</h1>
+    <p class="subtitulo">Facturación por sesiones hechas (no por pagos recibidos)</p>
+
+    <div class="lista">
+      <div class="cabecera-seccion">
+        <span>Esta semana</span>
+        <span class="fecha-seccion">desde {{ fecha_semana.strftime('%d/%m/%Y') }}</span>
+      </div>
+
+      {% if semana %}
+      <div class="metricas">
+        <div class="metrica">
+          <span class="label">Facturación</span>
+          <span class="valor">{{ "%.2f"|format(semana['Facturación Total']) }} €</span>
+        </div>
+        <div class="metrica">
+          <span class="label">Horas</span>
+          <span class="valor">{{ semana['Horas Totales'] }}</span>
+        </div>
+        <div class="metrica">
+          <span class="label">€ / hora</span>
+          <span class="valor">{{ "%.2f"|format(semana['Precio medio hora Total']) }} €</span>
+        </div>
+      </div>
+      {% if semana['Sesiones CrossFit Kids'] %}
+      <p class="nota">
+        CrossFit Kids: {{ semana['Sesiones CrossFit Kids'] }} sesiones
+        {% if semana['Facturación CrossFit Kids'] is none %}
+        (facturación pendiente de que indiques el importe mensual)
+        {% endif %}
+      </p>
+      {% endif %}
+      {% else %}
+      <p class="empty">Todavía no se ha cerrado ninguna semana de este mes. Se registra al confirmar el cierre semanal.</p>
+      {% endif %}
+    </div>
+
+    <div class="lista" style="margin-top: 1rem;">
+      <div class="cabecera-seccion">
+        <span>Este mes</span>
+      </div>
+
+      {% if mes %}
+      <div class="metricas">
+        <div class="metrica">
+          <span class="label">Facturación</span>
+          <span class="valor">{{ "%.2f"|format(mes['Facturación Total']) }} €</span>
+        </div>
+        <div class="metrica">
+          <span class="label">Horas</span>
+          <span class="valor">{{ mes['Horas Totales'] }}</span>
+        </div>
+        <div class="metrica">
+          <span class="label">€ / hora</span>
+          <span class="valor">{{ "%.2f"|format(mes['Precio medio hora']) }} €</span>
+        </div>
+      </div>
+      {% else %}
+      <p class="empty">Todavía no hay ninguna semana cerrada este mes.</p>
+      {% endif %}
+    </div>
+  </div>
+</body>
+</html>

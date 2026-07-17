@@ -17,11 +17,14 @@ en su propia rama (`feat/webapp-flask`) y con su propio ritmo.
 1. **✅ Hecho (2026-07-16):** web app local de solo lectura. Muestra los
    clientes de `datos/clientes.xlsx` en una página web sencilla, corriendo
    en el propio ordenador de Fernando.
-2. **✅ Hecho (2026-07-16):** crear clientes nuevos y editar nombre, tipo de
-   programa, sesiones completadas y pendiente de pago, todo desde la web
+2. **✅ Hecho (2026-07-16/17):** crear clientes nuevos y editar nombre, tipo
+   de programa, sesiones completadas y pendiente de pago, todo desde la web
    (Fernando ya no necesita abrir el Excel para el día a día). Pantalla de
    confirmación "antes → después" antes de guardar — nunca se escribe
-   directamente desde el formulario.
+   directamente desde el formulario. Se añadió también una pestaña
+   "Economía" (`/economia`) con la facturación semanal y mensual en
+   directo desde `datos/facturacion.xlsx` — antes esto solo estaba en el
+   dashboard publicado (Artifact), que quedaba desconectado de esta web.
 3. Poner la web accesible desde internet (aprender qué es "alojar" una app,
    con sus costes y responsabilidades).
 4. Cuentas de acceso por cliente (aprender autenticación — cada cliente ve
