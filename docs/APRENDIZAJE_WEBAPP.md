@@ -26,7 +26,18 @@ en su propia rama (`feat/webapp-flask`) y con su propio ritmo.
    directo desde `datos/facturacion.xlsx` — antes esto solo estaba en el
    dashboard publicado (Artifact), que quedaba desconectado de esta web.
 3. Poner la web accesible desde internet (aprender qué es "alojar" una app,
-   con sus costes y responsabilidades).
+   con sus costes y responsabilidades). **Decisión tomada (2026-07-17):**
+   antes de alojarla, migrar de Excel a una base de datos real (SQLite para
+   empezar) — la mayoría de alojamientos no garantizan que un archivo como
+   `datos/clientes.xlsx` sobreviva a un reinicio, y es además una lección
+   de aprendizaje real en sí misma. Próximos pasos pendientes:
+   - Diseñar el esquema (tabla de clientes con las mismas columnas de hoy).
+   - Nuevo módulo de acceso a datos con `sqlite3` (sustituye a
+     `clientes/repositorio.py`, que sigue existiendo para el sistema real
+     del negocio con Excel — no se toca).
+   - Migrar los datos actuales del Excel a la base de datos.
+   - Adaptar `webapp/app.py` para leer/escribir de la base de datos.
+   - Solo entonces: elegir dónde alojarla.
 4. Cuentas de acceso por cliente (aprender autenticación — cada cliente ve
    solo lo suyo).
 
