@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Iniciar sesión — Antifrágil</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+  <div class="page">
+    <h1>Antifrágil</h1>
+    <p class="subtitulo">Introduce tu contraseña para continuar</p>
+
+    {% if error %}
+    <div class="aviso-error">{{ error }}</div>
+    {% endif %}
+
+    <form class="formulario" method="post">
+      <label class="campo">
+        <span>Contraseña</span>
+        <input type="password" name="password" required autofocus />
+      </label>
+      <button type="submit" class="boton">Entrar</button>
+    </form>
+  </div>
+</body>
+</html>

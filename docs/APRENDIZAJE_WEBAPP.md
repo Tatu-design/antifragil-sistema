@@ -55,6 +55,17 @@ en su propia rama (`feat/webapp-flask`) y con su propio ritmo.
 
    Pendiente ahora para este milestone: elegir dónde alojar la web app
    (ya no hay archivo local que dificulte esto).
+   **✅ Contraseña añadida (2026-07-18)**, requisito previo a alojarla:
+   sin esto, cualquiera con el enlace vería/editaría los datos de los
+   clientes en cuanto la web fuera pública. `webapp/auth.py` guarda la
+   contraseña como hash (nunca en texto plano) en la propia base de datos
+   (`datos/antifragil.db`, tabla `configuracion`). La primera vez que se
+   arranca la web sin contraseña configurada, pide crear una; después,
+   pide iniciar sesión en cada visita nueva (con "Salir" en el menú).
+   Esto es un login único para Fernando — distinto del milestone 4 (una
+   cuenta por cliente).
+
+   Pendiente: elegir alojamiento (PythonAnywhere) y desplegar.
 4. Cuentas de acceso por cliente (aprender autenticación — cada cliente ve
    solo lo suyo).
 

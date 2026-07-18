@@ -74,3 +74,11 @@ def crear_esquema(ruta: Path = RUTA_POR_DEFECTO) -> None:
             )
             """
         )
+        conexion.execute(
+            """
+            CREATE TABLE IF NOT EXISTS configuracion (
+                clave TEXT PRIMARY KEY,
+                valor TEXT NOT NULL
+            )
+            """
+        )

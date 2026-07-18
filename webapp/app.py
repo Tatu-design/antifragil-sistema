@@ -21,13 +21,74 @@ no solo esta web de aprendizaje.
 import sqlite3
 from datetime import datetime
 
-from flask import Flask, redirect, render_template, request, url_for
+from flask import Flask, redirect, render_template, request, session, url_for
 
 from calendar_integration.semana import get_week_range
 from clientes.repositorio import actualizar_cliente, crear_cliente, leer_clientes, listar_tipos_programa
 from economia.registro import obtener_mes, obtener_semana
+from webapp.auth import establecer_password, hay_password_configurada, obtener_secret_key, verificar_password
 
 app = Flask(__name__)
+app.secret_key = obtener_secret_key()
+
+RUTAS_PUBLICAS = {"login", "configurar_password", "static"}
+
+
+@app.before_request
+def _requerir_login():
+    """Se ejecuta antes de cada petición. Antes de que esta web sea visible
+    desde internet, hace falta al menos una contraseña — si no, cualquiera
+    con el enlace podría ver y editar los datos de los clientes."""
+    if request.endpoint in RUTAS_PUBLICAS:
+        return None
+
+    if not hay_password_configurada():
+        return redirect(url_for("configurar_password"))
+
+    if not session.get("autenticado"):
+        return redirect(url_for("login"))
+
+    return None
+
+
+@app.route("/configurar-password", methods=["GET", "POST"])
+def configurar_password():
+    if hay_password_configurada():
+        return redirect(url_for("login"))
+
+    if request.method == "POST":
+        password = request.form["password"]
+        password2 = request.form["password2"]
+        if password != password2:
+            return render_template("configurar_password.html", error="Las contraseñas no coinciden")
+        try:
+            establecer_password(password)
+        except ValueError as error:
+            return render_template("configurar_password.html", error=str(error))
+        session["autenticado"] = True
+        return redirect(url_for("inicio"))
+
+    return render_template("configurar_password.html")
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if not hay_password_configurada():
+        return redirect(url_for("configurar_password"))
+
+    if request.method == "POST":
+        if verificar_password(request.form["password"]):
+            session["autenticado"] = True
+            return redirect(url_for("inicio"))
+        return render_template("login.html", error="Contraseña incorrecta")
+
+    return render_template("login.html")
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
 
 
 def _con_sesiones_restantes(clientes: dict) -> list[dict]:
