@@ -30,14 +30,42 @@ en su propia rama (`feat/webapp-flask`) y con su propio ritmo.
    antes de alojarla, migrar de Excel a una base de datos real (SQLite para
    empezar) — la mayoría de alojamientos no garantizan que un archivo como
    `datos/clientes.xlsx` sobreviva a un reinicio, y es además una lección
-   de aprendizaje real en sí misma. Próximos pasos pendientes:
-   - Diseñar el esquema (tabla de clientes con las mismas columnas de hoy).
-   - Nuevo módulo de acceso a datos con `sqlite3` (sustituye a
-     `clientes/repositorio.py`, que sigue existiendo para el sistema real
-     del negocio con Excel — no se toca).
-   - Migrar los datos actuales del Excel a la base de datos.
-   - Adaptar `webapp/app.py` para leer/escribir de la base de datos.
-   - Solo entonces: elegir dónde alojarla.
+   de aprendizaje real en sí misma.
+
+   **Alcance de la migración (decisión del 2026-07-17, ampliada):**
+   Fernando quiere que SQLite pase a ser **el sistema real**, no solo el de
+   esta web de aprendizaje — es decir, `clientes/repositorio.py`,
+   `economia/registro.py` y `cierre_semanal/` acabarán leyendo y
+   escribiendo la base de datos en vez del Excel, y el Excel se retira.
+
+   **Pero no se hace todavía.** El domingo 19 de julio de 2026 es el primer
+   cierre semanal real, y migrar los cimientos del sistema de negocio justo
+   antes (sin haberlo probado en producción ni una vez) es un riesgo
+   innecesario. Se decidió: el cierre de este domingo se hace con Excel
+   (ya probado de punta a punta); la migración completa empieza el lunes
+   siguiente, con calma y el Excel como red de seguridad mientras dure.
+
+   **Ya construido como base, pero todavía NO conectado a nada real:**
+   - `webapp/db.py`: acceso a datos con `sqlite3` (tablas `programas` y
+     `clientes`), con las mismas funciones que `clientes/repositorio.py`
+     (`leer_clientes`, `crear_cliente`, `actualizar_cliente`,
+     `listar_tipos_programa`) para que el resto del código apenas tenga
+     que cambiar cuando llegue el momento.
+   - `webapp/migrar_desde_excel.py`: copia los datos actuales de
+     `datos/clientes.xlsx` a `datos/webapp.db`. Probado: migra los 7
+     programas y los 8 clientes reales correctamente. Se puede volver a
+     ejecutar sin duplicar nada.
+   - `webapp/app.py` **sigue usando `clientes/repositorio.py` (Excel)** —
+     a propósito, para no tener dos copias de los datos divergiendo entre
+     ahora y la migración completa del lunes.
+
+   Pendiente para el lunes:
+   - Migrar también `economia/registro.py` (facturación semanal/mensual) a
+     SQLite.
+   - Adaptar `clientes/repositorio.py` y `cierre_semanal/` para usar la
+     base de datos.
+   - Conectar por fin `webapp/app.py` a la base de datos ya migrada.
+   - Solo entonces: elegir dónde alojar la web.
 4. Cuentas de acceso por cliente (aprender autenticación — cada cliente ve
    solo lo suyo).
 
