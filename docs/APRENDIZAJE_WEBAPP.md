@@ -65,7 +65,10 @@ en su propia rama (`feat/webapp-flask`) y con su propio ritmo.
    Esto es un login único para Fernando — distinto del milestone 4 (una
    cuenta por cliente).
 
-   Pendiente: elegir alojamiento (PythonAnywhere) y desplegar.
+   **Alojamiento elegido: PythonAnywhere** (gratis, pensado justo para
+   esto). Guía completa paso a paso en
+   `docs/DESPLEGAR_PYTHONANYWHERE.md` — requiere que Fernando cree su
+   propia cuenta y suba el proyecto, Claude no puede hacerlo por él.
 4. Cuentas de acceso por cliente (aprender autenticación — cada cliente ve
    solo lo suyo).
 
