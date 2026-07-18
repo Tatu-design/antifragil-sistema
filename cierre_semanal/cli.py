@@ -11,9 +11,9 @@ de Google Calendar (nunca retipeado a mano — ver lección del 2026-07-14).
 
 Los dos modos usan exactamente el mismo cálculo a partir de los mismos
 eventos, así que lo que se previsualiza es exactamente lo que se escribiría.
-"aplicar" actualiza `datos/clientes.xlsx` Y registra la semana en
-`datos/facturacion.xlsx` — solo debe invocarse tras confirmación explícita
-de Fernando.
+"aplicar" actualiza los clientes Y registra la semana económica en
+`datos/antifragil.db` (SQLite) — solo debe invocarse tras confirmación
+explícita de Fernando.
 """
 
 import json

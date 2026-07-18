@@ -9,22 +9,68 @@
   Solo lectura, no escribe todavía en ningún sitio.
 - Paso 2 construido: lógica de descuento/renovación de programas
   (`programas/logica.py`, `programas/procesar.py`) y base de datos de
-  clientes en `datos/clientes.xlsx`, un Excel con formato (colores,
-  desplegables, filtros) generado por `clientes/generar_plantilla.py` y
-  leído/escrito por `clientes/repositorio.py`. Probado de punta a punta con
-  datos de ejemplo.
+  clientes. Probado de punta a punta con datos reales.
 - Paso 3 construido: skill `cierre-semanal` (`cierre_semanal/cli.py`) une
-  Calendar + programas + Excel en un solo flujo, con modo "previsualizar"
-  (no escribe) y modo "aplicar" (solo tras confirmación explícita de
-  Fernando). Probado de punta a punta con datos reales.
+  Calendar + programas + base de datos en un solo flujo, con modo
+  "previsualizar" (no escribe) y modo "aplicar" (solo tras confirmación
+  explícita de Fernando). Probado de punta a punta con datos reales.
 - Paso 4 construido: cálculo económico semanal/mensual (`economia/`) —
   facturación por sesiones hechas (no por pagos recibidos), desglosada por
   tarifa, con horas totales y precio medio por hora, replicando la lógica
-  de la hoja de cálculo que ya usaba Fernando. Se guarda en
-  `datos/facturacion.xlsx`, consultable por semana o por mes
-  (`economia/cli.py`). CrossFit Kids se factura por mensualidad: se cuenta
-  en sesiones pero su importe se reparte hacia atrás sobre las semanas del
-  mes en cuanto Fernando indica la facturación mensual total.
+  de la hoja de cálculo que ya usaba Fernando. Consultable por semana o por
+  mes (`economia/cli.py`). CrossFit Kids se factura por mensualidad: se
+  cuenta en sesiones pero su importe se reparte hacia atrás sobre las
+  semanas del mes en cuanto Fernando indica la facturación mensual total.
+
+### Migración de Excel a SQLite (2026-07-18)
+
+**El sistema real ya no usa Excel.** `datos/clientes.xlsx` y
+`datos/facturacion.xlsx` (y todo lo que se cuenta más abajo sobre ellos) es
+**historia de cómo se llegó hasta aquí**, no el estado actual. La base de
+datos real es `datos/antifragil.db` (SQLite), con tablas `programas`,
+`clientes`, `semanas` y `desglose` — ver `basedatos.py`.
+
+Por qué: Fernando quería una web app (`webapp/`, proyecto de aprendizaje
+Flask) sin tener que abrir Excel para nada, y con vistas a alojarla en
+internet más adelante — la mayoría de alojamientos no garantizan que un
+archivo Excel sobreviva a un reinicio, y SQLite es el estándar real para
+esto. Se decidió que la migración fuera completa (no solo para la web:
+también `clientes/repositorio.py`, `economia/registro.py` y
+`cierre_semanal/`), retirando el Excel del todo.
+
+Se secuenció con cuidado: el domingo 19 de julio de 2026 era el primer
+cierre semanal real, así que la migración se hizo el sábado 18, con tiempo
+de sobra para probarla a fondo antes — no a última hora ni durante el
+cierre en sí.
+
+Lo que cambió técnicamente:
+- `clientes/repositorio.py` y `economia/registro.py` mantienen exactamente
+  las mismas funciones públicas (`leer_clientes`, `crear_cliente`,
+  `actualizar_cliente`, `registrar_semana`, `obtener_mes`...), así que
+  `cierre_semanal/`, `economia/cli.py` y `webapp/app.py` no necesitaron
+  cambiar ni una línea de sus llamadas a estas funciones.
+- `migrar_excel_a_sqlite.py`: script de migración de una sola vez (lee el
+  Excel real con `openpyxl` y rellena `datos/antifragil.db`). Es seguro
+  volver a ejecutarlo.
+- Desaparecen de raíz problemas que antes había que gestionar con Excel:
+  fórmulas que perdían su valor calculado al guardar, desplegables que
+  Excel reescribía en un formato que `openpyxl` no entendía, y bloqueos
+  por tener el archivo abierto (ver lecciones del 2026-07-15/16 en el
+  log). Con SQLite no hay ninguno de estos tres problemas.
+- Terminología de columnas simplificada de paso: las claves económicas ya
+  no llevan tildes ni espacios (`facturacion_total` en vez de
+  `"Facturación Total"`), y los totales del mes se calculan al vuelo con
+  SQL (`SUM(...) GROUP BY`) en vez de guardarse aparte.
+- `clientes/generar_plantilla.py` (generador del Excel con formato) se
+  eliminó — ya no tiene sentido sin Excel.
+
+Probado de punta a punta antes de dar la migración por buena: migración de
+los 7 programas y 8 clientes reales, `cierre_semanal previsualizar` con
+datos reales de Calendar (resultado idéntico al de la versión en Excel:
+630€/15h/42€), `aplicar` completo en una copia de la base de datos
+(sesiones actualizadas correctamente, semana y mes registrados), y la web
+app (Clientes, Economía, crear/editar) sirviendo los datos reales
+correctamente.
 - Dashboard móvil (2026-07-16): página privada publicada como Artifact de
   Claude (no requiere servidor propio) mostrando el resumen semanal/mensual
   y el estado de cada cliente, para verlo cómodo desde el móvil:
@@ -54,7 +100,7 @@ calendario directamente a través de ese conector, ya autorizado.
 | Lectura de Calendar | Conector `claude.ai Google Calendar` (ya autorizado) | Ya existe y funciona; construir una autenticación propia (OAuth/cuenta de servicio) habría sido complejidad innecesaria — ver lección en `.claude/skills/lessons-learned/log.md` |
 | Clasificación de sesiones | Python puro, sin dependencias externas (`calendar_integration/parser.py`, `summary.py`) | Lógica determinista (no "a ojo" por IA) para que el conteo de sesiones sea siempre reproducible |
 | Interfaz | Conversación con Claude Code (skill `resumen-semanal`) | No hace falta una app aparte: Fernando pide el resumen y Claude lo genera usando el conector + el script de clasificación |
-| Base de datos de clientes/programas | Excel local `datos/clientes.xlsx`, con formato (`clientes/repositorio.py`, `openpyxl`) | Ver decisión del 2026-07-15 más abajo — Fernando pidió explícitamente que fuera "bonito y profesional", no un CSV plano |
+| Base de datos de clientes/programas/economía | SQLite local `datos/antifragil.db` (`basedatos.py`, `sqlite3`) | Empezó como Excel (ver historia debajo); migrado por completo el 2026-07-18 para poder alojar la web app y evitar los problemas de Excel |
 
 Se descartó Streamlit + SQLite + cuenta de servicio de Google Cloud (construido
 y luego eliminado el mismo día) porque duplicaba algo que ya existía.
@@ -123,6 +169,8 @@ antes se llamó "Sesiones llevadas"). `clientes/repositorio.py` convierte a
 
 ```
 antifragil/
+  basedatos.py            # conexión y esquema SQLite compartidos (datos/antifragil.db)
+  migrar_excel_a_sqlite.py  # migración de una sola vez, desde el Excel histórico
   calendar_integration/
     parser.py        # clasifica un título de evento (PT/CrossFit Lidomare/Kids)
     summary.py        # agrupa eventos clasificados en un resumen semanal
@@ -132,27 +180,27 @@ antifragil/
     logica.py          # descuento y renovación de un programa individual
     procesar.py         # combina el resumen semanal con los programas actuales
   clientes/
-    generar_plantilla.py  # crea datos/clientes.xlsx con formato (una sola vez)
-    repositorio.py         # lee/escribe datos/clientes.xlsx
+    repositorio.py       # lee/escribe clientes y programas en SQLite
   economia/
     calculo.py           # facturación/horas/precio medio, desglosado por tarifa
-    registro.py            # lee/escribe datos/facturacion.xlsx (histórico semanal/mensual)
+    registro.py            # lee/escribe el histórico semanal/mensual en SQLite
     cli.py                  # consultas + registro de la facturación mensual de Kids
   cierre_semanal/
     cli.py                  # une Calendar + programas + economía (previsualizar / aplicar)
+  webapp/
+    app.py                  # web app Flask (proyecto de aprendizaje) — clientes + economía
   datos/
-    clientes.xlsx           # base de datos real, con formato (nunca en Git)
-    clientes.example.csv     # plantilla de ejemplo (estructura de columnas), sí versionada
-    facturacion.xlsx          # registro económico real (nunca en Git)
+    antifragil.db            # base de datos real (nunca en Git)
   .claude/skills/resumen-semanal/SKILL.md   # paso 1: solo resumen de Calendar
   .claude/skills/cierre-semanal/SKILL.md     # pasos 3+4: flujo completo con confirmación
 ```
 
 `calendar_integration/`, `programas/` y `economia/calculo.py` contienen solo
-lógica pura (sin credenciales, sin llamadas de red). `clientes/` y
-`economia/registro.py` sí tocan disco, pero son archivos locales del propio
-proyecto, no un servicio externo — la obtención de eventos reales de
-Calendar la hacen los skills a través del conector ya autorizado.
+lógica pura (sin credenciales, sin llamadas de red). `clientes/repositorio.py`,
+`economia/registro.py` y `basedatos.py` sí tocan disco, pero es un archivo
+SQLite local del propio proyecto, no un servicio externo — la obtención de
+eventos reales de Calendar la hacen los skills a través del conector ya
+autorizado.
 
 ### Regla de negocio de `programas/logica.py` (confirmada por Fernando, 2026-07-15)
 
@@ -182,10 +230,12 @@ el orden original está completa; quedan ajustes y pulido según el uso real.
 
 ## Próximos pasos técnicos pendientes de decidir
 
-- Probar el flujo `cierre-semanal` completo (incluyendo `aplicar`) con una
-  semana real y confirmación de Fernando
+- Hacer el primer cierre semanal real con confirmación de Fernando
+  (domingo 19 de julio de 2026), ya sobre SQLite
 - Cuando termine julio 2026, registrar la facturación mensual de CrossFit
   Kids con `economia/cli.py kids`
+- Milestone 3 de `webapp/` (ver `docs/APRENDIZAJE_WEBAPP.md`): elegir dónde
+  alojar la web app ahora que ya no depende de un archivo Excel local
 
 ## Principios de arquitectura (de SYSTEM_VISION.md)
 

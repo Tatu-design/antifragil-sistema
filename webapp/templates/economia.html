@@ -26,21 +26,21 @@
       <div class="metricas">
         <div class="metrica">
           <span class="label">Facturación</span>
-          <span class="valor">{{ "%.2f"|format(semana['Facturación Total']) }} €</span>
+          <span class="valor">{{ "%.2f"|format(semana.facturacion_total) }} €</span>
         </div>
         <div class="metrica">
           <span class="label">Horas</span>
-          <span class="valor">{{ semana['Horas Totales'] }}</span>
+          <span class="valor">{{ semana.horas_totales }}</span>
         </div>
         <div class="metrica">
           <span class="label">€ / hora</span>
-          <span class="valor">{{ "%.2f"|format(semana['Precio medio hora Total']) }} €</span>
+          <span class="valor">{{ "%.2f"|format(semana.precio_medio_hora) }} €</span>
         </div>
       </div>
-      {% if semana['Sesiones CrossFit Kids'] %}
+      {% if semana.sesiones_kids %}
       <p class="nota">
-        CrossFit Kids: {{ semana['Sesiones CrossFit Kids'] }} sesiones
-        {% if semana['Facturación CrossFit Kids'] is none %}
+        CrossFit Kids: {{ semana.sesiones_kids }} sesiones
+        {% if semana.facturacion_kids is none %}
         (facturación pendiente de que indiques el importe mensual)
         {% endif %}
       </p>
@@ -59,15 +59,15 @@
       <div class="metricas">
         <div class="metrica">
           <span class="label">Facturación</span>
-          <span class="valor">{{ "%.2f"|format(mes['Facturación Total']) }} €</span>
+          <span class="valor">{{ "%.2f"|format(mes.facturacion_total) }} €</span>
         </div>
         <div class="metrica">
           <span class="label">Horas</span>
-          <span class="valor">{{ mes['Horas Totales'] }}</span>
+          <span class="valor">{{ mes.horas_totales }}</span>
         </div>
         <div class="metrica">
           <span class="label">€ / hora</span>
-          <span class="valor">{{ "%.2f"|format(mes['Precio medio hora']) }} €</span>
+          <span class="valor">{{ "%.2f"|format(mes.precio_medio_hora) }} €</span>
         </div>
       </div>
       {% else %}

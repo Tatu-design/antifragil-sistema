@@ -1,100 +1,61 @@
 """Lectura y escritura de la base de datos de clientes.
 
-Es un archivo Excel local (`datos/clientes.xlsx`, con formato — ver
-`clientes/generar_plantilla.py`) que Fernando edita a mano (elige el
-programa de un desplegable; tarifa y sesiones totales se calculan solas) y
-que este módulo lee y actualiza tras cada resumen semanal. No depende de
-ningún conector ni credencial: es un archivo del propio ordenador. Al
-escribir solo se cambian valores de celda, nunca el formato, así que el
-aspecto del Excel no se pierde.
+Desde el 2026-07-18, esto es SQLite (`datos/antifragil.db`, ver
+`basedatos.py`) — antes era un Excel. Se mantienen exactamente las mismas
+funciones y formas de datos que ya usaba el resto del proyecto
+(`programas/procesar.py`, `cierre_semanal/`, `webapp/app.py`), así que ese
+código no ha necesitado cambiar.
 
-Importante: la tarifa y las sesiones totales son fórmulas de Excel, no
-valores fijos. Este módulo lee el archivo con `data_only=True`, que devuelve
-el último valor calculado por Excel — por eso Fernando debe **guardar el
-archivo (Ctrl+S) después de elegir un programa** para que el sistema pueda
-leer esos números.
+Ventaja frente al Excel: no hay fórmulas que pierdan su valor calculado al
+guardar, ni desplegables que Excel reescriba en un formato que la librería
+no entienda, ni bloqueos por tener el archivo abierto — problemas reales
+que se documentaron en `.claude/skills/lessons-learned/log.md` y que
+desaparecen con una base de datos de verdad.
 """
 
 from pathlib import Path
 
-from openpyxl import load_workbook
-from openpyxl.worksheet.datavalidation import DataValidation
-
+from basedatos import RUTA_POR_DEFECTO, conectar
 from programas.logica import ActualizacionPrograma
-
-RUTA_POR_DEFECTO = Path(__file__).resolve().parent.parent / "datos" / "clientes.xlsx"
-HOJA = "Clientes"
-HOJA_PROGRAMAS = "Programas"
-PRIMERA_FILA_DATOS = 3
-ULTIMA_FILA_CON_HUECO = 30
-
-
-def _tabla_programas(wb) -> dict[str, tuple]:
-    """Lee la hoja "Programas" (valores literales, nunca fórmulas) como
-    {nombre_programa: (tarifa, sesiones_totales)} — sirve de respaldo
-    cuando el valor calculado de la fórmula en "Clientes" no está
-    disponible (ver más abajo)."""
-    hoja = wb[HOJA_PROGRAMAS]
-    tabla: dict[str, tuple] = {}
-    fila = 3
-    while hoja[f"A{fila}"].value:
-        tabla[hoja[f"A{fila}"].value] = (hoja[f"B{fila}"].value, hoja[f"C{fila}"].value)
-        fila += 1
-    return tabla
 
 
 def leer_clientes(ruta: Path = RUTA_POR_DEFECTO) -> dict[str, dict]:
-    """Devuelve {cliente: {fila, tipo_programa, tarifa, sesiones_totales,
-    sesiones_completadas, pendiente_pago}} tal cual está en el Excel.
+    """Devuelve {cliente: {tipo_programa, tarifa, sesiones_totales,
+    sesiones_completadas, pendiente_pago}}.
 
     Fernando anota las sesiones "completadas" (consumidas del bono actual),
-    no las que le quedan — así lo pidió el 2026-07-15. `a_programa` hace la
-    conversión a "restantes" para la lógica de `programas`.
-
-    Tarifa y sesiones totales son fórmulas en el Excel (VLOOKUP contra la
-    hoja "Programas"); si Excel no ha recalculado y guardado el archivo
-    (por ejemplo, justo después de que este mismo código haya escrito algo),
-    el valor cacheado puede venir vacío. En ese caso se recalcula aquí
-    mismo, en Python, contra la misma hoja "Programas" — así no dependemos
-    de que Fernando reabra el Excel y pulse Ctrl+S para que el sistema siga
-    funcionando (lección del 2026-07-15/2026-07-16).
+    no las que le quedan. `a_programa` hace la conversión a "restantes"
+    para la lógica de `programas`.
     """
-    wb = load_workbook(ruta, data_only=True)
-    hoja = wb[HOJA]
-    tabla_programas = _tabla_programas(wb)
+    with conectar(ruta) as conexion:
+        filas = conexion.execute(
+            """
+            SELECT c.nombre, c.tipo_programa, p.tarifa, p.sesiones_totales,
+                   c.sesiones_completadas, c.pendiente_pago
+            FROM clientes c
+            JOIN programas p ON p.nombre = c.tipo_programa
+            ORDER BY c.nombre
+            """
+        ).fetchall()
 
-    clientes: dict[str, dict] = {}
-    fila = PRIMERA_FILA_DATOS
-    while hoja[f"A{fila}"].value:
-        tipo_programa = hoja[f"B{fila}"].value
-        tarifa = hoja[f"C{fila}"].value
-        sesiones_totales = hoja[f"D{fila}"].value
-
-        if (tarifa is None or sesiones_totales is None) and tipo_programa in tabla_programas:
-            tarifa_respaldo, sesiones_respaldo = tabla_programas[tipo_programa]
-            tarifa = tarifa if tarifa is not None else tarifa_respaldo
-            sesiones_totales = sesiones_totales if sesiones_totales is not None else sesiones_respaldo
-
-        clientes[hoja[f"A{fila}"].value] = {
-            "fila": fila,
-            "tipo_programa": tipo_programa,
-            "tarifa": tarifa,
-            "sesiones_totales": sesiones_totales,
-            "sesiones_completadas": hoja[f"E{fila}"].value,
-            "pendiente_pago": hoja[f"F{fila}"].value,
+    return {
+        fila["nombre"]: {
+            "tipo_programa": fila["tipo_programa"],
+            "tarifa": fila["tarifa"],
+            "sesiones_totales": fila["sesiones_totales"],
+            "sesiones_completadas": fila["sesiones_completadas"],
+            "pendiente_pago": "Sí" if fila["pendiente_pago"] else "No",
         }
-        fila += 1
-
-    return clientes
+        for fila in filas
+    }
 
 
 def a_programa(fila: dict) -> dict | None:
     """Convierte una fila en el formato que espera `programas.procesar`
     (que trabaja en "sesiones restantes", no "completadas").
 
-    Devuelve None si al cliente le faltan datos por rellenar (tarifa,
-    sesiones totales, etc.) — así se puede avisar a Fernando en vez de
-    calcular con números inventados.
+    Devuelve None si al cliente le faltan datos por rellenar — así se
+    puede avisar a Fernando en vez de calcular con números inventados.
     """
     try:
         sesiones_totales = int(fila["sesiones_totales"])
@@ -109,7 +70,8 @@ def a_programa(fila: dict) -> dict | None:
 
 
 def cargar_programas(ruta: Path = RUTA_POR_DEFECTO) -> tuple[dict[str, dict], list[str]]:
-    """Lee el Excel y lo deja listo para `programas.procesar.procesar_semana`.
+    """Lee la base de datos y la deja lista para
+    `programas.procesar.procesar_semana`.
 
     Devuelve (programas, incompletos): los clientes sin tarifa/sesiones
     rellenas todavía se listan aparte en vez de calcular con datos inventados.
@@ -129,8 +91,8 @@ def cargar_programas(ruta: Path = RUTA_POR_DEFECTO) -> tuple[dict[str, dict], li
 
 
 def cargar_tarifas(ruta: Path = RUTA_POR_DEFECTO) -> dict[str, float]:
-    """Devuelve {cliente: tarifa} para los clientes con tarifa numérica ya
-    calculada — usado por `economia.calculo` para la facturación semanal."""
+    """Devuelve {cliente: tarifa} — usado por `economia.calculo` para la
+    facturación semanal."""
     clientes = leer_clientes(ruta)
     tarifas: dict[str, float] = {}
     for nombre, fila in clientes.items():
@@ -141,83 +103,43 @@ def cargar_tarifas(ruta: Path = RUTA_POR_DEFECTO) -> dict[str, float]:
     return tarifas
 
 
-def _asegurar_validaciones(wb) -> None:
-    """Repone los desplegables si no están (openpyxl no lee el formato
-    "extendido" en el que Excel a veces reescribe las validaciones al
-    guardar, y los descarta al reabrir el archivo — ver lección del
-    2026-07-15 en el log). Se comprueba y repone en cada escritura para que
-    el desplegable nunca desaparezca sin que nadie se dé cuenta."""
-    hoja = wb[HOJA]
-    validaciones = hoja.data_validations.dataValidation
-
-    tiene_validacion_programa = any("Programas!" in (dv.formula1 or "") for dv in validaciones)
-    tiene_validacion_pago = any(dv.formula1 == '"Sí,No"' for dv in validaciones)
-
-    if not tiene_validacion_programa:
-        hoja_programas = wb[HOJA_PROGRAMAS]
-        ultima_fila_programas = 2
-        while hoja_programas[f"A{ultima_fila_programas + 1}"].value:
-            ultima_fila_programas += 1
-        validacion = DataValidation(
-            type="list", formula1=f"=Programas!$A$3:$A${ultima_fila_programas}", allow_blank=True
-        )
-        hoja.add_data_validation(validacion)
-        validacion.add(f"B{PRIMERA_FILA_DATOS}:B{ULTIMA_FILA_CON_HUECO}")
-
-    if not tiene_validacion_pago:
-        validacion = DataValidation(type="list", formula1='"Sí,No"', allow_blank=False)
-        hoja.add_data_validation(validacion)
-        validacion.add(f"F{PRIMERA_FILA_DATOS}:F{ULTIMA_FILA_CON_HUECO}")
-
-
 def listar_tipos_programa(ruta: Path = RUTA_POR_DEFECTO) -> list[str]:
-    """Nombres de programa disponibles (hoja "Programas"), para rellenar el
-    desplegable de la web app — la misma lista que usa el Excel."""
-    wb = load_workbook(ruta, data_only=True)
-    return list(_tabla_programas(wb).keys())
+    """Nombres de programa disponibles, para el desplegable de la web app."""
+    with conectar(ruta) as conexion:
+        filas = conexion.execute("SELECT nombre FROM programas ORDER BY nombre").fetchall()
+    return [fila["nombre"] for fila in filas]
 
 
-def _primera_fila_libre(hoja) -> int:
-    fila = PRIMERA_FILA_DATOS
-    while hoja[f"A{fila}"].value:
-        fila += 1
-    if fila > ULTIMA_FILA_CON_HUECO:
-        raise ValueError(
-            "No quedan filas preparadas en el Excel para un cliente nuevo. "
-            "Pídele a Claude que amplíe la plantilla."
+def guardar_programa(nombre: str, tarifa: float, sesiones_totales: int, ruta: Path = RUTA_POR_DEFECTO) -> None:
+    """Da de alta o actualiza un programa (tarifas y bonos — ver
+    docs/TARIFAS.md). Si Fernando cambia un precio, solo hay que llamar a
+    esto de nuevo con el mismo nombre."""
+    with conectar(ruta) as conexion:
+        conexion.execute(
+            "INSERT INTO programas (nombre, tarifa, sesiones_totales) VALUES (?, ?, ?) "
+            "ON CONFLICT(nombre) DO UPDATE SET tarifa = excluded.tarifa, sesiones_totales = excluded.sesiones_totales",
+            (nombre, tarifa, sesiones_totales),
         )
-    return fila
 
 
 def crear_cliente(
-    nombre: str,
-    tipo_programa: str,
-    sesiones_completadas: int,
-    pendiente_pago: bool,
-    ruta: Path = RUTA_POR_DEFECTO,
+    nombre: str, tipo_programa: str, sesiones_completadas: int, pendiente_pago: bool, ruta: Path = RUTA_POR_DEFECTO
 ) -> None:
-    """Da de alta un cliente nuevo en la siguiente fila libre (ya preparada
-    con el desplegable y las fórmulas de tarifa/sesiones — ver
-    `clientes/generar_plantilla.py`)."""
+    """Da de alta un cliente nuevo. Solo se llama tras confirmación
+    explícita (ver `webapp/app.py`)."""
     nombre = nombre.strip()
     if not nombre:
         raise ValueError("El nombre del cliente no puede estar vacío")
 
-    clientes = leer_clientes(ruta)
-    if nombre in clientes:
-        raise ValueError(f"Ya existe un cliente llamado '{nombre}'")
-
-    wb = load_workbook(ruta)
-    hoja = wb[HOJA]
-    fila = _primera_fila_libre(hoja)
-
-    hoja[f"A{fila}"] = nombre
-    hoja[f"B{fila}"] = tipo_programa
-    hoja[f"E{fila}"] = sesiones_completadas
-    hoja[f"F{fila}"] = "Sí" if pendiente_pago else "No"
-
-    _asegurar_validaciones(wb)
-    wb.save(ruta)
+    with conectar(ruta) as conexion:
+        existe = conexion.execute("SELECT 1 FROM clientes WHERE nombre = ?", (nombre,)).fetchone()
+        if existe:
+            raise ValueError(f"Ya existe un cliente llamado '{nombre}'")
+        conexion.execute(
+            "INSERT INTO clientes (nombre, tipo_programa, sesiones_completadas, pendiente_pago) "
+            "VALUES (?, ?, ?, ?)",
+            (nombre, tipo_programa, sesiones_completadas, int(pendiente_pago)),
+        )
 
 
 def actualizar_cliente(
@@ -228,52 +150,45 @@ def actualizar_cliente(
     pendiente_pago: bool,
     ruta: Path = RUTA_POR_DEFECTO,
 ) -> None:
-    """Edición manual de un cliente concreto (usada por la web app):
-    escribe nombre, tipo de programa, sesiones completadas y pendiente de
-    pago directamente, sin pasar por la lógica de renovación de
-    `programas.procesar` — es una corrección puntual, no un cierre semanal.
+    """Edición manual de un cliente concreto (usada por la web app): nombre,
+    tipo de programa, sesiones completadas y pendiente de pago, sin pasar
+    por la lógica de renovación de `programas.procesar` — es una
+    corrección puntual, no un cierre semanal.
 
     Si `nuevo_nombre` es distinto de `nombre`, cambia también el nombre del
-    cliente (ver aviso en la web: hay que renombrar igual las sesiones en
-    Google Calendar, si no dejarían de reconocerse)."""
+    cliente — hay que renombrar igual las sesiones en Google Calendar, o el
+    sistema dejaría de reconocerlas (el nombre es la clave que las cruza)."""
     nuevo_nombre = nuevo_nombre.strip()
     if not nuevo_nombre:
         raise ValueError("El nombre del cliente no puede estar vacío")
 
-    clientes = leer_clientes(ruta)
-    if nombre not in clientes:
-        raise ValueError(f"No existe el cliente '{nombre}'")
-    if nuevo_nombre != nombre and nuevo_nombre in clientes:
-        raise ValueError(f"Ya existe un cliente llamado '{nuevo_nombre}'")
-
-    fila = clientes[nombre]["fila"]
-    wb = load_workbook(ruta)
-    hoja = wb[HOJA]
-    hoja[f"A{fila}"] = nuevo_nombre
-    hoja[f"B{fila}"] = tipo_programa
-    hoja[f"E{fila}"] = sesiones_completadas
-    hoja[f"F{fila}"] = "Sí" if pendiente_pago else "No"
-
-    _asegurar_validaciones(wb)
-    wb.save(ruta)
+    with conectar(ruta) as conexion:
+        existe = conexion.execute("SELECT 1 FROM clientes WHERE nombre = ?", (nombre,)).fetchone()
+        if not existe:
+            raise ValueError(f"No existe el cliente '{nombre}'")
+        if nuevo_nombre != nombre:
+            colision = conexion.execute("SELECT 1 FROM clientes WHERE nombre = ?", (nuevo_nombre,)).fetchone()
+            if colision:
+                raise ValueError(f"Ya existe un cliente llamado '{nuevo_nombre}'")
+        conexion.execute(
+            "UPDATE clientes SET nombre = ?, tipo_programa = ?, sesiones_completadas = ?, pendiente_pago = ? "
+            "WHERE nombre = ?",
+            (nuevo_nombre, tipo_programa, sesiones_completadas, int(pendiente_pago), nombre),
+        )
 
 
 def aplicar_actualizaciones(
     resultados: dict[str, ActualizacionPrograma], ruta: Path = RUTA_POR_DEFECTO
 ) -> None:
-    """Escribe en el Excel las sesiones completadas y el pendiente de pago
-    ya calculados (convirtiendo de "restantes" a "completadas"). Solo se
-    llama después de que Fernando confirme el resumen. Solo se tocan
-    valores de celda: el formato del Excel no cambia."""
+    """Escribe las sesiones completadas y el pendiente de pago ya calculados
+    (convirtiendo de "restantes" a "completadas"). Solo se llama después de
+    que Fernando confirme el resumen del cierre semanal."""
     clientes = leer_clientes(ruta)
-    wb = load_workbook(ruta)
-    hoja = wb[HOJA]
-
-    for nombre, actualizacion in resultados.items():
-        fila = clientes[nombre]["fila"]
-        sesiones_totales = int(clientes[nombre]["sesiones_totales"])
-        hoja[f"E{fila}"] = sesiones_totales - actualizacion.sesiones_restantes
-        hoja[f"F{fila}"] = "Sí" if actualizacion.pendiente_pago else "No"
-
-    _asegurar_validaciones(wb)
-    wb.save(ruta)
+    with conectar(ruta) as conexion:
+        for nombre, actualizacion in resultados.items():
+            sesiones_totales = int(clientes[nombre]["sesiones_totales"])
+            sesiones_completadas = sesiones_totales - actualizacion.sesiones_restantes
+            conexion.execute(
+                "UPDATE clientes SET sesiones_completadas = ?, pendiente_pago = ? WHERE nombre = ?",
+                (sesiones_completadas, int(actualizacion.pendiente_pago), nombre),
+            )

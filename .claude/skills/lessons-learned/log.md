@@ -162,3 +162,35 @@ el Excel. Lección general: cuando una limitación de una librería se puede
 evitar recalculando el resultado por nuestra cuenta con datos que ya
 tenemos, hacerlo — no limitarse a documentar la limitación y pedirle al
 usuario que la compense a mano.
+
+## 2026-07-18 — Migración completa de Excel a SQLite, secuenciada por riesgo real
+
+**Qué pasó:** Fernando pidió poder crear/editar clientes desde la web app
+de aprendizaje sin tocar Excel. Al construirlo con SQLite en un módulo
+aparte (`webapp/db.py`), se hizo evidente que mantener dos copias de los
+datos (Excel para el negocio real, SQLite para la web) era exactamente el
+tipo de complejidad frágil que este proyecto evita — así que Fernando
+decidió migrar **todo el sistema real** a SQLite, no solo la web.
+
+La secuencia se decidió por riesgo, no por calendario: como el domingo 19
+de julio era el primer cierre semanal real, la primera propuesta fue
+esperar al lunes para migrar. Pero Fernando aclaró que ese cierre era "solo
+una comprobación" y que avanzar rápido era la prioridad — así que la
+migración completa se adelantó al sábado 18, con margen de sobra para
+probarla a fondo (migración de datos reales, `cierre_semanal previsualizar`
+y `aplicar` en una copia, web app completa) antes de que llegara el cierre
+real del domingo.
+
+**Por qué pasó:** La decisión inicial de "esperar al lunes" fue prudente
+pero se ancló al calendario (día de la semana) en vez de a la condición de
+riesgo real (¿ha quedado esto probado a fondo con margen antes del primer
+uso real?). En cuanto Fernando aclaró que el cierre del domingo no era tan
+crítico como se asumió, la condición real ya no exigía esperar.
+
+**Qué se hace distinto a partir de ahora:** Cuando se decida posponer un
+cambio arriesgado "hasta tal día", identificar y decir en voz alta cuál es
+la condición de riesgo real detrás de esa fecha (aquí: "tener tiempo de
+sobra para probarlo antes del primer uso real"). Si esa condición se puede
+cumplir antes, no hace falta esperar al día que se dijo al principio —
+pero solo tras confirmar explícitamente con el usuario que el contexto ha
+cambiado, no unilateralmente.

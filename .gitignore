@@ -11,6 +11,9 @@ __pycache__/
 *.pyc
 
 # Datos reales de clientes y facturación — nunca se suben al repositorio
+# (antifragil.db es el sistema real desde el 2026-07-18; el resto son
+# reliquias de cuando el sistema usaba Excel, se dejan por si acaso)
+datos/antifragil.db
 datos/clientes.csv
 datos/clientes.xlsx
 datos/facturacion.xlsx

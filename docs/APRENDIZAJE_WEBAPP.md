@@ -1,9 +1,16 @@
 # Proyecto de aprendizaje: web app con Flask
 
 > Este es un proyecto aparte del sistema operativo de Antifrágil (que sigue
-> funcionando por chat + Excel + dashboard). El objetivo aquí es que
+> funcionando por chat + skills + dashboard). El objetivo aquí es que
 > Fernando aprenda a construir una web app real, paso a paso, sin arriesgar
 > los datos reales del negocio mientras se aprende.
+>
+> **Actualización (2026-07-18):** el sistema real ya migró de Excel a
+> SQLite por completo (ver `docs/ARQUITECTURA.md`). Las referencias a
+> `datos/clientes.xlsx` en este documento son historia — el dato real hoy
+> vive en `datos/antifragil.db`, y `webapp/app.py` lo usa a través de
+> `clientes/repositorio.py` y `economia/registro.py`, sin necesitar
+> cambios propios.
 
 ## Por qué existe esto
 
@@ -26,46 +33,28 @@ en su propia rama (`feat/webapp-flask`) y con su propio ritmo.
    directo desde `datos/facturacion.xlsx` — antes esto solo estaba en el
    dashboard publicado (Artifact), que quedaba desconectado de esta web.
 3. Poner la web accesible desde internet (aprender qué es "alojar" una app,
-   con sus costes y responsabilidades). **Decisión tomada (2026-07-17):**
-   antes de alojarla, migrar de Excel a una base de datos real (SQLite para
-   empezar) — la mayoría de alojamientos no garantizan que un archivo como
-   `datos/clientes.xlsx` sobreviva a un reinicio, y es además una lección
-   de aprendizaje real en sí misma.
+   con sus costes y responsabilidades).
 
-   **Alcance de la migración (decisión del 2026-07-17, ampliada):**
-   Fernando quiere que SQLite pase a ser **el sistema real**, no solo el de
-   esta web de aprendizaje — es decir, `clientes/repositorio.py`,
-   `economia/registro.py` y `cierre_semanal/` acabarán leyendo y
-   escribiendo la base de datos en vez del Excel, y el Excel se retira.
+   **✅ Migración a SQLite completada (2026-07-18)** — más rápido de lo
+   planeado en un principio: Fernando decidió priorizar avanzar sobre la
+   cautela inicial ("el cierre del domingo es solo una comprobación"), así
+   que la migración completa se hizo el sábado 18 en vez de esperar al
+   lunes — con tiempo de sobra para probarla a fondo antes del cierre real
+   del domingo 19. Detalle completo en `docs/ARQUITECTURA.md`. En resumen:
+   - `basedatos.py` (nuevo, en la raíz): conexión y esquema compartidos de
+     `datos/antifragil.db`.
+   - `clientes/repositorio.py` y `economia/registro.py` reescritos para
+     usar SQLite en vez de Excel, manteniendo las mismas funciones
+     públicas — `cierre_semanal/`, `economia/cli.py` y `webapp/app.py` no
+     necesitaron cambiar sus llamadas.
+   - `migrar_excel_a_sqlite.py` (raíz): migración real de una sola vez,
+     probada con los 7 programas y 8 clientes reales.
+   - `clientes/generar_plantilla.py` y los módulos `webapp/db.py` /
+     `webapp/db_economia.py` (una versión previa, solo para la web) se
+     eliminaron — quedaron redundantes.
 
-   **Pero no se hace todavía.** El domingo 19 de julio de 2026 es el primer
-   cierre semanal real, y migrar los cimientos del sistema de negocio justo
-   antes (sin haberlo probado en producción ni una vez) es un riesgo
-   innecesario. Se decidió: el cierre de este domingo se hace con Excel
-   (ya probado de punta a punta); la migración completa empieza el lunes
-   siguiente, con calma y el Excel como red de seguridad mientras dure.
-
-   **Ya construido como base, pero todavía NO conectado a nada real:**
-   - `webapp/db.py`: acceso a datos con `sqlite3` (tablas `programas` y
-     `clientes`), con las mismas funciones que `clientes/repositorio.py`
-     (`leer_clientes`, `crear_cliente`, `actualizar_cliente`,
-     `listar_tipos_programa`) para que el resto del código apenas tenga
-     que cambiar cuando llegue el momento.
-   - `webapp/migrar_desde_excel.py`: copia los datos actuales de
-     `datos/clientes.xlsx` a `datos/webapp.db`. Probado: migra los 7
-     programas y los 8 clientes reales correctamente. Se puede volver a
-     ejecutar sin duplicar nada.
-   - `webapp/app.py` **sigue usando `clientes/repositorio.py` (Excel)** —
-     a propósito, para no tener dos copias de los datos divergiendo entre
-     ahora y la migración completa del lunes.
-
-   Pendiente para el lunes:
-   - Migrar también `economia/registro.py` (facturación semanal/mensual) a
-     SQLite.
-   - Adaptar `clientes/repositorio.py` y `cierre_semanal/` para usar la
-     base de datos.
-   - Conectar por fin `webapp/app.py` a la base de datos ya migrada.
-   - Solo entonces: elegir dónde alojar la web.
+   Pendiente ahora para este milestone: elegir dónde alojar la web app
+   (ya no hay archivo local que dificulte esto).
 4. Cuentas de acceso por cliente (aprender autenticación — cada cliente ve
    solo lo suyo).
 
@@ -161,7 +150,7 @@ petición de Fernando.
 ## Reglas de este proyecto
 
 - No toca el flujo real del negocio (Calendar, cierre semanal, dashboard) —
-  comparte solo la lectura/escritura de `datos/clientes.xlsx` a través del
-  mismo `clientes/repositorio.py`.
+  comparte solo la lectura/escritura de la base de datos (`datos/antifragil.db`)
+  a través de `clientes/repositorio.py` y `economia/registro.py`.
 - Ninguna escritura sin pantalla de confirmación previa — misma regla de
   seguridad que el resto del proyecto.

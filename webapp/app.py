@@ -10,9 +10,15 @@ Milestone 2: crear clientes nuevos y editar nombre, tipo de programa,
 sesiones completadas y pendiente de pago desde la web. Sigue la misma regla
 de seguridad que el resto del proyecto: nunca se guarda nada directamente
 desde un formulario — antes se muestra una pantalla de "vas a guardar esto"
-y solo al confirmar se escribe en datos/clientes.xlsx.
+y solo al confirmar se escribe en la base de datos.
+
+Desde el 2026-07-18, `clientes/repositorio.py` y `economia/registro.py`
+(de donde vienen todas las funciones de aquí abajo) usan SQLite
+(`datos/antifragil.db`) en vez de Excel — es el sistema real del negocio,
+no solo esta web de aprendizaje.
 """
 
+import sqlite3
 from datetime import datetime
 
 from flask import Flask, redirect, render_template, request, url_for
@@ -95,10 +101,10 @@ def guardar_nuevo():
             sesiones_completadas=int(request.form["sesiones_completadas"]),
             pendiente_pago=request.form["pendiente_pago"] == "si",
         )
-    except PermissionError:
+    except sqlite3.OperationalError:
         return render_template(
             "error.html",
-            mensaje="No se pudo guardar: el archivo datos/clientes.xlsx está abierto en Excel. Ciérralo y vuelve a intentarlo.",
+            mensaje="No se pudo guardar: la base de datos está ocupada ahora mismo. Vuelve a intentarlo en unos segundos.",
         ), 409
     except ValueError as error:
         return render_template("error.html", mensaje=str(error)), 400
@@ -161,10 +167,10 @@ def guardar(nombre):
             sesiones_completadas=int(request.form["sesiones_completadas"]),
             pendiente_pago=request.form["pendiente_pago"] == "si",
         )
-    except PermissionError:
+    except sqlite3.OperationalError:
         return render_template(
             "error.html",
-            mensaje="No se pudo guardar: el archivo datos/clientes.xlsx está abierto en Excel. Ciérralo y vuelve a intentarlo.",
+            mensaje="No se pudo guardar: la base de datos está ocupada ahora mismo. Vuelve a intentarlo en unos segundos.",
         ), 409
     except ValueError as error:
         return render_template("error.html", mensaje=str(error)), 400
