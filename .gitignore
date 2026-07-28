@@ -20,3 +20,13 @@ datos/facturacion.xlsx
 datos/webapp.db
 datos/~$*
 datos/config_servidor.json
+
+# Cualquier copia de la base de datos real, tenga el nombre que tenga —
+# durante el trabajo de diagnóstico se descargan copias con nombres como
+# "copia_sprint.db", "servidor_diag.db", etc. El patrón exacto de arriba
+# no las cubría; esto sí, sea cual sea el nombre y esté donde esté
+# (sprint de integridad, 2026-07-28, tras encontrar una copia real sin
+# proteger en el propio directorio del proyecto).
+*.db
+*.db-wal
+*.db-shm
