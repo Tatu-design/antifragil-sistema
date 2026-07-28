@@ -321,6 +321,51 @@ Fernando planifique su semana, simplemente ya no hace falta leerlo para
 contar sesiones). La rutina en la nube (`trig_01JZ6et1nsACiTiu9Ho2rnt8`) no
 se ha borrado por si se retoma más adelante, pero no es la vía activa.
 
+### Firma pública de sesión desde el enlace personal del cliente (2026-07-28)
+
+Hasta ahora `/mi/<token>` (perfil público por cliente, milestone 4, ver más
+abajo) era de solo lectura. Fernando pidió que el propio cliente pudiera
+confirmar su sesión de PT de hoy desde ese mismo enlace, en vez de esperar
+a que Fernando lo hiciera desde su perfil de administrador — sin tocar
+nada del flujo de Fernando, que sigue funcionando exactamente igual.
+
+**Diseño**: módulo nuevo `firma_publica.py`, que envuelve
+`registrar_sesion_pt()` (la misma función que ya usaba Fernando) sin
+modificarla, y añade solo lo específico del autoservicio:
+
+- **Como mucho una firma por día desde el enlace público** — a diferencia
+  de Fernando, que puede firmar varias veces al día si hace falta (decisión
+  del 2026-07-24, sin cambios). Al ser una escritura sin supervisión
+  directa, se limita más que la de Fernando.
+- **Recibo permanente con fecha y hora**: tabla nueva `firmas_publicas`
+  (cliente, fecha, hora), aparte de `historial_sesiones` — se consultó no
+  añadir una columna `hora` a `historial_sesiones` (que no la tiene, solo
+  `fecha`) para no tocar el esquema ni el flujo ya probado de Fernando;
+  esta tabla nueva es de solo lectura para todo lo demás del sistema. El
+  cliente ve "Sesión firmada el {fecha} a las {hora}" cada vez que entra a
+  su enlace ese mismo día, en vez de un mensaje que desaparece al recargar.
+- **Aviso a Fernando** (`avisos.py`, tipo nuevo `firma_cliente`) cada vez
+  que un cliente firma su propia sesión — la capa de supervisión que
+  compensa que esta escritura ya no la hace Fernando directamente.
+- **Solo puede firmar la sesión del cliente dueño del token**: la ruta
+  `/mi/<token>/firmar` resuelve el nombre a partir del token con
+  `obtener_cliente_por_token()`, nunca de un dato del formulario.
+- **Solo puede CREAR, nunca editar ni borrar**: `editar_sesion_pt`/
+  `eliminar_sesion_pt` siguen siendo accesibles solo desde el perfil de
+  administrador de Fernando (`/cliente/<nombre>/...`), sin cambios.
+- **Misma protección de doble toque y de reintento de red** que ya existía
+  para Fernando: botón desactivado al enviar, más `clave_idempotencia`
+  (generada en cada carga de `/mi/<token>`) reutilizando el mismo mecanismo
+  de `registrar_sesion_pt`.
+
+Probado de punta a punta contra una base de datos temporal (nunca
+`datos/antifragil.db`): primera firma → recibo visible al recargar →
+segundo intento el mismo día no crea una sesión nueva y se ve como mensaje,
+no como error → aviso `firma_cliente` creado → Fernando sigue pudiendo
+firmar una segunda sesión ese mismo día desde su perfil → Fernando puede
+editar y borrar la sesión que firmó el cliente, igual que cualquier otra.
+Tests de regresión en `tests/test_firma_publica.py` (7 pruebas).
+
 ### Protección del trabajo: responsabilidad de Claude, no de Fernando (2026-07-28)
 
 Tras montar la copia de la base de datos, Fernando preguntó "¿si se me

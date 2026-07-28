@@ -227,3 +227,13 @@ def crear_esquema(ruta: Path = RUTA_POR_DEFECTO) -> None:
             )
             """
         )
+        conexion.execute(
+            """
+            CREATE TABLE IF NOT EXISTS firmas_publicas (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                cliente TEXT NOT NULL REFERENCES clientes(nombre),
+                fecha TEXT NOT NULL,
+                hora TEXT NOT NULL
+            )
+            """
+        )

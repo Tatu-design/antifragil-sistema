@@ -44,6 +44,19 @@
       </div>
     </div>
 
+    {% if firma_hoy %}
+    <div class="aviso-guardado">
+      Ya has firmado tu sesión de hoy<br>
+      Sesión firmada el {{ firma_hoy.fecha }} a las {{ firma_hoy.hora }}
+    </div>
+    {% elif cliente.sesiones_totales and cliente.sesiones_restantes > 0 %}
+    <form method="post" action="{{ url_for('mi_firmar', token=token) }}"
+          onsubmit="this.querySelector('button').disabled = true; this.querySelector('button').textContent = 'Guardando…';">
+      <input type="hidden" name="clave_idempotencia" value="{{ clave_idempotencia }}">
+      <button type="submit" class="boton-firmar">✓ Confirmar que hice mi sesión de hoy</button>
+    </form>
+    {% endif %}
+
     <div class="lista">
       <div class="cabecera-seccion">
         <span>Historial de sesiones</span>

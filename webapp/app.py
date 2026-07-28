@@ -40,6 +40,7 @@ from clientes.repositorio import (
     obtener_historial,
 )
 from economia.registro import listar_meses, obtener_mes, obtener_ultima_semana
+from firma_publica import firma_de_hoy, firmar_sesion_publica
 from procesar_dia import procesar_dia
 from registrar_asistencia import (
     editar_sesion_pt,
@@ -67,7 +68,7 @@ app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 60 * 60 * 24 * 7
 # dentro de la propia función.
 RUTAS_PUBLICAS = {
     "login", "configurar_password", "static", "admin_procesar_dia", "admin_debug",
-    "admin_verificar_semana", "admin_backup", "mi_perfil",
+    "admin_verificar_semana", "admin_backup", "mi_perfil", "mi_firmar",
 }
 
 
@@ -337,15 +338,57 @@ def guardar(nombre):
 @app.route("/mi/<token>")
 def mi_perfil(token):
     """Página pública y personal de un cliente (milestone 4) — sin
-    contraseña, solo con su enlace único. De solo lectura: ve su programa,
-    sesiones y pagos, pero no puede cambiar nada."""
+    contraseña, solo con su enlace único. Ve su programa, sesiones y pagos
+    (solo lectura), y desde el 2026-07-28 puede confirmar él mismo su
+    sesión de hoy — ver `mi_firmar` más abajo."""
     encontrado = obtener_cliente_por_token(token)
     if encontrado is None:
         return render_template("error.html", mensaje="Este enlace no es válido. Pide uno nuevo a Fernando."), 404
 
     nombre, cliente = encontrado
     filas = _con_sesiones_restantes({nombre: cliente})
-    return render_template("mi_perfil.html", nombre=nombre, cliente=filas[0], entradas=obtener_historial(nombre))
+    return render_template(
+        "mi_perfil.html",
+        token=token,
+        nombre=nombre,
+        cliente=filas[0],
+        entradas=obtener_historial(nombre),
+        clave_idempotencia=uuid.uuid4().hex,
+        firma_hoy=firma_de_hoy(nombre),
+    )
+
+
+@app.route("/mi/<token>/firmar", methods=["POST"])
+def mi_firmar(token):
+    """Confirma la sesión de PT de HOY para el propio cliente, desde su
+    enlace personal — nunca otra fecha. El nombre se resuelve siempre a
+    partir del token de la URL, nunca de un dato del formulario, así que
+    solo se puede firmar la sesión del cliente dueño de ese enlace.
+
+    Como mucho una firma por día desde aquí (decisión de Fernando,
+    2026-07-28 — distinto del botón de Fernando, que sí permite varias al
+    día). Si ya había firmado hoy, no es un error: `mi_perfil` ya sabe
+    mostrar el recibo en vez del botón, así que basta con volver ahí."""
+    encontrado = obtener_cliente_por_token(token)
+    if encontrado is None:
+        return render_template("error.html", mensaje="Este enlace no es válido. Pide uno nuevo a Fernando."), 404
+    nombre, _cliente = encontrado
+
+    clave_idempotencia = request.form.get("clave_idempotencia")
+    try:
+        firmar_sesion_publica(nombre, clave_idempotencia)
+    except sqlite3.OperationalError:
+        return render_template(
+            "error.html",
+            mensaje="No se pudo registrar la sesión: la base de datos está ocupada. Vuelve a intentarlo.",
+        ), 409
+    except ValueError:
+        # Ya había firmado hoy (o un reintento llega tarde) — no hace falta
+        # mostrar un error, la propia página vuelve a pintar el estado
+        # correcto (el recibo o el mensaje de "ya has firmado").
+        pass
+
+    return redirect(url_for("mi_perfil", token=token))
 
 
 @app.route("/cliente/<nombre>/historial/<int:entrada_id>/editar", methods=["GET", "POST"])
