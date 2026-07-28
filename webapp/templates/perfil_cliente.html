@@ -53,6 +53,7 @@
       {% if cliente.sesiones_totales %}
       <form method="post" action="{{ url_for('firmar_sesion', nombre=nombre) }}"
             onsubmit="this.querySelector('button').disabled = true; this.querySelector('button').textContent = 'Guardando…';">
+        <input type="hidden" name="clave_idempotencia" value="{{ clave_idempotencia }}">
         <button type="submit" class="boton-firmar">✓ Firmar sesión de hoy</button>
       </form>
       {% endif %}

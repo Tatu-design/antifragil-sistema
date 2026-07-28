@@ -19,9 +19,14 @@ no solo esta web de aprendizaje.
 """
 
 import sqlite3
+import tempfile
+import uuid
 from datetime import datetime
+from pathlib import Path
 
-from flask import Flask, jsonify, redirect, render_template, request, send_file, session, url_for
+from zona_horaria import hoy_negocio
+
+from flask import Flask, after_this_request, jsonify, redirect, render_template, request, send_file, session, url_for
 
 from avisos import contar_no_leidos, listar_avisos_pendientes, marcar_todos_leidos, registrar_aviso, resolver_aviso
 from basedatos import RUTA_POR_DEFECTO, crear_esquema
@@ -171,9 +176,14 @@ def inicio():
 def firmar_sesion(nombre):
     """Confirma que un cliente ha hecho su sesión de PT hoy — descuenta del
     bono, guarda la fecha en su historial y suma la sesión a la economía de
-    la semana, todo al momento (decisión de Fernando del 2026-07-22)."""
+    la semana, todo al momento (decisión de Fernando del 2026-07-22).
+
+    `clave_idempotencia` (un valor de un solo uso generado al cargar la
+    página del perfil) impide que un reintento de red o una doble pestaña
+    guarden la misma firma dos veces — sprint de integridad, 2026-07-28."""
+    clave_idempotencia = request.form.get("clave_idempotencia")
     try:
-        resultado = registrar_sesion_pt(nombre)
+        resultado = registrar_sesion_pt(nombre, clave_idempotencia=clave_idempotencia)
     except sqlite3.OperationalError:
         return render_template(
             "error.html",
@@ -205,6 +215,7 @@ def perfil_cliente(nombre):
         "perfil_cliente.html",
         nombre=nombre,
         cliente=cliente,
+        clave_idempotencia=uuid.uuid4().hex,
         entradas=obtener_historial(nombre),
         firmado=request.args.get("firmado"),
         borrado=request.args.get("borrado"),
@@ -398,7 +409,7 @@ def _etiqueta_mes(anio: int, mes: int) -> str:
 
 @app.route("/economia")
 def economia():
-    hoy = datetime.now().date()
+    hoy = hoy_negocio()
 
     semana = obtener_ultima_semana()
     mes = obtener_mes(hoy.year, hoy.month)
@@ -521,15 +532,37 @@ def admin_verificar_semana():
 @app.route("/admin/backup")
 def admin_backup():
     """Descarga la base de datos completa (`antifragil.db`) — para la copia
-    de seguridad semanal automática a Google Drive (decisión de Fernando,
+    de seguridad diaria automática a Google Drive (decisión de Fernando,
     2026-07-28: quiere los datos de clientes/economía a salvo aunque pase
     algo con el servidor). Protegida con el mismo token de máquina a
     máquina que el resto de rutas /admin/*, no con la contraseña personal
-    de Fernando."""
+    de Fernando.
+
+    No entrega el archivo vivo directamente: en modo WAL, leer el archivo
+    principal mientras otra petición está escribiendo podría copiar un
+    estado a medio guardar. Se usa la API de backup de SQLite
+    (`sqlite3.Connection.backup`) para generar una "foto" consistente en un
+    archivo temporal, se envía esa foto, y se borra después (sprint de
+    integridad, 2026-07-28)."""
     token = request.headers.get("X-Admin-Token")
     if token != obtener_admin_token():
         return jsonify({"error": "token inválido"}), 401
-    return send_file(RUTA_POR_DEFECTO, as_attachment=True, download_name="antifragil.db")
+
+    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as archivo_temporal:
+        ruta_temporal = Path(archivo_temporal.name)
+    try:
+        origen = sqlite3.connect(RUTA_POR_DEFECTO)
+        destino = sqlite3.connect(ruta_temporal)
+        with destino:
+            origen.backup(destino)
+        origen.close()
+        destino.close()
+        return send_file(ruta_temporal, as_attachment=True, download_name="antifragil.db")
+    finally:
+        @after_this_request
+        def _borrar_temporal(response):
+            ruta_temporal.unlink(missing_ok=True)
+            return response
 
 
 @app.route("/admin/debug", methods=["POST"])
@@ -544,7 +577,7 @@ def admin_debug():
 
     datos = request.get_json(force=True, silent=True) or {}
     mensaje = datos.get("mensaje", "(sin mensaje)")
-    registrar_aviso(datetime.now().date().isoformat(), "debug_rutina", mensaje)
+    registrar_aviso(hoy_negocio().isoformat(), "debug_rutina", mensaje)
     return jsonify({"ok": True})
 
 
