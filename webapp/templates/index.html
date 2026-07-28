@@ -5,12 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Antifrágil — Clientes</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+  <link rel="icon" href="{{ url_for('static', filename='favicon.png') }}" />
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='favicon.png') }}" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Antifrágil" />
+  <meta name="theme-color" content="#007563" />
 </head>
 <body>
-  <div class="page">
+  <div class="page-ancha">
     <nav class="nav">
+      <img src="{{ url_for('static', filename='logo.png') }}" alt="Antifrágil" class="logo-nav" />
       <a href="{{ url_for('inicio') }}" class="activo">Clientes</a>
       <a href="{{ url_for('economia') }}">Economía</a>
+      <a href="{{ url_for('avisos') }}">Avisos{% if avisos_no_leidos %} <span class="pill pendiente">{{ avisos_no_leidos }}</span>{% endif %}</a>
       <a href="{{ url_for('logout') }}" style="margin-left:auto;">Salir</a>
     </nav>
 
@@ -26,9 +33,20 @@
     <div class="aviso-guardado">✔ Guardado: {{ guardado }}</div>
     {% endif %}
 
-    <div class="lista">
+    <div class="stats-resumen">
+      <div class="stat-card">
+        <div class="stat-label">Clientes activos</div>
+        <div class="stat-valor">{{ total_clientes }}</div>
+      </div>
+      <div class="stat-card {% if total_pendientes %}stat-alerta{% endif %}">
+        <div class="stat-label">Pendientes de pago</div>
+        <div class="stat-valor">{{ total_pendientes }}</div>
+      </div>
+    </div>
+
+    <div class="clientes-grid">
       {% for cliente in clientes %}
-      <div class="fila">
+      <a class="fila tarjeta-cliente" href="{{ url_for('perfil_cliente', nombre=cliente.nombre) }}">
         <div class="cabecera">
           <span class="nombre">{{ cliente.nombre }}</span>
           {% if cliente.pendiente_pago %}
@@ -39,15 +57,19 @@
         </div>
         <div class="programa">{{ cliente.tipo_programa or "sin programa asignado" }}</div>
         {% if cliente.sesiones_totales %}
-        <div class="meta">
-          {{ cliente.sesiones_completadas }} de {{ cliente.sesiones_totales }} sesiones
-          · quedan {{ cliente.sesiones_restantes }}
+        <div class="progreso-mini">
+          <div class="progreso-mini-numeros">
+            <span><strong>{{ cliente.sesiones_completadas }}</strong> de {{ cliente.sesiones_totales }} sesiones</span>
+            <span>quedan {{ cliente.sesiones_restantes }}</span>
+          </div>
+          <div class="progreso-mini-barra">
+            <span style="width: {{ (cliente.sesiones_completadas / cliente.sesiones_totales * 100) | round(0, 'floor') }}%;"></span>
+          </div>
         </div>
         {% else %}
         <div class="meta">Faltan datos por rellenar en el Excel</div>
         {% endif %}
-        <a class="editar" href="{{ url_for('editar', nombre=cliente.nombre) }}">Editar →</a>
-      </div>
+      </a>
       {% endfor %}
     </div>
   </div>

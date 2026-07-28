@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{ nombre }} — Antifrágil</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+  <link rel="icon" href="{{ url_for('static', filename='favicon.png') }}" />
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='favicon.png') }}" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Antifrágil" />
+  <meta name="theme-color" content="#007563" />
+</head>
+<body>
+  <div class="page">
+    <div class="perfil-saludo">
+      <img src="{{ url_for('static', filename='logo.png') }}" alt="Antifrágil" class="logo-login" />
+      <h1>Hola, {{ nombre }}</h1>
+      <p class="subtitulo" style="margin:0;">Así va tu bono ahora mismo</p>
+    </div>
+
+    <div class="perfil-hero">
+      <div class="programa-nombre">{{ cliente.tipo_programa }}</div>
+
+      {% if cliente.sesiones_totales %}
+      <div class="perfil-progreso">
+        <div class="perfil-progreso-numeros">
+          <span class="grande">{{ cliente.sesiones_completadas }}</span>
+          <span class="de">de {{ cliente.sesiones_totales }} sesiones</span>
+        </div>
+        <div class="perfil-progreso-barra">
+          <span style="width: {{ (cliente.sesiones_completadas / cliente.sesiones_totales * 100) | round(0, 'floor') }}%;"></span>
+        </div>
+        <div class="perfil-progreso-restantes">Te quedan {{ cliente.sesiones_restantes }}</div>
+      </div>
+      {% endif %}
+
+      <div class="estado">
+        {% if cliente.pendiente_pago %}
+        <span class="pill pendiente">Pendiente de pago</span>
+        {% else %}
+        <span class="pill aldia">Al día</span>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="lista">
+      <div class="cabecera-seccion">
+        <span>Historial de sesiones</span>
+      </div>
+
+      {% if entradas %}
+      {% for entrada in entradas %}
+      <div class="fila">
+        <div class="sesion-fila">
+          <div class="sesion-badge">{{ entrada.numero_sesion }}</div>
+          <div class="sesion-info">
+            <div class="fecha">{{ entrada.fecha }}</div>
+            <div class="tipo">{{ entrada.tipo_programa }} · sesión {{ entrada.numero_sesion }} de {{ entrada.sesiones_totales }}</div>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+      {% else %}
+      <p class="empty">Todavía no hay sesiones registradas con fecha.</p>
+      {% endif %}
+    </div>
+  </div>
+</body>
+</html>

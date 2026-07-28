@@ -13,6 +13,7 @@ que se documentaron en `.claude/skills/lessons-learned/log.md` y que
 desaparecen con una base de datos de verdad.
 """
 
+import secrets
 from pathlib import Path
 
 from basedatos import RUTA_POR_DEFECTO, conectar
@@ -21,7 +22,7 @@ from programas.logica import ActualizacionPrograma
 
 def leer_clientes(ruta: Path = RUTA_POR_DEFECTO) -> dict[str, dict]:
     """Devuelve {cliente: {tipo_programa, tarifa, sesiones_totales,
-    sesiones_completadas, pendiente_pago}}.
+    sesiones_completadas, pendiente_pago, token}}.
 
     Fernando anota las sesiones "completadas" (consumidas del bono actual),
     no las que le quedan. `a_programa` hace la conversión a "restantes"
@@ -31,7 +32,7 @@ def leer_clientes(ruta: Path = RUTA_POR_DEFECTO) -> dict[str, dict]:
         filas = conexion.execute(
             """
             SELECT c.nombre, c.tipo_programa, p.tarifa, p.sesiones_totales,
-                   c.sesiones_completadas, c.pendiente_pago
+                   c.sesiones_completadas, c.pendiente_pago, c.token
             FROM clientes c
             JOIN programas p ON p.nombre = c.tipo_programa
             ORDER BY c.nombre
@@ -45,6 +46,7 @@ def leer_clientes(ruta: Path = RUTA_POR_DEFECTO) -> dict[str, dict]:
             "sesiones_totales": fila["sesiones_totales"],
             "sesiones_completadas": fila["sesiones_completadas"],
             "pendiente_pago": "Sí" if fila["pendiente_pago"] else "No",
+            "token": fila["token"],
         }
         for fila in filas
     }
@@ -64,6 +66,7 @@ def a_programa(fila: dict) -> dict | None:
             "sesiones_restantes": sesiones_totales - sesiones_completadas,
             "sesiones_totales": sesiones_totales,
             "pendiente_pago": str(fila["pendiente_pago"]).strip().lower() in ("sí", "si"),
+            "tipo_programa": fila["tipo_programa"],
         }
     except (TypeError, ValueError):
         return None
@@ -136,9 +139,9 @@ def crear_cliente(
         if existe:
             raise ValueError(f"Ya existe un cliente llamado '{nombre}'")
         conexion.execute(
-            "INSERT INTO clientes (nombre, tipo_programa, sesiones_completadas, pendiente_pago) "
-            "VALUES (?, ?, ?, ?)",
-            (nombre, tipo_programa, sesiones_completadas, int(pendiente_pago)),
+            "INSERT INTO clientes (nombre, tipo_programa, sesiones_completadas, pendiente_pago, token) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (nombre, tipo_programa, sesiones_completadas, int(pendiente_pago), secrets.token_urlsafe(24)),
         )
 
 
@@ -175,6 +178,145 @@ def actualizar_cliente(
             "WHERE nombre = ?",
             (nuevo_nombre, tipo_programa, sesiones_completadas, int(pendiente_pago), nombre),
         )
+
+
+def registrar_historial(historial: dict[str, list[dict]], ruta: Path = RUTA_POR_DEFECTO) -> None:
+    """Guarda el historial de sesiones (fecha -> nº de bono) calculado por
+    `programas.procesar.procesar_semana`. Solo se llama tras confirmación
+    explícita, igual que `aplicar_actualizaciones` — de hecho siempre se
+    llama junto a ella, en el mismo cierre semanal.
+
+    Cada llamada añade una fila nueva — un cliente puede tener varias
+    sesiones el mismo día si hace falta (decisión de Fernando, 2026-07-24:
+    antes `UNIQUE(cliente, fecha)` lo impedía; cada sesión se identifica
+    ahora por su propio `id`, no por la fecha)."""
+    with conectar(ruta) as conexion:
+        for cliente, entradas in historial.items():
+            for entrada in entradas:
+                conexion.execute(
+                    "INSERT INTO historial_sesiones (cliente, fecha, tipo_programa, numero_sesion, sesiones_totales, tarifa) "
+                    "VALUES (?, ?, ?, ?, ?, ?)",
+                    (
+                        cliente,
+                        entrada["fecha"],
+                        entrada["tipo_programa"],
+                        entrada["numero_sesion"],
+                        entrada["sesiones_totales"],
+                        entrada.get("tarifa"),
+                    ),
+                )
+
+
+def obtener_historial(nombre: str, ruta: Path = RUTA_POR_DEFECTO) -> list[dict]:
+    """Historial de sesiones de un cliente, de la más reciente a la más
+    antigua (si hay varias el mismo día, la añadida más tarde va primero)."""
+    with conectar(ruta) as conexion:
+        filas = conexion.execute(
+            "SELECT id, fecha, tipo_programa, numero_sesion, sesiones_totales "
+            "FROM historial_sesiones WHERE cliente = ? ORDER BY fecha DESC, id DESC",
+            (nombre,),
+        ).fetchall()
+    return [dict(fila) for fila in filas]
+
+
+def marcar_pendiente_pago(cliente: str, valor: bool, ruta: Path = RUTA_POR_DEFECTO) -> None:
+    """Cambia solo el estado de pago pendiente, sin tocar nada más — usado
+    por `registrar_asistencia.eliminar_sesion_pt` para deshacer una
+    renovación de bono cuando se borra la sesión que la causó (decisión de
+    Fernando, 2026-07-24)."""
+    with conectar(ruta) as conexion:
+        conexion.execute("UPDATE clientes SET pendiente_pago = ? WHERE nombre = ?", (int(valor), cliente))
+
+
+def _sincronizar_completadas_con_ultima(conexion, cliente: str) -> None:
+    """Tras editar o borrar una entrada del historial, las sesiones
+    completadas del cliente deben seguir coincidiendo con la más reciente
+    que quede — si no, la tarjeta y el historial dirían números distintos
+    (justo el error que motivó esta función, 2026-07-22). Si hay varias
+    sesiones el mismo día, "la más reciente" es la que se añadió después
+    (id más alto) — decisión de Fernando, 2026-07-24."""
+    ultima = conexion.execute(
+        "SELECT numero_sesion FROM historial_sesiones WHERE cliente = ? ORDER BY fecha DESC, id DESC LIMIT 1",
+        (cliente,),
+    ).fetchone()
+    if ultima:
+        conexion.execute(
+            "UPDATE clientes SET sesiones_completadas = ? WHERE nombre = ?",
+            (ultima["numero_sesion"], cliente),
+        )
+
+
+def editar_historial(entrada_id: int, nueva_fecha: str, nuevo_numero_sesion: int, ruta: Path = RUTA_POR_DEFECTO) -> dict:
+    """Corrige una entrada ya guardada del historial (fecha y/o número de
+    sesión) — para arreglar errores como un número de sesión equivocado.
+    Cada entrada se identifica por su `id`, no por (cliente, fecha) — un
+    cliente puede tener varias sesiones el mismo día (decisión de
+    Fernando, 2026-07-24). Si la entrada corregida sigue siendo la más
+    reciente (o pasa a serlo), las sesiones completadas del cliente se
+    ajustan también. Devuelve la entrada tal como quedó, con su cliente."""
+    with conectar(ruta) as conexion:
+        fila = conexion.execute(
+            "SELECT cliente FROM historial_sesiones WHERE id = ?", (entrada_id,)
+        ).fetchone()
+        if fila is None:
+            raise ValueError("Esa entrada del historial ya no existe")
+        cliente = fila["cliente"]
+
+        conexion.execute(
+            "UPDATE historial_sesiones SET fecha = ?, numero_sesion = ? WHERE id = ?",
+            (nueva_fecha, nuevo_numero_sesion, entrada_id),
+        )
+        _sincronizar_completadas_con_ultima(conexion, cliente)
+
+    return {"id": entrada_id, "cliente": cliente, "fecha": nueva_fecha, "numero_sesion": nuevo_numero_sesion}
+
+
+def eliminar_historial(entrada_id: int, ruta: Path = RUTA_POR_DEFECTO) -> dict:
+    """Borra una entrada del historial por su `id` (p. ej. un toque de más
+    en "Firmar sesión" por error). Devuelve la entrada borrada — para poder
+    también deshacer su aportación económica, ver `registrar_asistencia.py`."""
+    with conectar(ruta) as conexion:
+        fila = conexion.execute(
+            "SELECT cliente, fecha, numero_sesion, sesiones_totales, tipo_programa FROM historial_sesiones "
+            "WHERE id = ?",
+            (entrada_id,),
+        ).fetchone()
+        if fila is None:
+            raise ValueError("Esa entrada del historial ya no existe")
+        entrada = dict(fila)
+        entrada["id"] = entrada_id
+        cliente = entrada["cliente"]
+
+        conexion.execute("DELETE FROM historial_sesiones WHERE id = ?", (entrada_id,))
+        _sincronizar_completadas_con_ultima(conexion, cliente)
+
+    return entrada
+
+
+def obtener_cliente_por_token(token: str, ruta: Path = RUTA_POR_DEFECTO) -> tuple[str, dict] | None:
+    """Busca al cliente dueño de este enlace personal (ver `/mi/<token>` en
+    `webapp/app.py`, milestone 4: cada cliente ve su propio bono e
+    historial sin necesitar la contraseña de Fernando)."""
+    for nombre, datos in leer_clientes(ruta).items():
+        if datos.get("token") == token:
+            return nombre, datos
+    return None
+
+
+def asegurar_tokens(ruta: Path = RUTA_POR_DEFECTO) -> int:
+    """Genera un token a los clientes que todavía no tengan uno (los dados
+    de alta antes de que existiera esta función). Devuelve cuántos se
+    generaron. Segura de repetir."""
+    generados = 0
+    with conectar(ruta) as conexion:
+        filas = conexion.execute("SELECT nombre FROM clientes WHERE token IS NULL").fetchall()
+        for fila in filas:
+            conexion.execute(
+                "UPDATE clientes SET token = ? WHERE nombre = ?",
+                (secrets.token_urlsafe(24), fila["nombre"]),
+            )
+            generados += 1
+    return generados
 
 
 def aplicar_actualizaciones(

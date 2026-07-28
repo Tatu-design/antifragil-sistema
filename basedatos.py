@@ -23,6 +23,21 @@ def conectar(ruta: Path = RUTA_POR_DEFECTO) -> sqlite3.Connection:
     conexion = sqlite3.connect(ruta)
     conexion.row_factory = sqlite3.Row  # permite leer columnas por nombre, como un diccionario
     conexion.execute("PRAGMA foreign_keys = ON")
+    # WAL en vez del modo por defecto: cada guardado no tiene que reescribir
+    # ni sincronizar en disco un archivo de "journal" entero, solo anotar el
+    # cambio aparte, y las lecturas ya no esperan a que termine una
+    # escritura en curso — notablemente más rápido para una web que abre
+    # muchas conexiones cortas por petición (decisión de Fernando del
+    # 2026-07-24, tras notar la web lenta al firmar sesiones).
+    #
+    # `wal_autocheckpoint = 1` obliga a volcar ese cambio al archivo
+    # principal (antifragil.db) en cuanto se guarda, en vez de dejarlo un
+    # rato aparte en antifragil.db-wal — así el archivo que se descarga o
+    # sincroniza con el servidor (`sincronizar_servidor.py`, y cualquier
+    # copia de diagnóstico) sigue siendo siempre ese único archivo completo,
+    # sin tener que acordarse de mover también un archivo -wal aparte.
+    conexion.execute("PRAGMA journal_mode = WAL")
+    conexion.execute("PRAGMA wal_autocheckpoint = 1")
     return conexion
 
 
@@ -45,10 +60,12 @@ def crear_esquema(ruta: Path = RUTA_POR_DEFECTO) -> None:
                 nombre TEXT PRIMARY KEY,
                 tipo_programa TEXT NOT NULL REFERENCES programas(nombre),
                 sesiones_completadas INTEGER NOT NULL DEFAULT 0,
-                pendiente_pago INTEGER NOT NULL DEFAULT 0
+                pendiente_pago INTEGER NOT NULL DEFAULT 0,
+                token TEXT
             )
             """
         )
+        conexion.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_clientes_token ON clientes(token)")
         conexion.execute(
             """
             CREATE TABLE IF NOT EXISTS semanas (
@@ -79,6 +96,76 @@ def crear_esquema(ruta: Path = RUTA_POR_DEFECTO) -> None:
             CREATE TABLE IF NOT EXISTS configuracion (
                 clave TEXT PRIMARY KEY,
                 valor TEXT NOT NULL
+            )
+            """
+        )
+        conexion.execute(
+            """
+            CREATE TABLE IF NOT EXISTS avisos (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                fecha TEXT NOT NULL,
+                tipo TEXT NOT NULL,
+                detalle TEXT NOT NULL,
+                resuelto INTEGER NOT NULL DEFAULT 0,
+                leido INTEGER NOT NULL DEFAULT 0
+            )
+            """
+        )
+        conexion.execute(
+            """
+            CREATE TABLE IF NOT EXISTS historial_sesiones (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                cliente TEXT NOT NULL REFERENCES clientes(nombre),
+                fecha TEXT NOT NULL,
+                tipo_programa TEXT NOT NULL,
+                numero_sesion INTEGER NOT NULL,
+                sesiones_totales INTEGER NOT NULL,
+                tarifa REAL
+            )
+            """
+        )
+        columnas = {fila["name"] for fila in conexion.execute("PRAGMA table_info(historial_sesiones)")}
+        if "tarifa" not in columnas:
+            conexion.execute("ALTER TABLE historial_sesiones ADD COLUMN tarifa REAL")
+
+        # Migración 2026-07-24: hasta ahora un cliente solo podía tener una
+        # sesión de PT por día (UNIQUE(cliente, fecha)) — Fernando pidió
+        # poder firmar más de una si hace falta (p. ej. una sesión extra de
+        # regalo, o dos sesiones reales el mismo día). SQLite no permite
+        # quitar un UNIQUE con ALTER TABLE, así que se reconstruye la tabla
+        # sin él, conservando todos los datos y los mismos `id`. Cada
+        # sesión pasa a identificarse por su `id`, no por (cliente, fecha).
+        definicion = conexion.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='historial_sesiones'"
+        ).fetchone()["sql"]
+        if "UNIQUE" in definicion:
+            conexion.execute(
+                """
+                CREATE TABLE historial_sesiones_nueva (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    cliente TEXT NOT NULL REFERENCES clientes(nombre),
+                    fecha TEXT NOT NULL,
+                    tipo_programa TEXT NOT NULL,
+                    numero_sesion INTEGER NOT NULL,
+                    sesiones_totales INTEGER NOT NULL,
+                    tarifa REAL
+                )
+                """
+            )
+            conexion.execute(
+                "INSERT INTO historial_sesiones_nueva "
+                "(id, cliente, fecha, tipo_programa, numero_sesion, sesiones_totales, tarifa) "
+                "SELECT id, cliente, fecha, tipo_programa, numero_sesion, sesiones_totales, tarifa "
+                "FROM historial_sesiones"
+            )
+            conexion.execute("DROP TABLE historial_sesiones")
+            conexion.execute("ALTER TABLE historial_sesiones_nueva RENAME TO historial_sesiones")
+        conexion.execute(
+            """
+            CREATE TABLE IF NOT EXISTS clases_grupo (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                fecha TEXT NOT NULL,
+                tipo TEXT NOT NULL
             )
             """
         )

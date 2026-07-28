@@ -21,17 +21,49 @@ no solo esta web de aprendizaje.
 import sqlite3
 from datetime import datetime
 
-from flask import Flask, redirect, render_template, request, session, url_for
+from flask import Flask, jsonify, redirect, render_template, request, send_file, session, url_for
 
-from calendar_integration.semana import get_week_range
-from clientes.repositorio import actualizar_cliente, crear_cliente, leer_clientes, listar_tipos_programa
-from economia.registro import obtener_mes, obtener_semana
-from webapp.auth import establecer_password, hay_password_configurada, obtener_secret_key, verificar_password
+from avisos import contar_no_leidos, listar_avisos_pendientes, marcar_todos_leidos, registrar_aviso, resolver_aviso
+from basedatos import RUTA_POR_DEFECTO, crear_esquema
+from clientes.repositorio import (
+    actualizar_cliente,
+    asegurar_tokens,
+    crear_cliente,
+    leer_clientes,
+    listar_tipos_programa,
+    obtener_cliente_por_token,
+    obtener_historial,
+)
+from economia.registro import listar_meses, obtener_mes, obtener_ultima_semana
+from procesar_dia import procesar_dia
+from registrar_asistencia import (
+    editar_sesion_pt,
+    eliminar_sesion_pt,
+    eliminar_ultima_clase_grupo,
+    registrar_clase_grupo,
+    registrar_sesion_pt,
+)
+from verificar_semana import verificar_semana
+from webapp.auth import establecer_password, hay_password_configurada, obtener_admin_token, obtener_secret_key, verificar_password
+
+crear_esquema()  # crea las tablas si es la primera vez que arranca en esta máquina (ej. un servidor nuevo)
+asegurar_tokens()  # da un enlace personal a clientes dados de alta antes del milestone 4
 
 app = Flask(__name__)
 app.secret_key = obtener_secret_key()
+# El CSS, el logo y la tipografía casi nunca cambian — sin esto, el
+# navegador los volvía a descargar en cada página (iba notablemente más
+# lenta). Una semana de caché es un buen equilibrio para un proyecto que
+# cambia de vez en cuando, no cada día.
+app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 60 * 60 * 24 * 7
 
-RUTAS_PUBLICAS = {"login", "configurar_password", "static"}
+# admin_procesar_dia no usa contraseña de sesión (lo llama una rutina
+# automática, no un navegador) — se protege con su propio token, comprobado
+# dentro de la propia función.
+RUTAS_PUBLICAS = {
+    "login", "configurar_password", "static", "admin_procesar_dia", "admin_debug",
+    "admin_verificar_semana", "admin_backup", "mi_perfil",
+}
 
 
 @app.before_request
@@ -123,8 +155,60 @@ def _es_si(valor) -> bool:
 @app.route("/")
 def inicio():
     clientes = leer_clientes()
+    filas = _con_sesiones_restantes(clientes)
     guardado = request.args.get("guardado")
-    return render_template("index.html", clientes=_con_sesiones_restantes(clientes), guardado=guardado)
+    pendientes = sum(1 for f in filas if f["pendiente_pago"])
+    return render_template(
+        "index.html",
+        clientes=filas,
+        guardado=guardado,
+        total_clientes=len(filas),
+        total_pendientes=pendientes,
+    )
+
+
+@app.route("/cliente/<nombre>/firmar", methods=["POST"])
+def firmar_sesion(nombre):
+    """Confirma que un cliente ha hecho su sesión de PT hoy — descuenta del
+    bono, guarda la fecha en su historial y suma la sesión a la economía de
+    la semana, todo al momento (decisión de Fernando del 2026-07-22)."""
+    try:
+        resultado = registrar_sesion_pt(nombre)
+    except sqlite3.OperationalError:
+        return render_template(
+            "error.html",
+            mensaje="No se pudo registrar la sesión: la base de datos está ocupada. Vuelve a intentarlo.",
+        ), 409
+    except ValueError as error:
+        return render_template("error.html", mensaje=str(error)), 400
+
+    mensaje = f"sesión {resultado['numero_sesion']} de {resultado['sesiones_totales']}"
+    if resultado["renovado"]:
+        mensaje += " — ¡bono renovado!"
+    return redirect(url_for("perfil_cliente", nombre=nombre, firmado=mensaje))
+
+
+@app.route("/cliente/<nombre>")
+def perfil_cliente(nombre):
+    """Perfil de un cliente para Fernando: bono, botón de firmar sesión,
+    enlace a editar y el historial, todo en una sola pantalla (decisión del
+    2026-07-22 — antes estaba repartido entre la tarjeta de la lista, editar
+    e historial por separado)."""
+    clientes = leer_clientes()
+    if nombre not in clientes:
+        return f"No existe el cliente '{nombre}'", 404
+
+    filas = _con_sesiones_restantes({nombre: clientes[nombre]})
+    cliente = filas[0]
+    cliente["token"] = clientes[nombre].get("token")
+    return render_template(
+        "perfil_cliente.html",
+        nombre=nombre,
+        cliente=cliente,
+        entradas=obtener_historial(nombre),
+        firmado=request.args.get("firmado"),
+        borrado=request.args.get("borrado"),
+    )
 
 
 @app.route("/cliente/nuevo")
@@ -239,15 +323,242 @@ def guardar(nombre):
     return redirect(url_for("inicio", guardado=request.form["nombre"]))
 
 
+@app.route("/mi/<token>")
+def mi_perfil(token):
+    """Página pública y personal de un cliente (milestone 4) — sin
+    contraseña, solo con su enlace único. De solo lectura: ve su programa,
+    sesiones y pagos, pero no puede cambiar nada."""
+    encontrado = obtener_cliente_por_token(token)
+    if encontrado is None:
+        return render_template("error.html", mensaje="Este enlace no es válido. Pide uno nuevo a Fernando."), 404
+
+    nombre, cliente = encontrado
+    filas = _con_sesiones_restantes({nombre: cliente})
+    return render_template("mi_perfil.html", nombre=nombre, cliente=filas[0], entradas=obtener_historial(nombre))
+
+
+@app.route("/cliente/<nombre>/historial/<int:entrada_id>/editar", methods=["GET", "POST"])
+def editar_historial_ruta(nombre, entrada_id):
+    """Corrige una entrada del historial ya guardada — para arreglar un
+    número de sesión equivocado. Cada entrada se identifica por su `id`,
+    no por su fecha — un cliente puede tener varias sesiones el mismo día
+    (decisión de Fernando, 2026-07-24)."""
+    if request.method == "POST":
+        try:
+            editar_sesion_pt(entrada_id, request.form["fecha"], int(request.form["numero_sesion"]))
+        except sqlite3.OperationalError:
+            return render_template(
+                "error.html", mensaje="No se pudo guardar: la base de datos está ocupada. Reintenta."
+            ), 409
+        except ValueError as error:
+            return render_template("error.html", mensaje=str(error)), 400
+        return redirect(url_for("perfil_cliente", nombre=nombre))
+
+    coincidencias = [entrada for entrada in obtener_historial(nombre) if entrada["id"] == entrada_id]
+    if not coincidencias:
+        return f"No existe esa entrada del historial de '{nombre}'", 404
+    return render_template("editar_historial.html", nombre=nombre, entrada=coincidencias[0])
+
+
+@app.route("/cliente/<nombre>/historial/<int:entrada_id>/eliminar", methods=["POST"])
+def eliminar_historial_ruta(nombre, entrada_id):
+    """Borra una entrada del historial y deshace su aportación económica de
+    esa semana — p. ej. una firma duplicada por error."""
+    try:
+        resultado = eliminar_sesion_pt(entrada_id)
+    except sqlite3.OperationalError:
+        return render_template(
+            "error.html", mensaje="No se pudo borrar: la base de datos está ocupada. Reintenta."
+        ), 409
+    except ValueError as error:
+        return render_template("error.html", mensaje=str(error)), 400
+
+    aviso = None
+    if resultado.get("deshizo_renovacion"):
+        aviso = "También se ha deshecho la renovación de bono que causó esta sesión — ya no queda pendiente de pago."
+    return redirect(url_for("perfil_cliente", nombre=nombre, borrado=aviso))
+
+
+@app.route("/cliente/<nombre>/historial")
+def historial(nombre):
+    """El historial ahora vive dentro del perfil del cliente — este enlace
+    antiguo se queda por si alguien lo tenía guardado."""
+    return redirect(url_for("perfil_cliente", nombre=nombre))
+
+
+MESES_ES = {
+    1: "Enero", 2: "Febrero", 3: "Marzo", 4: "Abril", 5: "Mayo", 6: "Junio",
+    7: "Julio", 8: "Agosto", 9: "Septiembre", 10: "Octubre", 11: "Noviembre", 12: "Diciembre",
+}
+
+
+def _etiqueta_mes(anio: int, mes: int) -> str:
+    return f"{MESES_ES[mes]} {anio}"
+
+
 @app.route("/economia")
 def economia():
-    lunes_semana_actual, _ = get_week_range(datetime.now())
-    fecha = lunes_semana_actual.date()
+    hoy = datetime.now().date()
 
-    semana = obtener_semana(fecha.isoformat())
-    mes = obtener_mes(fecha.year, fecha.month)
+    semana = obtener_ultima_semana()
+    mes = obtener_mes(hoy.year, hoy.month)
+    meses_anteriores = [m for m in listar_meses() if (m["anio"], m["mes"]) != (hoy.year, hoy.month)]
+    for m in meses_anteriores:
+        m["etiqueta"] = _etiqueta_mes(m["anio"], m["mes"])
 
-    return render_template("economia.html", semana=semana, mes=mes, fecha_semana=fecha)
+    return render_template(
+        "economia.html",
+        semana=semana,
+        mes=mes,
+        etiqueta_mes_actual=_etiqueta_mes(hoy.year, hoy.month),
+        meses_anteriores=meses_anteriores,
+        clase_registrada=request.args.get("clase_registrada"),
+        clase_deshecha=request.args.get("clase_deshecha"),
+    )
+
+
+NOMBRES_CLASE = {"lidomare": "CrossFit Lidomare", "kids": "CrossFit Kids"}
+
+
+@app.route("/clase/<tipo>/firmar", methods=["POST"])
+def firmar_clase(tipo):
+    """Cuenta una clase de grupo (no es de un cliente concreto) al momento
+    de terminarla — ver `registrar_asistencia.py`."""
+    if tipo not in NOMBRES_CLASE:
+        return render_template("error.html", mensaje=f"Tipo de clase desconocido: {tipo}"), 400
+
+    try:
+        registrar_clase_grupo(tipo)
+    except sqlite3.OperationalError:
+        return render_template(
+            "error.html",
+            mensaje="No se pudo registrar la clase: la base de datos está ocupada. Vuelve a intentarlo.",
+        ), 409
+
+    return redirect(url_for("economia", clase_registrada=NOMBRES_CLASE[tipo]))
+
+
+@app.route("/clase/<tipo>/deshacer", methods=["POST"])
+def deshacer_clase(tipo):
+    """Deshace la última clase de grupo de este tipo — p. ej. un toque de
+    más en "+1 CrossFit Lidomare/Kids" (decisión de Fernando, 2026-07-24:
+    hasta ahora las sesiones de PT se podían corregir pero las clases de
+    grupo no)."""
+    if tipo not in NOMBRES_CLASE:
+        return render_template("error.html", mensaje=f"Tipo de clase desconocido: {tipo}"), 400
+
+    try:
+        deshecha = eliminar_ultima_clase_grupo(tipo)
+    except sqlite3.OperationalError:
+        return render_template(
+            "error.html",
+            mensaje="No se pudo deshacer: la base de datos está ocupada. Vuelve a intentarlo.",
+        ), 409
+    except ValueError as error:
+        return render_template("error.html", mensaje=str(error)), 400
+
+    return redirect(
+        url_for("economia", clase_deshecha=f"{NOMBRES_CLASE[tipo]} del {deshecha['fecha']}")
+    )
+
+
+@app.route("/admin/procesar-dia", methods=["POST"])
+def admin_procesar_dia():
+    """Llamada por la rutina automática diaria (una nube de Claude Code, no
+    un navegador): procesa las sesiones de un día y las suma a la semana en
+    curso. Protegida con un token de máquina, no con la contraseña de
+    Fernando — ver `webapp/auth.py` y decisión del 2026-07-21."""
+    token = request.headers.get("X-Admin-Token")
+    if token != obtener_admin_token():
+        return jsonify({"error": "token inválido"}), 401
+
+    datos = request.get_json(force=True, silent=True) or {}
+    fecha = datos.get("fecha")
+    eventos = datos.get("eventos")
+    if not fecha or eventos is None:
+        return jsonify({"error": "faltan 'fecha' o 'eventos' en el cuerpo de la petición"}), 400
+
+    try:
+        resultado = procesar_dia(eventos, fecha)
+    except sqlite3.OperationalError:
+        return jsonify({"error": "base de datos ocupada, reintenta"}), 409
+
+    return jsonify(resultado)
+
+
+@app.context_processor
+def _inyectar_avisos_no_leidos():
+    if not session.get("autenticado"):
+        return {}
+    return {"avisos_no_leidos": contar_no_leidos()}
+
+
+@app.route("/admin/verificar-semana", methods=["POST"])
+def admin_verificar_semana():
+    """Comprobación semanal contra Calendar (decisión de Fernando del
+    2026-07-22): solo lectura, nunca corrige nada — cualquier diferencia
+    entre lo firmado en la app y lo que hay en Calendar se guarda como
+    aviso. La llamo yo mismo cuando Fernando pide revisar la semana, con
+    los eventos reales de Calendar (nunca inventados)."""
+    token = request.headers.get("X-Admin-Token")
+    if token != obtener_admin_token():
+        return jsonify({"error": "token inválido"}), 401
+
+    datos = request.get_json(force=True, silent=True) or {}
+    eventos = datos.get("eventos")
+    fecha_referencia = datos.get("fecha_referencia")
+    if eventos is None or not fecha_referencia:
+        return jsonify({"error": "faltan 'eventos' o 'fecha_referencia' en el cuerpo de la petición"}), 400
+
+    try:
+        resultado = verificar_semana(eventos, datetime.strptime(fecha_referencia, "%Y-%m-%d"))
+    except sqlite3.OperationalError:
+        return jsonify({"error": "base de datos ocupada, reintenta"}), 409
+
+    return jsonify(resultado)
+
+
+@app.route("/admin/backup")
+def admin_backup():
+    """Descarga la base de datos completa (`antifragil.db`) — para la copia
+    de seguridad semanal automática a Google Drive (decisión de Fernando,
+    2026-07-28: quiere los datos de clientes/economía a salvo aunque pase
+    algo con el servidor). Protegida con el mismo token de máquina a
+    máquina que el resto de rutas /admin/*, no con la contraseña personal
+    de Fernando."""
+    token = request.headers.get("X-Admin-Token")
+    if token != obtener_admin_token():
+        return jsonify({"error": "token inválido"}), 401
+    return send_file(RUTA_POR_DEFECTO, as_attachment=True, download_name="antifragil.db")
+
+
+@app.route("/admin/debug", methods=["POST"])
+def admin_debug():
+    """Ruta temporal de diagnóstico para la puesta en marcha de la
+    actualización diaria (2026-07-21) — la rutina en la nube manda aquí un
+    informe de qué ve disponible, para poder depurar sin que Fernando tenga
+    que mirar nada él mismo. Se puede borrar una vez la rutina funcione bien."""
+    token = request.headers.get("X-Admin-Token")
+    if token != obtener_admin_token():
+        return jsonify({"error": "token inválido"}), 401
+
+    datos = request.get_json(force=True, silent=True) or {}
+    mensaje = datos.get("mensaje", "(sin mensaje)")
+    registrar_aviso(datetime.now().date().isoformat(), "debug_rutina", mensaje)
+    return jsonify({"ok": True})
+
+
+@app.route("/avisos")
+def avisos():
+    lista = listar_avisos_pendientes()
+    marcar_todos_leidos()
+    return render_template("avisos.html", avisos=lista)
+
+
+@app.route("/avisos/<int:aviso_id>/resolver", methods=["POST"])
+def resolver_aviso_ruta(aviso_id):
+    resolver_aviso(aviso_id)
+    return redirect(url_for("avisos"))
 
 
 if __name__ == "__main__":

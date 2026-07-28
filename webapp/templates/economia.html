@@ -5,74 +5,142 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Antifrágil — Economía</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+  <link rel="icon" href="{{ url_for('static', filename='favicon.png') }}" />
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='favicon.png') }}" />
+  <meta name="theme-color" content="#007563" />
 </head>
 <body>
-  <div class="page">
+  <div class="page-ancha">
     <nav class="nav">
+      <img src="{{ url_for('static', filename='logo.png') }}" alt="Antifrágil" class="logo-nav" />
       <a href="{{ url_for('inicio') }}">Clientes</a>
       <a href="{{ url_for('economia') }}" class="activo">Economía</a>
+      <a href="{{ url_for('avisos') }}">Avisos{% if avisos_no_leidos %} <span class="pill pendiente">{{ avisos_no_leidos }}</span>{% endif %}</a>
       <a href="{{ url_for('logout') }}" style="margin-left:auto;">Salir</a>
     </nav>
 
     <h1>Economía</h1>
     <p class="subtitulo">Facturación por sesiones hechas (no por pagos recibidos)</p>
 
-    <div class="lista">
-      <div class="cabecera-seccion">
-        <span>Esta semana</span>
-        <span class="fecha-seccion">desde {{ fecha_semana.strftime('%d/%m/%Y') }}</span>
+    {% if clase_registrada %}
+    <div class="aviso-guardado">✔ Clase registrada — {{ clase_registrada }} de hoy</div>
+    {% endif %}
+
+    {% if clase_deshecha %}
+    <div class="aviso-guardado">✔ Deshecha — {{ clase_deshecha }}</div>
+    {% endif %}
+
+    <div class="botones-clase">
+      <form method="post" action="{{ url_for('firmar_clase', tipo='lidomare') }}" style="flex:1;">
+        <button type="submit" class="boton-clase">+1 CrossFit Lidomare hoy</button>
+      </form>
+      <form method="post" action="{{ url_for('firmar_clase', tipo='kids') }}" style="flex:1;">
+        <button type="submit" class="boton-clase">+1 CrossFit Kids hoy</button>
+      </form>
+    </div>
+    <div class="botones-clase" style="margin-top:0.5rem;">
+      <form method="post" action="{{ url_for('deshacer_clase', tipo='lidomare') }}" style="flex:1;"
+            onsubmit="return confirm('¿Deshacer la última clase de CrossFit Lidomare registrada?');">
+        <button type="submit" class="boton-secundario" style="width:100%;">Deshacer última Lidomare</button>
+      </form>
+      <form method="post" action="{{ url_for('deshacer_clase', tipo='kids') }}" style="flex:1;"
+            onsubmit="return confirm('¿Deshacer la última clase de CrossFit Kids registrada?');">
+        <button type="submit" class="boton-secundario" style="width:100%;">Deshacer última Kids</button>
+      </form>
+    </div>
+
+    <div class="economia-resumen-grid">
+      <div class="lista">
+        <div class="cabecera-seccion">
+          <span>Última semana cerrada</span>
+          {% if semana %}
+          <span class="fecha-seccion">desde {{ semana.fecha_inicio }}</span>
+          {% endif %}
+        </div>
+
+        {% if semana %}
+        <div class="metricas">
+          <div class="metrica">
+            <span class="label">Facturación</span>
+            <span class="valor">{{ "%.2f"|format(semana.facturacion_total) }} €</span>
+          </div>
+          <div class="metrica">
+            <span class="label">Horas</span>
+            <span class="valor">{{ semana.horas_totales }}</span>
+          </div>
+          <div class="metrica">
+            <span class="label">€ / hora</span>
+            <span class="valor">{{ "%.2f"|format(semana.precio_medio_hora) }} €</span>
+          </div>
+        </div>
+        {% if semana.sesiones_kids %}
+        <p class="nota">
+          CrossFit Kids: {{ semana.sesiones_kids }} sesiones
+          {% if semana.facturacion_kids is none %}
+          (facturación pendiente de que indiques el importe mensual)
+          {% endif %}
+        </p>
+        {% endif %}
+        {% else %}
+        <p class="empty">Todavía no se ha cerrado ninguna semana. Se registra al confirmar el cierre semanal.</p>
+        {% endif %}
       </div>
 
-      {% if semana %}
-      <div class="metricas">
-        <div class="metrica">
-          <span class="label">Facturación</span>
-          <span class="valor">{{ "%.2f"|format(semana.facturacion_total) }} €</span>
+      <div class="lista" style="margin-top: 1rem;">
+        <div class="cabecera-seccion">
+          <span>{{ etiqueta_mes_actual }}</span>
         </div>
-        <div class="metrica">
-          <span class="label">Horas</span>
-          <span class="valor">{{ semana.horas_totales }}</span>
+
+        {% if mes %}
+        <div class="metricas">
+          <div class="metrica">
+            <span class="label">Facturación</span>
+            <span class="valor">{{ "%.2f"|format(mes.facturacion_total) }} €</span>
+          </div>
+          <div class="metrica">
+            <span class="label">Horas</span>
+            <span class="valor">{{ mes.horas_totales }}</span>
+          </div>
+          <div class="metrica">
+            <span class="label">€ / hora</span>
+            <span class="valor">{{ "%.2f"|format(mes.precio_medio_hora) }} €</span>
+          </div>
         </div>
-        <div class="metrica">
-          <span class="label">€ / hora</span>
-          <span class="valor">{{ "%.2f"|format(semana.precio_medio_hora) }} €</span>
-        </div>
-      </div>
-      {% if semana.sesiones_kids %}
-      <p class="nota">
-        CrossFit Kids: {{ semana.sesiones_kids }} sesiones
-        {% if semana.facturacion_kids is none %}
-        (facturación pendiente de que indiques el importe mensual)
+        {% else %}
+        <p class="empty">Todavía no hay ninguna semana cerrada este mes.</p>
         {% endif %}
-      </p>
-      {% endif %}
-      {% else %}
-      <p class="empty">Todavía no se ha cerrado ninguna semana de este mes. Se registra al confirmar el cierre semanal.</p>
-      {% endif %}
+      </div>
     </div>
 
     <div class="lista" style="margin-top: 1rem;">
       <div class="cabecera-seccion">
-        <span>Este mes</span>
+        <span>Historial de meses</span>
       </div>
 
-      {% if mes %}
-      <div class="metricas">
-        <div class="metrica">
-          <span class="label">Facturación</span>
-          <span class="valor">{{ "%.2f"|format(mes.facturacion_total) }} €</span>
+      {% if meses_anteriores %}
+      {% for m in meses_anteriores %}
+      <div class="fila">
+        <div class="cabecera">
+          <span class="nombre">{{ m.etiqueta }}</span>
         </div>
-        <div class="metrica">
-          <span class="label">Horas</span>
-          <span class="valor">{{ mes.horas_totales }}</span>
-        </div>
-        <div class="metrica">
-          <span class="label">€ / hora</span>
-          <span class="valor">{{ "%.2f"|format(mes.precio_medio_hora) }} €</span>
+        <div class="metricas" style="padding: 0.5rem 0 0;">
+          <div class="metrica">
+            <span class="label">Facturación</span>
+            <span class="valor">{{ "%.2f"|format(m.facturacion_total) }} €</span>
+          </div>
+          <div class="metrica">
+            <span class="label">Horas</span>
+            <span class="valor">{{ m.horas_totales }}</span>
+          </div>
+          <div class="metrica">
+            <span class="label">€ / hora</span>
+            <span class="valor">{{ "%.2f"|format(m.precio_medio_hora) }} €</span>
+          </div>
         </div>
       </div>
+      {% endfor %}
       {% else %}
-      <p class="empty">Todavía no hay ninguna semana cerrada este mes.</p>
+      <p class="empty">Todavía no hay ningún mes anterior completado.</p>
       {% endif %}
     </div>
   </div>

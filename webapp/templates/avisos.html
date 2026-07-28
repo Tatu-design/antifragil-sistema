@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Antifrágil — Avisos</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+  <link rel="icon" href="{{ url_for('static', filename='favicon.png') }}" />
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='favicon.png') }}" />
+  <meta name="theme-color" content="#007563" />
+</head>
+<body>
+  <div class="page-ancha">
+    <nav class="nav">
+      <img src="{{ url_for('static', filename='logo.png') }}" alt="Antifrágil" class="logo-nav" />
+      <a href="{{ url_for('inicio') }}">Clientes</a>
+      <a href="{{ url_for('economia') }}">Economía</a>
+      <a href="{{ url_for('avisos') }}" class="activo">Avisos</a>
+      {# el contador se pone a 0 nada más entrar aquí, a propósito #}
+      <a href="{{ url_for('logout') }}" style="margin-left:auto;">Salir</a>
+    </nav>
+
+    <h1>Avisos</h1>
+    <p class="subtitulo">Cosas que la actualización diaria no pudo procesar sola</p>
+
+    <div class="lista">
+      {% if avisos %}
+      {% for aviso in avisos %}
+      <div class="fila">
+        <div class="cabecera">
+          <span class="nombre">{{ aviso.fecha }}</span>
+          {% if not aviso.leido %}
+          <span class="pill aldia">Nuevo</span>
+          {% endif %}
+        </div>
+        <div class="programa">{{ aviso.tipo.replace('_', ' ') }}</div>
+        <div class="meta">{{ aviso.detalle }}</div>
+        <form method="post" action="{{ url_for('resolver_aviso_ruta', aviso_id=aviso.id) }}" style="margin-top: 0.5rem;">
+          <button type="submit" class="editar" style="background:none; border:none; padding:0; cursor:pointer; font:inherit;">Descartar →</button>
+        </form>
+      </div>
+      {% endfor %}
+      {% else %}
+      <p class="empty">No hay avisos pendientes.</p>
+      {% endif %}
+    </div>
+  </div>
+</body>
+</html>

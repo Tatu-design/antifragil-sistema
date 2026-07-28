@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{ nombre }} — Antifrágil</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+  <link rel="icon" href="{{ url_for('static', filename='favicon.png') }}" />
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='favicon.png') }}" />
+  <meta name="theme-color" content="#007563" />
+</head>
+<body>
+  <div class="page">
+    <a class="volver" href="{{ url_for('inicio') }}">← Clientes</a>
+
+    <h1>{{ nombre }}</h1>
+    <p class="subtitulo" style="margin:0 0 1.25rem;">Perfil, sesiones y pagos</p>
+
+    {% if firmado %}
+    <div class="aviso-guardado">✔ Sesión firmada — {{ firmado }}</div>
+    {% endif %}
+
+    {% if borrado %}
+    <div class="aviso-guardado">✔ Sesión borrada — {{ borrado }}</div>
+    {% endif %}
+
+    <div class="perfil-hero">
+      <div class="programa-nombre">{{ cliente.tipo_programa or "sin programa asignado" }}</div>
+
+      {% if cliente.sesiones_totales %}
+      <div class="perfil-progreso">
+        <div class="perfil-progreso-numeros">
+          <span class="grande">{{ cliente.sesiones_completadas }}</span>
+          <span class="de">de {{ cliente.sesiones_totales }} sesiones</span>
+        </div>
+        <div class="perfil-progreso-barra">
+          <span style="width: {{ (cliente.sesiones_completadas / cliente.sesiones_totales * 100) | round(0, 'floor') }}%;"></span>
+        </div>
+        <div class="perfil-progreso-restantes">Quedan {{ cliente.sesiones_restantes }}</div>
+      </div>
+      {% endif %}
+
+      <div class="estado">
+        {% if cliente.pendiente_pago %}
+        <span class="pill pendiente">Pendiente de pago</span>
+        {% else %}
+        <span class="pill aldia">Al día</span>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="acciones-perfil">
+      {% if cliente.sesiones_totales %}
+      <form method="post" action="{{ url_for('firmar_sesion', nombre=nombre) }}"
+            onsubmit="this.querySelector('button').disabled = true; this.querySelector('button').textContent = 'Guardando…';">
+        <button type="submit" class="boton-firmar">✓ Firmar sesión de hoy</button>
+      </form>
+      {% endif %}
+      <a class="boton-secundario" href="{{ url_for('editar', nombre=nombre) }}">Editar programa</a>
+    </div>
+
+    {% if cliente.token %}
+    <p class="meta" style="margin-bottom: 1.5rem; word-break: break-all;">
+      Enlace personal del cliente: {{ url_for('mi_perfil', token=cliente.token, _external=True) }}
+    </p>
+    {% endif %}
+
+    <div class="lista">
+      <div class="cabecera-seccion">
+        <span>Historial de sesiones</span>
+      </div>
+
+      {% if entradas %}
+      {% for entrada in entradas %}
+      <div class="fila">
+        <div class="sesion-fila">
+          <div class="sesion-badge">{{ entrada.numero_sesion }}</div>
+          <div class="sesion-info" style="flex:1;">
+            <div class="fecha">{{ entrada.fecha }}</div>
+            <div class="tipo">{{ entrada.tipo_programa }} · sesión {{ entrada.numero_sesion }} de {{ entrada.sesiones_totales }}</div>
+          </div>
+          <a class="editar" href="{{ url_for('editar_historial_ruta', nombre=nombre, entrada_id=entrada.id) }}">Editar →</a>
+        </div>
+      </div>
+      {% endfor %}
+      {% else %}
+      <p class="empty">Todavía no hay sesiones registradas con fecha.</p>
+      {% endif %}
+    </div>
+  </div>
+</body>
+</html>

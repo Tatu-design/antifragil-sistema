@@ -5,16 +5,25 @@ from collections import Counter
 from calendar_integration.parser import SesionDetectada, clasificar_evento
 
 
+def _fecha_evento(evento: dict) -> str:
+    """Fecha (YYYY-MM-DD) del inicio de un evento, con o sin hora."""
+    inicio = evento.get("start", {})
+    return (inicio.get("dateTime") or inicio.get("date") or "")[:10]
+
+
 def resumir_semana(eventos: list[dict]) -> dict:
     """A partir de eventos crudos de Google Calendar, devuelve:
 
     - sesiones_pt: Counter {nombre_cliente: nº sesiones}
+    - sesiones_pt_fechas: {nombre_cliente: [fechas ISO ordenadas]} — para el
+      historial de sesiones por cliente (ver `programas/procesar.py`)
     - crossfit_lidomare: nº de clases
     - crossfit_kids: nº de clases
     - no_reconocidos: lista de títulos que no encajan en ningún tipo conocido
       (para que Fernando pueda revisarlos y ajustar el formato de sus eventos)
     """
     sesiones_pt: Counter = Counter()
+    sesiones_pt_fechas: dict[str, list[str]] = {}
     crossfit_lidomare = 0
     crossfit_kids = 0
     no_reconocidos: list[str] = []
@@ -29,13 +38,18 @@ def resumir_semana(eventos: list[dict]) -> dict:
 
         if sesion.tipo == "pt":
             sesiones_pt[sesion.cliente] += 1
+            sesiones_pt_fechas.setdefault(sesion.cliente, []).append(_fecha_evento(evento))
         elif sesion.tipo == "crossfit_lidomare":
             crossfit_lidomare += 1
         elif sesion.tipo == "crossfit_kids":
             crossfit_kids += 1
 
+    for fechas in sesiones_pt_fechas.values():
+        fechas.sort()
+
     return {
         "sesiones_pt": sesiones_pt,
+        "sesiones_pt_fechas": sesiones_pt_fechas,
         "crossfit_lidomare": crossfit_lidomare,
         "crossfit_kids": crossfit_kids,
         "no_reconocidos": no_reconocidos,

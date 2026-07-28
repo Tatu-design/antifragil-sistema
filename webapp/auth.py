@@ -35,8 +35,20 @@ def _guardar_configuracion(clave: str, valor: str, ruta: Path = RUTA_POR_DEFECTO
         )
 
 
+_password_configurada_cache: bool | None = None
+
+
 def hay_password_configurada(ruta: Path = RUTA_POR_DEFECTO) -> bool:
-    return _leer_configuracion("password_hash", ruta) is not None
+    """Se comprueba en `before_request`, es decir en TODA petición — pero la
+    contraseña solo se establece una vez en la vida de la app, así que en
+    cuanto se confirma que existe se guarda en memoria y no hace falta
+    volver a preguntarle a la base de datos (decisión de Fernando del
+    2026-07-24, tras notar la web lenta)."""
+    global _password_configurada_cache
+    if _password_configurada_cache:
+        return True
+    _password_configurada_cache = _leer_configuracion("password_hash", ruta) is not None
+    return _password_configurada_cache
 
 
 def establecer_password(password: str, ruta: Path = RUTA_POR_DEFECTO) -> None:
@@ -62,3 +74,15 @@ def obtener_secret_key(ruta: Path = RUTA_POR_DEFECTO) -> str:
     nueva = secrets.token_hex(32)
     _guardar_configuracion("secret_key", nueva, ruta)
     return nueva
+
+
+def obtener_admin_token(ruta: Path = RUTA_POR_DEFECTO) -> str:
+    """Clave para que la actualización diaria automática (una rutina en la
+    nube, sin sesión de navegador) pueda llamar a `/admin/procesar-dia` sin
+    tu contraseña personal — un token de máquina a máquina, no de usuario."""
+    existente = _leer_configuracion("admin_token", ruta)
+    if existente:
+        return existente
+    nuevo = secrets.token_hex(32)
+    _guardar_configuracion("admin_token", nuevo, ruta)
+    return nuevo

@@ -89,6 +89,426 @@ correctamente.
   abrir. La idea de dar acceso a los propios clientes a su perfil queda
   aparcada como módulo futuro (requeriría cuentas de usuario reales).
 
+### Sincronización automática con el servidor (2026-07-19)
+
+Primer cierre semanal real hecho sobre SQLite (semana 13-19 julio 2026,
+630€/15h/42€h — coincide con los cálculos previos validados en Excel).
+
+Tras ese cierre, Fernando pidió que la web alojada en PythonAnywhere se
+mantuviera al día sin ningún paso manual — "yo solo quiero tocar Calendar".
+El problema real: `datos/antifragil.db` vive en su ordenador (único sitio
+donde Claude puede escribir, ya que solo Claude tiene acceso al conector de
+Calendar, y solo dentro de una conversación), mientras que el servidor
+tiene su propia copia del archivo — sin nada que las mantenga iguales,
+habría que volver a subir el archivo a mano cada semana.
+
+Solución: `sincronizar_servidor.py`, que usa la **API propia de
+PythonAnywhere** (no Google, no OAuth nuevo — evita repetir el error de
+sobreingeniería del 2026-07-14) para subir `datos/antifragil.db` y recargar
+la web automáticamente. `cierre_semanal/cli.py` la llama al final del modo
+`aplicar`, así que confirmar el cierre semanal ya deja la web pública al
+día en el mismo paso, sin que Fernando tenga que entrar a PythonAnywhere.
+
+### Actualización diaria automática y avisos (2026-07-21)
+
+Fernando pidió ir un paso más allá de sincronizar tras el cierre semanal:
+que clientes y economía se actualicen solos **cada día**, sin que él tenga
+que confirmar nada. Decisión explícita: sin pantalla de confirmación diaria
+(a diferencia del cierre semanal) — en su lugar, un sistema de "avisos"
+para lo que no se pueda procesar solo (evento sin clasificar, cliente sin
+programa...), revisable a posteriori en `/avisos`.
+
+Límite real descubierto: una rutina programada de Claude Code corre **en
+la nube**, no en el ordenador de Fernando — no puede tocar
+`datos/antifragil.db` local. Se decidió (con Fernando, explícitamente) que
+el **servidor pase a ser la copia viva** a partir de ahora; el ordenador de
+Fernando queda como copia secundaria.
+
+Piezas nuevas:
+- `procesar_dia.py`: como `cierre_semanal/cli.py` pero para un solo día,
+  sumando su desglose económico al de la semana en curso (`obtener_desglose_semana`
+  en `economia/registro.py`) en vez de sustituirlo.
+- `webapp/app.py`, ruta `/admin/procesar-dia`: recibe los eventos del día
+  (en crudo, tal cual Calendar) por POST, protegida con un token de
+  máquina (`webapp/auth.py: obtener_admin_token`), no con la contraseña de
+  Fernando — la llama una rutina automática, no un navegador.
+- `avisos.py` + tabla `avisos`: registra lo que la actualización diaria no
+  pudo procesar sola. Con distinción "nuevo" (`leido=0`) / "ya visto" — al
+  entrar en `/avisos` se marcan todos como leídos, y un contador en el menú
+  avisa de cuántos hay nuevos sin tener que entrar.
+- Rutina en la nube ("Antifragil - actualizacion diaria", trigger
+  `trig_01JZ6et1nsACiTiu9Ho2rnt8`, cron `45 21 * * *` = 23:45 hora de
+  Madrid): lee Calendar del día con su propio conector y hace POST a
+  `/admin/procesar-dia`.
+
+**Puesta en marcha con problemas (2026-07-21):** el disparo manual
+("ejecutar ahora" y `run_once_at` a pocos minutos vista) no funcionó en
+9 intentos distintos, incluida la prueba más simple posible (un solo
+`curl`, o crear un único evento de Calendar sin salir a internet). Se
+encontró la causa probable revisando otra rutina ya existente de Fernando
+(el "Briefing Ejecutivo", activa desde junio): esa rutina **sí** se dispara
+todos los días por cron sin fallar — la prueba está en sus borradores de
+Gmail, uno por día. Conclusión: el disparo programado real (cron) funciona;
+el botón de disparo manual/inmediato parece tener un fallo aparte, no
+relacionado con la configuración de esta rutina. Pendiente de confirmar
+con el primer disparo real de esta noche.
+
+`webapp/app.py` también gana `/admin/debug`, una ruta de diagnóstico
+temporal (mismo token) para que la rutina deje constancia de errores sin
+que Fernando tenga que mirar nada — se puede borrar una vez esto funcione
+de forma estable.
+
+### Registro de asistencia en el momento (2026-07-22) — sustituye a Calendar para el día a día
+
+Tras no poder verificar que la rutina automática de Calendar funcionara de
+verdad (9 intentos de prueba sin ningún resultado observable, ver sección
+anterior), Fernando propuso un cambio de fondo: en vez de perseguir una
+automatización invisible que no se podía comprobar, **confirmar cada
+sesión con un toque nada más terminarla**, desde su propio móvil. Mejor
+una herramienta simple y fiable que depende de él, que una automática que
+depende de un sistema en la nube fuera de nuestro control.
+
+- **PT**: botón "✓ Firmar sesión de hoy" en cada tarjeta de cliente
+  (`/cliente/<nombre>/firmar`) — descuenta del bono (con renovación
+  automática si tocaba), guarda la fecha en su historial, y suma la sesión
+  a la economía de la semana en curso. Todo en el momento, sin pantalla de
+  confirmación previa (el propio toque ya es la confirmación) — a
+  diferencia del cierre semanal manual, que sí la lleva.
+- **CrossFit Lidomare / Kids**: no son de un cliente concreto, así que
+  llevan sus propios botones en la pestaña Economía ("+1 CrossFit Lidomare
+  hoy" / "+1 CrossFit Kids hoy", `/clase/<tipo>/firmar`) — solo suman a la
+  economía de la semana, sin tocar ningún cliente.
+
+Piezas nuevas:
+- `programas/procesar.py`: se extrajo `procesar_una_sesion()` de dentro
+  del bucle de `procesar_semana()` — la misma lógica de renovación de
+  bonos, ahora reutilizable tanto para procesar una semana entera (fecha a
+  fecha) como para confirmar una sola sesión al momento, sin duplicar
+  código.
+- `registrar_asistencia.py`: `registrar_sesion_pt()` y
+  `registrar_clase_grupo()` — usan `procesar_una_sesion()` y el mismo
+  reparto económico semanal aditivo (`obtener_desglose_semana`) que ya se
+  había construido para la actualización diaria por Calendar.
+
+**Calendar queda aparcado para este propósito** (sigue sirviendo para que
+Fernando planifique su semana, simplemente ya no hace falta leerlo para
+contar sesiones). La rutina en la nube (`trig_01JZ6et1nsACiTiu9Ho2rnt8`) no
+se ha borrado por si se retoma más adelante, pero no es la vía activa.
+
+### Copia de seguridad semanal a Google Drive (2026-07-28)
+
+Fernando preguntó si los datos (sesiones, economía) quedan guardados para
+siempre y si en 2028 se podría pedir un informe de 2026-2027 — sí, nada se
+borra ni se resume con el tiempo, todo queda en `historial_sesiones` /
+`semanas` / `desglose` indefinidamente. Pero hasta ahora todo vivía en un
+único sitio: el archivo de la base de datos en el servidor de
+PythonAnywhere, sin ninguna copia aparte. Para algo pensado para usarse
+durante años, eso es un punto único de fallo real.
+
+**Solución**: ruta nueva `/admin/backup` (protegida con el mismo
+`admin_token` que el resto de rutas `/admin/*`) que entrega el archivo
+completo de la base de datos. Una rutina en la nube (Claude Code routine,
+`trig_01CKLkkC43B65EyCSCTquY5m`), programada cada domingo a las 23:00
+(hora de Madrid), la descarga y la sube a una carpeta en Google Drive
+("Copias de seguridad Antifragil"), con nombre `antifragil-AAAA-MM-DD.db`.
+No se borran copias antiguas — el archivo pesa poco y así queda también un
+histórico de "fotos" de los datos en distintos momentos, no solo la copia
+más reciente.
+
+La rutina termina creando un **borrador** de Gmail confirmando si la copia
+salió bien o avisando si algo falló — así ni Fernando ni Claude tienen que
+entrar a comprobar Drive cada semana a mano (decisión tomada tras que la
+conexión de Google Drive de la sesión de chat se cayera y no hubiera forma
+de verificarlo desde ahí: mejor que el propio sistema avise solo que
+depender de comprobarlo manualmente). Solo puede crear un borrador, no
+enviar el correo directamente — Fernando lo verá en Borradores, no en la
+bandeja de entrada.
+
+### Varias sesiones de PT el mismo día (2026-07-24)
+
+El bloqueo de "no firmar dos veces el mismo día" de hace un rato resultó
+ser demasiado estricto: Fernando necesita poder firmar más de una sesión
+al mismo cliente el mismo día (p. ej. una sesión de regalo). El bloqueo no
+era solo mío — venía de la propia estructura de la base de datos
+(`UNIQUE(cliente, fecha)` en `historial_sesiones`, ahí desde el principio,
+pensada para un caso que en la práctica no se cumple siempre: como mucho
+una sesión de PT por cliente y día).
+
+**Arreglo de fondo**: cada sesión pasa a identificarse por su propio `id`
+(la clave que ya tenía la tabla), no por su fecha. Se quitó el `UNIQUE`
+reconstruyendo la tabla (SQLite no permite quitarlo con `ALTER TABLE`,
+así que se crea una copia sin él y se sustituye, conservando todos los
+`id` y datos — migración automática en `basedatos.crear_esquema()`).
+`editar_historial`/`eliminar_historial` (y sus rutas web) pasaron de
+identificar la entrada por `(cliente, fecha)` a identificarla por `id` —
+las URL de editar/borrar cambiaron de `/historial/<fecha>/editar` a
+`/historial/<id>/editar`.
+
+Como la protección real contra un doble toque accidental (la causa
+original del descuadre de Felipe y Javi) ya no puede venir de "una sesión
+por día", se cambió el sitio donde vive esa protección: el botón "Firmar
+sesión de hoy" se desactiva y cambia de texto nada más pulsarlo (en el
+propio navegador, `perfil_cliente.html`), así un doble toque físico no
+llega a mandar la segunda petición — pero una segunda sesión real, minutos
+u horas después, se puede firmar sin problema.
+
+### Avisos duplicados (2026-07-24)
+
+Fernando vio el mismo aviso de "discrepancia económica" (el hueco conocido
+de Nikki, ver más abajo) repetido varias veces seguidas en Avisos. Causa:
+la comprobación de sincronización se ejecuta en cada firma, y como el
+hueco de Nikki seguía sin resolver, cada sesión que se firmaba esa semana
+(de cualquier cliente) volvía a detectarlo y creaba un aviso nuevo en vez
+de reconocer que ya había avisado de lo mismo.
+
+**Arreglo**: `registrar_aviso()` ahora no guarda un aviso si ya hay uno sin
+resolver con el mismo tipo y el mismo texto exacto — aplica a todos los
+tipos de aviso, no solo a este, así que también evita que se dupliquen
+avisos de bono terminado o de discrepancia con Calendar si algo los
+dispara más de una vez. Se resolvieron a mano los 2 avisos duplicados que
+ya se habían creado, dejando solo uno.
+
+### Verificación a fondo de la sincronización (2026-07-24)
+
+A petición de Fernando, se probaron a propósito varios ciclos completos
+(firmar → comprobar cliente + semana + mes → borrar → comprobar que todo
+vuelve exactamente a como estaba) contra una copia de la base de datos
+real, buscando huecos parecidos al de Felipe y Javi. Aparecieron tres
+reales, los tres arreglados:
+
+1. **Firmar dos veces el mismo día para el mismo cliente sobrescribía la
+   sesión en el historial (por el `UNIQUE(cliente, fecha)`) pero sumaba la
+   economía dos veces** — probablemente la causa real del descuadre de
+   Felipe y Javi de ayer. Ahora `registrar_sesion_pt` lo detecta y rechaza
+   con un mensaje claro ("ya tiene una sesión firmada ese día, edítala en
+   vez de firmar otra vez") en lugar de dejarlo pasar en silencio.
+2. **Borrar la sesión que completó un bono (y lo renovó automáticamente)
+   no deshacía la renovación**: el cliente se quedaba marcado "pendiente de
+   pago" de un bono que, según el historial que quedaba, nunca se había
+   completado. Ahora, al borrar la sesión más reciente de un cliente si
+   esa sesión era la que completaba el bono, se deshace también el
+   "pendiente de pago". El perfil del cliente muestra un aviso cuando esto
+   pasa.
+3. **Las clases de grupo (CrossFit Lidomare/Kids) no se podían corregir**:
+   a diferencia de las sesiones de PT, un toque de más en "+1 CrossFit
+   Lidomare/Kids" no se podía deshacer de ninguna manera. Se añadió una
+   tabla `clases_grupo` (fecha + tipo, igual que `historial_sesiones` para
+   PT) y un botón "Deshacer última" para cada tipo en la pantalla de
+   Economía. La comprobación automática de sincronización ahora también
+   revisa Lidomare y Kids, no solo las sesiones de PT.
+
+De paso, al probar el caso 3 apareció un **falso positivo** en la propia
+comprobación de sincronización de ayer: la tarifa de Lidomare (15€) vive en
+la misma tabla `desglose` que las de PT, así que cualquier clase de
+Lidomare generaba una alarma falsa de "0 sesiones reales en el historial"
+además de la comprobación correcta — se excluyó esa tarifa de la
+comparación de PT, ya que se compara aparte contra `clases_grupo`.
+
+Casos probados y confirmados correctos sin necesitar cambios: sumar/restar
+una sesión de PT normal (cliente + semana + mes), y editar una sesión
+trasladando su fecha a otra semana (la facturación se mueve de una semana
+a la otra sin dejar rastro en la original).
+
+### Descuadre económico y sincronización historial↔economía (2026-07-23)
+
+Fernando reportó que sus propios números (620€/15h para la semana del
+20-26 julio, 2.210€/53h acumulado en julio) no coincidían con lo guardado
+en la app (740€/17h esa semana). Causa raíz: `semanas`/`desglose`
+(el total económico semanal) y `historial_sesiones` (la lista de sesiones
+firmadas) son dos tablas separadas que se mantienen a mano, cada firma /
+edición / borrado suma o resta el importe correspondiente en operaciones
+independientes (no una única transacción) — si algo se interrumpe a medio
+camino, o se corrige un dato con una herramienta que no pasa por
+`registrar_asistencia.py` (p. ej. un `DELETE` manual durante una reparación
+de datos), la economía y el historial pueden quedar desincronizados sin que
+nada lo detecte. Comprobado: Felipe y Javi tenía 2 sesiones de más (120€)
+contadas en la economía de esa semana sin fila correspondiente en el
+historial — coincide exactamente con la diferencia que reportó Fernando.
+
+**Arreglo del dato**: corregidas `semanas`/`desglose` de la semana del
+2026-07-20 en el servidor (verificado antes de escribir, comparando con una
+descarga fresca de la base de datos por si Fernando había firmado algo
+mientras tanto). Los totales ahora coinciden exactamente con lo que
+Fernando reportó.
+
+**Arreglo de fondo** (para que esto no pueda volver a pasar sin que se
+note el mismo día):
+
+1. `historial_sesiones` guarda ahora la **tarifa** de cada sesión en el
+   momento de firmarla (columna nueva, con backfill para las filas
+   antiguas usando la tarifa actual de cada cliente). Antes había que
+   fiarse de la tarifa *actual* del cliente para reconstruir cuánto debería
+   sumar una sesión pasada — con esto queda fijado para siempre, aunque el
+   precio cambie más adelante.
+2. `economia.registro.verificar_sincronizacion_semana()`: recalcula, tarifa
+   a tarifa, cuántas sesiones hay *de verdad* en el historial de una semana
+   y lo compara con lo guardado en `desglose`. Nunca corrige nada por su
+   cuenta — solo detecta y devuelve la diferencia.
+3. Esta comprobación se dispara **sola, al momento**, cada vez que se firma,
+   edita o borra una sesión de PT (`registrar_asistencia.py`) — si algo no
+   cuadra, se guarda un aviso (`discrepancia_economica`) ese mismo día, en
+   vez de que Fernando lo descubra semanas después comparando con su propia
+   hoja de cálculo.
+4. La verificación semanal contra Calendar (`/admin/verificar-semana`)
+   ejecuta también esta comprobación como barrido periódico de las semanas
+   recientes, además de la comprobación puntual de cada firma.
+
+**Pendiente, no urgente**: la comprobación también señala que Nikki tiene 2
+sesiones (37,50€ cada una) contadas en la economía de la semana del 20-26
+julio sin fila en el historial con fecha — pero esto coincide con lo que
+Fernando cree correcto (también las contaba en su propia hoja), así que no
+es un error económico, es un hueco de **historial** de antes del cambio a
+firma manual (2026-07-22): esas 2 sesiones existieron pero nunca quedó
+registrada la fecha exacta. No se ha tocado — si Fernando recuerda las
+fechas, se pueden añadir para que el perfil de Nikki muestre el historial
+completo (hoy salta de la sesión 9 a la 12).
+
+### Rendimiento: menos conexiones a la base de datos por petición (2026-07-24)
+
+Tras el arreglo de rendimiento del 2026-07-23 (peso de archivos y caché),
+Fernando siguió notando el botón "Firmar sesión" lento y las páginas
+lentas al navegar entre ellas. Medido en local para contar operaciones,
+no tiempo (PythonAnywhere gratuito ya tenía su propio suelo de ~1-1,5s por
+petición, ver sección de abajo): firmar una sesión abría **10 conexiones
+independientes** a SQLite en una sola petición (cargar el programa,
+aplicar la actualización, guardar el historial, cargar tarifas, leer y
+guardar la economía de la semana, más las 2 consultas de la comprobación
+de sincronización añadida el día anterior); una página normal abría 4:
+`hay_password_configurada()` en cada petición (vía `before_request`, para
+comprobar algo que solo se configura una vez en la vida de la app),
+`contar_no_leidos()` para el número de avisos del menú (en cada página),
+y las consultas propias de la ruta.
+
+Tres cambios, sin tocar ningún comportamiento visible:
+
+1. **`hay_password_configurada()` en caché** (`webapp/auth.py`): se
+   comprueba una vez y se guarda en memoria — la contraseña no cambia
+   sola, así que no hace falta preguntarle a la base de datos en cada
+   clic.
+2. **Modo WAL en SQLite** (`basedatos.conectar()`): el modo por defecto
+   bloquea todas las lecturas mientras hay una escritura en curso; en WAL
+   pueden convivir. Se fuerza además `wal_autocheckpoint = 1` para que
+   cada guardado se vuelque al momento al archivo principal
+   (`antifragil.db`) — así sigue siendo un único archivo completo, sin
+   depender también de un archivo auxiliar (`-wal`) que `sincronizar_servidor.py`
+   o cualquier copia de diagnóstico tendría que acordarse de mover aparte.
+   Comprobado en el servidor real tras desplegar: una escritura de prueba
+   quedó en el archivo principal sin dejar ningún `-wal`/`-shm` suelto.
+3. **Una consulta menos en la comprobación de sincronización** (añadida
+   ayer): en vez de volver a leer el desglose de la semana que se acababa
+   de guardar, se reutiliza el que ya se tenía en memoria.
+
+Resultado local: firmar pasó de 10 a 9 conexiones (la mayor parte del
+resto son escrituras reales, no repetidas — no hay mucho más margen sin
+rehacer `registrar_asistencia.py` de raíz, algo no justificado ahora
+mismo). El cambio con más impacto esperado es el modo WAL: quita el
+bloqueo entre lecturas y escrituras, que es justo lo que más se nota
+cuando alguien firma una sesión mientras otra persona (Fernando u otro
+cliente mirando su enlace personal) está cargando una página al mismo
+tiempo.
+
+### Rendimiento de la web (2026-07-23)
+
+Fernando notó la web lenta. Medido con peticiones reales al servidor, se
+encontraron tres causas concretas (no relacionadas con el tamaño de los
+datos, que es pequeño):
+
+1. **Logo sobredimensionado**: 130 KB a resolución completa (3117×1089)
+   para mostrarse como icono de ~40px en el menú. Redimensionado a 458×160
+   → 24 KB (favicon.png igual, de 1089×1089 a 512×512).
+2. **Sin caché en el navegador**: cada página volvía a descargar el CSS y
+   el logo enteros, en vez de reutilizar lo ya descargado.
+   `app.config["SEND_FILE_MAX_AGE_DEFAULT"]` puesto a una semana en
+   `webapp/app.py` — estos archivos casi no cambian.
+3. **Tipografía Lato cargada desde Google en cada visita** (`@import` a
+   `fonts.googleapis.com`): un viaje de red externo de más, y un punto de
+   fallo fuera de nuestro control. Descargados los 4 archivos reales
+   (400/700, latin/latin-ext) a `webapp/static/fonts/` y servidos desde el
+   propio servidor con `@font-face`, sin depender de Google.
+
+**Límite honesto**: cada petición al servidor tarda ~1,2-1,5 segundos
+independientemente del tamaño del archivo — parece ser el tiempo base del
+plan gratuito de PythonAnywhere (CPU compartida), no algo arreglable desde
+el código. Con caché, ese coste solo se paga en la primera visita; las
+siguientes deberían notarse claramente más rápidas. Si el plan gratuito
+sigue sin ir lo bastante rápido, el siguiente paso sería un plan de pago de
+PythonAnywhere con recursos dedicados — no hace falta ahora, pero es la
+opción si hiciera falta más adelante.
+
+### Avisos de bono al firmar, y verificación semanal contra Calendar (2026-07-22)
+
+Dos añadidos pequeños sobre el registro de asistencia:
+
+- `registrar_asistencia.py` ahora avisa solo cuando pasa algo que merece
+  atención: si la sesión firmada deja al cliente con 1 sola sesión
+  (`aviso_ultima_sesion`) o si la renueva de golpe (`paso.renovado` — el
+  bono se acaba de terminar y el nuevo queda pendiente de pago). Aparecen
+  como avisos nuevos, con su contador en el menú.
+- `verificar_semana.py` + ruta `/admin/verificar-semana` + skill
+  `verificar-calendar`: Calendar pasa a ser una **comprobación**, no una
+  fuente de datos — al final de la semana se compara lo firmado en la app
+  con lo que de verdad hay en Calendar (sesiones que faltan por firmar,
+  firmas sin evento correspondiente, clases de grupo con conteo distinto,
+  eventos sin clasificar) y cualquier diferencia se guarda como aviso. Es
+  de solo lectura: nunca corrige nada por su cuenta, ni sobre clientes ni
+  sobre economía — eso queda siempre en manos de Fernando.
+
+### Perfil público por cliente (2026-07-21, milestone 4 adelantado)
+
+Cada cliente tiene ahora un enlace personal (`/mi/<token>`) de solo
+lectura con su programa, sesiones restantes y estado de pago, y su
+historial de sesiones con fecha — sin necesitar la contraseña de Fernando.
+
+`token`: columna nueva en `clientes` (texto aleatorio único,
+`secrets.token_urlsafe`), generada al crear el cliente; `asegurar_tokens()`
+rellena el hueco a los clientes dados de alta antes de este cambio (se
+llama sola al arrancar la web, segura de repetir). El enlace se ve y se
+copia desde la pantalla de "Editar cliente".
+
+Alcance deliberadamente pequeño: solo bono + historial de sesiones. El
+historial de **pagos** (importes y fechas concretas) queda fuera — hoy el
+sistema solo guarda "pendiente sí/no", no un registro de pagos individual;
+sería una tabla y un flujo nuevos, aparcados como paso aparte si Fernando
+los pide.
+
+Requiere un archivo de configuración local con el token de la API de
+Fernando (`datos/config_servidor.json` — usuario, token, dominio), fuera de
+git (añadido a `.gitignore`) porque es una credencial real. Si ese archivo
+no existe, `sincronizar()` simplemente no hace nada — el cierre semanal en
+local sigue funcionando igual sin esto configurado, es un extra opcional,
+no un requisito.
+
+### Historial de sesiones por cliente (2026-07-20)
+
+Fernando pidió poder ver, por cliente, en qué fecha hizo cada sesión y a
+qué número de bono corresponde ("sesión 5 de 12, el 15 de julio") — para
+comprobarlo él mismo y, más adelante, compartirlo con el propio cliente
+(login por cliente, milestone 4, todavía sin construir).
+
+Antes, `programas/procesar.py` solo sabía "esta semana, este cliente hizo
+3 sesiones" (un conteo agregado) — la fecha exacta de Calendar se
+descartaba nada más contarla. Ahora `calendar_integration/summary.py`
+conserva la fecha de cada sesión, y `procesar_semana` las recorre una a
+una (no de golpe) para poder etiquetar cada fecha con su número de bono —
+incluyendo el caso de que una renovación caiga a mitad de semana (la
+sesión que agota el bono se etiqueta como la última del bono viejo, no la
+primera del nuevo). El resultado final por cliente (renovado, pendiente de
+pago, sesiones restantes) es matemáticamente idéntico al cálculo agregado
+de antes — se verificó con casos de prueba antes de dar el cambio por
+bueno.
+
+Tabla nueva `historial_sesiones` (`basedatos.py`), con `UNIQUE(cliente,
+fecha)` para que repetir un cierre semanal actualice la entrada existente
+en vez de duplicarla. Vista nueva en la web: `/cliente/<nombre>/historial`.
+
+**Limitación conocida y aceptada:** no hay reconstrucción retroactiva de
+fechas anteriores a este cambio — el primer cierre real (13-19 julio) ya
+se había aplicado sin guardar fechas individuales. Se decidió no intentar
+reconstruirlo a partir del estado actual (arriesgaba números incorrectos
+si algo no cuadraba exactamente) — la página de historial muestra el
+estado actual del cliente como punto de partida, y el registro fecha a
+fecha empieza limpio desde el próximo cierre semanal en adelante.
+
 ## Stack técnico (decidido 2026-07-14, revisado el mismo día)
 
 Fernando ya tenía Google Calendar conectado a Claude (conector de claude.ai),

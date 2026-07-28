@@ -5,10 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Iniciar sesión — Antifrágil</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+  <link rel="icon" href="{{ url_for('static', filename='favicon.png') }}" />
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='favicon.png') }}" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Antifrágil" />
+  <meta name="theme-color" content="#007563" />
 </head>
 <body>
   <div class="page">
-    <h1>Antifrágil</h1>
+    <h1 class="sr-only">Antifrágil</h1>
+    <img src="{{ url_for('static', filename='logo.png') }}" alt="Antifrágil" class="logo-login" />
     <p class="subtitulo">Introduce tu contraseña para continuar</p>
 
     {% if error %}

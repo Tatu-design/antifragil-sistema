@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Editar {{ nombre }} — Antifrágil</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+  <link rel="icon" href="{{ url_for('static', filename='favicon.png') }}" />
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='favicon.png') }}" />
+  <meta name="theme-color" content="#007563" />
 </head>
 <body>
   <div class="page">
@@ -40,6 +43,20 @@
     </form>
 
     <p class="aviso-texto">Si cambias el nombre, recuerda renombrar igual las sesiones en Google Calendar — si no, el sistema dejará de reconocerlas.</p>
+
+    {% if cliente.token %}
+    <div class="lista" style="margin-top: 1rem;">
+      <div class="cabecera-seccion">
+        <span>Enlace personal de {{ nombre }}</span>
+      </div>
+      <p class="meta" style="padding: 0 1.25rem 1rem;">
+        Compártelo con el cliente para que vea su propio bono e historial, sin necesitar tu contraseña.
+      </p>
+      <p class="meta" style="padding: 0 1.25rem 1.25rem; word-break: break-all;">
+        {{ url_for('mi_perfil', token=cliente.token, _external=True) }}
+      </p>
+    </div>
+    {% endif %}
   </div>
 </body>
 </html>

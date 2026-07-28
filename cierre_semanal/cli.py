@@ -23,17 +23,18 @@ from datetime import datetime
 
 from calendar_integration.semana import get_week_range
 from calendar_integration.summary import resumir_semana
-from clientes.repositorio import aplicar_actualizaciones, cargar_programas, cargar_tarifas
+from clientes.repositorio import aplicar_actualizaciones, cargar_programas, cargar_tarifas, registrar_historial
 from economia.calculo import calcular_desglose
 from economia.calculo import resumir as resumir_economia
 from economia.registro import registrar_semana
 from programas.procesar import procesar_semana
+from sincronizar_servidor import sincronizar
 
 
 def calcular(eventos: list[dict], fecha_referencia: datetime) -> dict:
     resumen_calendar = resumir_semana(eventos)
     programas, incompletos_datos = cargar_programas()
-    resultado_programas = procesar_semana(resumen_calendar["sesiones_pt"], programas)
+    resultado_programas = procesar_semana(resumen_calendar["sesiones_pt_fechas"], programas)
 
     tarifas = cargar_tarifas()
     desglose = calcular_desglose(
@@ -51,6 +52,7 @@ def calcular(eventos: list[dict], fecha_referencia: datetime) -> dict:
         "sin_programa": resultado_programas["sin_programa"],
         "incompletos_datos": incompletos_datos,
         "resultados": resultado_programas["resultados"],
+        "historial": resultado_programas["historial"],
         "desglose_tarifas": desglose,
         "resumen_economico": resumir_economia(desglose),
     }
@@ -72,11 +74,17 @@ def main() -> None:
 
     if modo == "aplicar":
         aplicar_actualizaciones(calculo["resultados"])
+        registrar_historial(calculo["historial"])
         registrar_semana(
             calculo["fecha_inicio"], calculo["fecha_fin"],
             calculo["desglose_tarifas"], calculo["crossfit_kids"],
         )
-        salida = {"escrito": True, "clientes_actualizados": list(calculo["resultados"].keys())}
+        mensaje_servidor = sincronizar()
+        salida = {
+            "escrito": True,
+            "clientes_actualizados": list(calculo["resultados"].keys()),
+            "servidor": mensaje_servidor,
+        }
     else:
         salida = {
             "semana": f'{calculo["fecha_inicio"]} a {calculo["fecha_fin"]}',
@@ -86,6 +94,7 @@ def main() -> None:
             "sin_programa": calculo["sin_programa"],
             "incompletos_datos": calculo["incompletos_datos"],
             "resultados": {nombre: asdict(r) for nombre, r in calculo["resultados"].items()},
+            "historial": calculo["historial"],
             "desglose_tarifas": calculo["desglose_tarifas"],
             "resumen_economico": calculo["resumen_economico"],
         }

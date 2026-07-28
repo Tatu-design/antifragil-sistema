@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Editar sesión de {{ nombre }} — Antifrágil</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+  <link rel="icon" href="{{ url_for('static', filename='favicon.png') }}" />
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='favicon.png') }}" />
+  <meta name="theme-color" content="#007563" />
+</head>
+<body>
+  <div class="page">
+    <a class="volver" href="{{ url_for('perfil_cliente', nombre=nombre) }}">← {{ nombre }}</a>
+    <h1>Editar sesión</h1>
+    <p class="subtitulo">{{ entrada.tipo_programa }}</p>
+
+    <form class="formulario" method="post">
+      <label class="campo">
+        <span>Fecha</span>
+        <input type="text" name="fecha" value="{{ entrada.fecha }}" placeholder="AAAA-MM-DD" required />
+      </label>
+
+      <label class="campo">
+        <span>Sesión número (de {{ entrada.sesiones_totales }})</span>
+        <input type="number" name="numero_sesion" value="{{ entrada.numero_sesion }}" min="1" max="{{ entrada.sesiones_totales }}" required />
+      </label>
+
+      <button type="submit" class="boton">Guardar cambios</button>
+    </form>
+
+    <form method="post" action="{{ url_for('eliminar_historial_ruta', nombre=nombre, entrada_id=entrada.id) }}" style="margin-top: 1rem;">
+      <button type="submit" class="boton-secundario" style="width:100%;" onclick="return confirm('¿Borrar esta sesión del historial?');">Eliminar esta sesión</button>
+    </form>
+
+    <p class="aviso-texto">Si cambias la fecha a otra semana distinta, la facturación se traslada automáticamente de una semana a la otra.</p>
+  </div>
+</body>
+</html>
