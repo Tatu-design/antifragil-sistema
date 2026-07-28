@@ -16,6 +16,7 @@ from calendar_integration.summary import resumir_semana
 from clientes.repositorio import leer_clientes, obtener_historial
 from economia.calculo import TARIFA_CROSSFIT_LIDOMARE
 from economia.registro import obtener_desglose_semana, obtener_semana, verificar_sincronizacion_semana
+from zona_horaria import hoy_negocio
 
 
 def verificar_semana(eventos: list[dict], fecha_referencia: datetime) -> dict:
@@ -75,7 +76,7 @@ def verificar_semana(eventos: list[dict], fecha_referencia: datetime) -> dict:
             f"CrossFit Lidomare: Calendar tiene {resumen['crossfit_lidomare']} clases esta semana, la app tiene {lidomare_app}"
         )
 
-    fecha_hoy = datetime.now().date().isoformat()
+    fecha_hoy = hoy_negocio().isoformat()
     for detalle in discrepancias:
         registrar_aviso(fecha_hoy, "discrepancia_calendar", detalle)
 

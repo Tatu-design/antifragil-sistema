@@ -21,6 +21,8 @@ import sys
 from dataclasses import asdict
 from datetime import datetime
 
+from zona_horaria import ahora_negocio
+
 from calendar_integration.semana import get_week_range
 from calendar_integration.summary import resumir_semana
 from clientes.repositorio import aplicar_actualizaciones, cargar_programas, cargar_tarifas, registrar_historial
@@ -67,7 +69,7 @@ def main() -> None:
 
     modo = sys.argv[1] if len(sys.argv) > 1 else "previsualizar"
     fecha_arg = sys.argv[2] if len(sys.argv) > 2 else None
-    fecha_referencia = datetime.strptime(fecha_arg, "%Y-%m-%d") if fecha_arg else datetime.now()
+    fecha_referencia = datetime.strptime(fecha_arg, "%Y-%m-%d") if fecha_arg else ahora_negocio()
 
     eventos = json.loads(sys.stdin.read())
     calculo = calcular(eventos, fecha_referencia)

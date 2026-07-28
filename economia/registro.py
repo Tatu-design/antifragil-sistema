@@ -6,20 +6,25 @@ Desde el 2026-07-18, esto es SQLite (`datos/antifragil.db`, ver
 públicas que ya usaban `cierre_semanal/` y `economia/cli.py`.
 
 Dos tablas:
-- `semanas`: una fila por semana cerrada.
+- `semanas`: una fila por semana cerrada (vista SEMANAL, agrupada por el
+  lunes de cada semana — puede mezclar sesiones de dos meses distintos si
+  la semana cae a caballo, y eso es correcto para la vista semanal).
 - `desglose`: una fila por (semana, tarifa) — el detalle por tarifa que
   antes llevaba Fernando a mano en su propia hoja de cálculo.
 
-A diferencia de la versión en Excel, **no hace falta guardar aparte los
-totales del mes**: con SQL se suman las semanas de un mes al vuelo
-(`SUM(...) GROUP BY`) cada vez que se preguntan, así que no hay un total
-guardado que se pueda quedar desactualizado.
+**La vista MENSUAL (`listar_meses`/`obtener_mes`) NO usa `semanas`.** Antes
+agrupaba las semanas por el mes de su lunes, lo que atribuía una semana
+entera (p. ej. 27 de julio-2 de agosto) al mes del lunes aunque varias
+sesiones fueran realmente de otro mes — bug confirmado y corregido en el
+sprint de integridad del 2026-07-28. Ahora el mes se calcula directamente
+desde `historial_sesiones` y `clases_grupo`, agrupando por la fecha REAL de
+cada sesión/clase — la única fuente que tiene esa fecha real.
 
-CrossFit Kids se registra sin facturación hasta que Fernando indica el
-importe mensual (`registrar_facturacion_kids`), momento en el que se
-reparte hacia atrás sobre las semanas de ese mes (importe ÷ sesiones del
-mes = precio por sesión; cada semana se multiplica por sus sesiones).
-"""
+CrossFit Kids: cada clase cuenta como 1 hora trabajada; la facturación
+mensual se introduce a mano (`registrar_facturacion_kids`) y se guarda ya
+por mes real en `facturacion_kids_mensual` — antes de introducirla, la
+vista mensual debe marcarse como provisional (le falta la facturación/horas
+de Kids todavía)."""
 
 import sqlite3
 from datetime import date
@@ -35,15 +40,21 @@ def registrar_semana(
     desglose: dict[float, dict],
     sesiones_kids: int,
     ruta: Path = RUTA_POR_DEFECTO,
+    conexion: sqlite3.Connection | None = None,
 ) -> None:
     """Guarda (o actualiza, si ya existía) el resultado económico de una
     semana. `desglose`: {tarifa: {"sesiones": n, "facturacion": importe}}
-    — formato que devuelve `economia.calculo.calcular_desglose`."""
+    — formato que devuelve `economia.calculo.calcular_desglose`.
+
+    `conexion`: si se pasa una conexión ya abierta (de una transacción más
+    amplia, ver `registrar_asistencia.py`), se reutiliza en vez de abrir
+    otra — así firmar una sesión es una única operación atómica (sprint de
+    integridad, 2026-07-28)."""
     resumen = resumir(desglose)
     anio, mes = fecha_inicio.year, fecha_inicio.month
     clave = fecha_inicio.isoformat()
 
-    with conectar(ruta) as conexion:
+    def _hacer(conexion: sqlite3.Connection) -> None:
         conexion.execute(
             """
             INSERT INTO semanas
@@ -57,7 +68,6 @@ def registrar_semana(
             """,
             (clave, fecha_fin.isoformat(), anio, mes, resumen["facturacion_total"], resumen["horas_totales"], sesiones_kids),
         )
-
         conexion.execute("DELETE FROM desglose WHERE fecha_inicio_semana = ?", (clave,))
         for tarifa, datos in desglose.items():
             conexion.execute(
@@ -65,11 +75,26 @@ def registrar_semana(
                 (clave, tarifa, datos["sesiones"], datos["facturacion"]),
             )
 
+    if conexion is not None:
+        _hacer(conexion)
+    else:
+        with conectar(ruta) as conexion:
+            _hacer(conexion)
 
-def obtener_desglose_semana(fecha_inicio_iso: str, ruta: Path = RUTA_POR_DEFECTO) -> dict[float, dict]:
+
+def obtener_desglose_semana(
+    fecha_inicio_iso: str, ruta: Path = RUTA_POR_DEFECTO, conexion: sqlite3.Connection | None = None
+) -> dict[float, dict]:
     """El desglose por tarifa ya guardado de una semana — para sumarle un
     día nuevo antes de volver a guardar (ver actualización diaria en
     `webapp/app.py`, ruta `/admin/procesar-dia`)."""
+    if conexion is not None:
+        filas = conexion.execute(
+            "SELECT tarifa, sesiones, facturacion FROM desglose WHERE fecha_inicio_semana = ?",
+            (fecha_inicio_iso,),
+        ).fetchall()
+        return {fila["tarifa"]: {"sesiones": fila["sesiones"], "facturacion": fila["facturacion"]} for fila in filas}
+
     if not ruta.exists():
         return {}
     with conectar(ruta) as conexion:
@@ -176,23 +201,40 @@ def verificar_sincronizacion_semana(
 
 
 def registrar_facturacion_kids(anio: int, mes: int, facturacion_total_kids: float, ruta: Path = RUTA_POR_DEFECTO) -> float:
-    """Reparte la facturación mensual de CrossFit Kids entre las semanas de
-    ese mes, proporcionalmente a las sesiones de cada semana. Devuelve el
-    precio por sesión."""
+    """Guarda la facturación mensual de CrossFit Kids para el mes REAL
+    indicado (`facturacion_kids_mensual`, por fecha real — no por el mes al
+    que pertenecía el lunes de cada semana, que era la causa del bug
+    corregido en el sprint del 2026-07-28) y, para no romper la vista
+    semanal ya existente, sigue repartiéndola también entre las semanas de
+    `semanas` (proporcional a las sesiones de cada semana), igual que
+    antes. Devuelve el precio por sesión."""
+    if facturacion_total_kids <= 0:
+        raise ValueError("La facturación de Kids debe ser un importe positivo")
+
     with conectar(ruta) as conexion:
+        conexion.execute(
+            "INSERT INTO facturacion_kids_mensual (anio, mes, importe) VALUES (?, ?, ?) "
+            "ON CONFLICT(anio, mes) DO UPDATE SET importe = excluded.importe",
+            (anio, mes, facturacion_total_kids),
+        )
+
         sesiones_kids_mes = conexion.execute(
             "SELECT COALESCE(SUM(sesiones_kids), 0) AS total FROM semanas WHERE anio = ? AND mes = ?", (anio, mes)
         ).fetchone()["total"]
 
-        if not sesiones_kids_mes:
-            raise ValueError(f"No hay sesiones de CrossFit Kids registradas para {mes}/{anio}.")
-
-        precio_sesion = facturacion_total_kids / sesiones_kids_mes
-
-        conexion.execute(
-            "UPDATE semanas SET facturacion_kids = sesiones_kids * ? WHERE anio = ? AND mes = ?",
-            (precio_sesion, anio, mes),
-        )
+        if sesiones_kids_mes:
+            precio_sesion = facturacion_total_kids / sesiones_kids_mes
+            conexion.execute(
+                "UPDATE semanas SET facturacion_kids = sesiones_kids * ? WHERE anio = ? AND mes = ?",
+                (precio_sesion, anio, mes),
+            )
+        else:
+            # No hay semanas con lunes en este mes (p. ej. todas las clases
+            # de Kids de este mes cayeron en una semana cuyo lunes es del
+            # mes anterior) — la vista mensual real (calculada desde
+            # clases_grupo) sigue funcionando bien igualmente; solo la
+            # vista semanal antigua no tendría de dónde repartir.
+            precio_sesion = 0.0
 
     return precio_sesion
 
@@ -217,7 +259,13 @@ def _fila_semana_a_dict(fila: sqlite3.Row) -> dict:
     }
 
 
-def obtener_semana(fecha_inicio_iso: str, ruta: Path = RUTA_POR_DEFECTO) -> dict | None:
+def obtener_semana(
+    fecha_inicio_iso: str, ruta: Path = RUTA_POR_DEFECTO, conexion: sqlite3.Connection | None = None
+) -> dict | None:
+    if conexion is not None:
+        fila = conexion.execute("SELECT * FROM semanas WHERE fecha_inicio = ?", (fecha_inicio_iso,)).fetchone()
+        return _fila_semana_a_dict(fila) if fila else None
+
     if not ruta.exists():
         return None
     with conectar(ruta) as conexion:
@@ -237,68 +285,93 @@ def obtener_ultima_semana(ruta: Path = RUTA_POR_DEFECTO) -> dict | None:
     return _fila_semana_a_dict(fila) if fila else None
 
 
-def listar_meses(ruta: Path = RUTA_POR_DEFECTO) -> list[dict]:
-    """Un resumen por cada mes con al menos una semana cerrada, del más
-    reciente al más antiguo — el historial mensual de Economía. Cada
-    semana cuenta para el mes de su `fecha_inicio` — si una semana cae a
-    caballo entre dos meses, se registra ya recortada a las fechas reales
-    del mes que corresponda (ver `registrar_semana`), así que no hace
-    falta repartir nada aquí."""
-    if not ruta.exists():
-        return []
-    with conectar(ruta) as conexion:
-        filas = conexion.execute(
-            """
-            SELECT
-                anio, mes,
-                COALESCE(SUM(facturacion_pt_lidomare), 0) AS facturacion_pt_lidomare,
-                COALESCE(SUM(horas_pt_lidomare), 0) AS horas_pt_lidomare
-            FROM semanas GROUP BY anio, mes ORDER BY anio DESC, mes DESC
-            """
-        ).fetchall()
+def _calcular_mes_desde_historial(anio: int, mes: int, ruta: Path, conexion: sqlite3.Connection) -> dict:
+    """Calcula el resumen económico de un mes REAL directamente desde
+    `historial_sesiones` y `clases_grupo` — la fuente de verdad con la
+    fecha exacta de cada sesión/clase. Sustituye a agrupar `semanas` por el
+    mes del lunes de cada semana, que atribuía sesiones de un mes al
+    siguiente/anterior si la semana caía a caballo (bug confirmado y
+    corregido en el sprint de integridad, 2026-07-28)."""
+    patron_mes = f"{anio:04d}-{mes:02d}-%"
 
-    meses = []
-    for fila in filas:
-        facturacion_total = fila["facturacion_pt_lidomare"]
-        horas_totales = fila["horas_pt_lidomare"]
-        meses.append(
-            {
-                "anio": fila["anio"],
-                "mes": fila["mes"],
-                "facturacion_total": facturacion_total,
-                "horas_totales": horas_totales,
-                "precio_medio_hora": facturacion_total / horas_totales if horas_totales else 0.0,
-            }
-        )
-    return meses
+    fila_pt = conexion.execute(
+        "SELECT COALESCE(SUM(tarifa), 0) AS facturacion, COUNT(*) AS horas "
+        "FROM historial_sesiones WHERE fecha LIKE ? AND tarifa IS NOT NULL",
+        (patron_mes,),
+    ).fetchone()
 
+    fila_lidomare = conexion.execute(
+        "SELECT COUNT(*) AS n FROM clases_grupo WHERE tipo = 'lidomare' AND fecha LIKE ?", (patron_mes,)
+    ).fetchone()
+    horas_lidomare = fila_lidomare["n"]
+    facturacion_lidomare = horas_lidomare * TARIFA_CROSSFIT_LIDOMARE
 
-def obtener_mes(anio: int, mes: int, ruta: Path = RUTA_POR_DEFECTO) -> dict | None:
-    if not ruta.exists():
-        return None
-    with conectar(ruta) as conexion:
-        fila = conexion.execute(
-            """
-            SELECT
-                COALESCE(SUM(facturacion_pt_lidomare), 0) AS facturacion_pt_lidomare,
-                COALESCE(SUM(horas_pt_lidomare), 0) AS horas_pt_lidomare,
-                COALESCE(SUM(sesiones_kids), 0) AS sesiones_kids,
-                SUM(facturacion_kids) AS facturacion_kids,
-                COUNT(*) AS num_semanas
-            FROM semanas WHERE anio = ? AND mes = ?
-            """,
-            (anio, mes),
-        ).fetchone()
+    fila_kids = conexion.execute(
+        "SELECT COUNT(*) AS n FROM clases_grupo WHERE tipo = 'kids' AND fecha LIKE ?", (patron_mes,)
+    ).fetchone()
+    sesiones_kids = fila_kids["n"]
 
-    if not fila or not fila["num_semanas"]:
-        return None
+    fila_facturacion_kids = conexion.execute(
+        "SELECT importe FROM facturacion_kids_mensual WHERE anio = ? AND mes = ?", (anio, mes)
+    ).fetchone()
+    facturacion_kids = fila_facturacion_kids["importe"] if fila_facturacion_kids else None
 
-    horas_totales = fila["horas_pt_lidomare"]
-    facturacion_total = fila["facturacion_pt_lidomare"]
+    # Provisional: hay clases de Kids este mes pero todavía no se ha
+    # introducido su facturación — el total mostrado no las incluye aún
+    # (regla de negocio: la facturación/horas de Kids solo cuentan en el
+    # total una vez Fernando introduce el importe mensual).
+    provisional = sesiones_kids > 0 and facturacion_kids is None
+
+    horas_totales = fila_pt["horas"] + horas_lidomare + (sesiones_kids if facturacion_kids is not None else 0)
+    facturacion_total = fila_pt["facturacion"] + facturacion_lidomare + (facturacion_kids or 0)
+
     return {
+        "anio": anio,
+        "mes": mes,
         "facturacion_total": facturacion_total,
         "horas_totales": horas_totales,
         "precio_medio_hora": facturacion_total / horas_totales if horas_totales else 0.0,
-        "sesiones_kids": fila["sesiones_kids"],
-        "facturacion_kids": fila["facturacion_kids"],
+        "sesiones_kids": sesiones_kids,
+        "facturacion_kids": facturacion_kids,
+        "provisional": provisional,
     }
+
+
+def listar_meses(ruta: Path = RUTA_POR_DEFECTO) -> list[dict]:
+    """Un resumen por cada mes real con al menos una sesión/clase, del más
+    reciente al más antiguo — el historial mensual de Economía. Calculado
+    directamente desde `historial_sesiones`/`clases_grupo` por la fecha
+    real de cada fila, no por el mes del lunes de cada semana (ver
+    docstring del módulo)."""
+    if not ruta.exists():
+        return []
+    with conectar(ruta) as conexion:
+        meses_pt = conexion.execute(
+            "SELECT DISTINCT substr(fecha, 1, 4) AS anio, substr(fecha, 6, 2) AS mes FROM historial_sesiones"
+        ).fetchall()
+        meses_grupo = conexion.execute(
+            "SELECT DISTINCT substr(fecha, 1, 4) AS anio, substr(fecha, 6, 2) AS mes FROM clases_grupo"
+        ).fetchall()
+        claves = {(int(f["anio"]), int(f["mes"])) for f in meses_pt} | {(int(f["anio"]), int(f["mes"])) for f in meses_grupo}
+
+        return [
+            _calcular_mes_desde_historial(anio, mes, ruta, conexion)
+            for anio, mes in sorted(claves, reverse=True)
+        ]
+
+
+def obtener_mes(anio: int, mes: int, ruta: Path = RUTA_POR_DEFECTO) -> dict | None:
+    """Resumen económico de un mes real concreto — ver docstring del
+    módulo y de `_calcular_mes_desde_historial`. Devuelve `None` solo si no
+    hay ninguna sesión de PT ni clase de grupo registrada ese mes (para no
+    mostrar un mes completamente vacío como si tuviera datos)."""
+    if not ruta.exists():
+        return None
+    with conectar(ruta) as conexion:
+        resultado = _calcular_mes_desde_historial(anio, mes, ruta, conexion)
+        hay_datos = conexion.execute(
+            "SELECT EXISTS(SELECT 1 FROM historial_sesiones WHERE substr(fecha,1,4)=? AND substr(fecha,6,2)=?) "
+            "OR EXISTS(SELECT 1 FROM clases_grupo WHERE substr(fecha,1,4)=? AND substr(fecha,6,2)=?) AS hay",
+            (f"{anio:04d}", f"{mes:02d}", f"{anio:04d}", f"{mes:02d}"),
+        ).fetchone()["hay"]
+    return resultado if hay_datos else None

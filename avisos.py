@@ -7,19 +7,26 @@ procesar, y deja aquí constancia de lo que no, para revisar después (ver
 decisión de Fernando del 2026-07-21: quiere la actualización diaria sin
 confirmar cada vez, con avisos a posteriori en vez de antes de guardar)."""
 
+import sqlite3
 from pathlib import Path
 
 from basedatos import RUTA_POR_DEFECTO, conectar
 
 
-def registrar_aviso(fecha: str, tipo: str, detalle: str, ruta: Path = RUTA_POR_DEFECTO) -> None:
+def registrar_aviso(
+    fecha: str, tipo: str, detalle: str, ruta: Path = RUTA_POR_DEFECTO, conexion: sqlite3.Connection | None = None
+) -> None:
     """No duplica: si ya hay un aviso sin resolver con el mismo tipo y
     texto, no crea uno nuevo. Sin esto, algo que se comprueba en cada
     firma (como la sincronización con la economía) crea un aviso repetido
     por cada sesión que se firma esa semana, aunque sea siempre el mismo
     hueco ya conocido — encontrado el 2026-07-24, cuando el aviso del hueco
-    de Nikki se repitió varias veces seguidas."""
-    with conectar(ruta) as conexion:
+    de Nikki se repitió varias veces seguidas.
+
+    `conexion`: para poder formar parte de la misma transacción atómica que
+    firma una sesión (sprint de integridad, 2026-07-28)."""
+
+    def _hacer(conexion: sqlite3.Connection) -> None:
         ya_existe = conexion.execute(
             "SELECT 1 FROM avisos WHERE resuelto = 0 AND tipo = ? AND detalle = ? LIMIT 1",
             (tipo, detalle),
@@ -30,6 +37,12 @@ def registrar_aviso(fecha: str, tipo: str, detalle: str, ruta: Path = RUTA_POR_D
             "INSERT INTO avisos (fecha, tipo, detalle) VALUES (?, ?, ?)",
             (fecha, tipo, detalle),
         )
+
+    if conexion is not None:
+        _hacer(conexion)
+    else:
+        with conectar(ruta) as conexion:
+            _hacer(conexion)
 
 
 def listar_avisos_pendientes(ruta: Path = RUTA_POR_DEFECTO) -> list[dict]:

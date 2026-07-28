@@ -13,6 +13,7 @@ conectarse; cada uno gestiona sus propias tablas.
 """
 
 import sqlite3
+from contextlib import contextmanager
 from pathlib import Path
 
 RUTA_POR_DEFECTO = Path(__file__).resolve().parent / "datos" / "antifragil.db"
@@ -41,6 +42,29 @@ def conectar(ruta: Path = RUTA_POR_DEFECTO) -> sqlite3.Connection:
     return conexion
 
 
+@contextmanager
+def transaccion(ruta: Path = RUTA_POR_DEFECTO):
+    """Agrupa varios pasos de una operación de negocio (firmar sesión,
+    editar, borrar, clase de grupo) en una única transacción atómica: si
+    cualquier paso falla, no queda guardado ninguno (sprint de integridad,
+    2026-07-28 — antes, firmar una sesión hacía 3-4 guardados
+    independientes; un fallo a mitad podía dejar el bono actualizado pero
+    la economía no, o viceversa).
+
+    Los repositorios que reciben un parámetro `conexion` reutilizan esta
+    misma conexión en vez de abrir la suya propia — así todo el bloque
+    vive dentro de la misma transacción SQLite."""
+    conexion = conectar(ruta)
+    try:
+        yield conexion
+        conexion.commit()
+    except Exception:
+        conexion.rollback()
+        raise
+    finally:
+        conexion.close()
+
+
 def crear_esquema(ruta: Path = RUTA_POR_DEFECTO) -> None:
     """Crea todas las tablas si no existen todavía. Segura de repetir — no
     borra datos existentes."""
@@ -61,11 +85,15 @@ def crear_esquema(ruta: Path = RUTA_POR_DEFECTO) -> None:
                 tipo_programa TEXT NOT NULL REFERENCES programas(nombre),
                 sesiones_completadas INTEGER NOT NULL DEFAULT 0,
                 pendiente_pago INTEGER NOT NULL DEFAULT 0,
-                token TEXT
+                token TEXT,
+                ciclo_bono INTEGER NOT NULL DEFAULT 1
             )
             """
         )
         conexion.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_clientes_token ON clientes(token)")
+        columnas_clientes = {fila["name"] for fila in conexion.execute("PRAGMA table_info(clientes)")}
+        if "ciclo_bono" not in columnas_clientes:
+            conexion.execute("ALTER TABLE clientes ADD COLUMN ciclo_bono INTEGER NOT NULL DEFAULT 1")
         conexion.execute(
             """
             CREATE TABLE IF NOT EXISTS semanas (
@@ -120,13 +148,25 @@ def crear_esquema(ruta: Path = RUTA_POR_DEFECTO) -> None:
                 tipo_programa TEXT NOT NULL,
                 numero_sesion INTEGER NOT NULL,
                 sesiones_totales INTEGER NOT NULL,
-                tarifa REAL
+                tarifa REAL,
+                ciclo_bono INTEGER NOT NULL DEFAULT 1
             )
             """
         )
         columnas = {fila["name"] for fila in conexion.execute("PRAGMA table_info(historial_sesiones)")}
         if "tarifa" not in columnas:
             conexion.execute("ALTER TABLE historial_sesiones ADD COLUMN tarifa REAL")
+        if "ciclo_bono" not in columnas:
+            # Sprint de integridad 2026-07-28: sin esto, el historial no
+            # distingue a qué bono (antes o después de una renovación)
+            # pertenece cada sesión — borrar la primera sesión de un bono
+            # nuevo podía hacer que el contador "completadas" volviera a
+            # mostrar el número del bono ANTERIOR (bug confirmado y
+            # reproducido). Los datos ya existentes se marcan todos como
+            # ciclo 1 (no hay forma de reconstruir los cortes de ciclo
+            # pasados sin esta columna) — las sesiones nuevas sí llevan el
+            # ciclo correcto desde ahora.
+            conexion.execute("ALTER TABLE historial_sesiones ADD COLUMN ciclo_bono INTEGER NOT NULL DEFAULT 1")
 
         # Migración 2026-07-24: hasta ahora un cliente solo podía tener una
         # sesión de PT por día (UNIQUE(cliente, fecha)) — Fernando pidió
@@ -166,6 +206,24 @@ def crear_esquema(ruta: Path = RUTA_POR_DEFECTO) -> None:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 fecha TEXT NOT NULL,
                 tipo TEXT NOT NULL
+            )
+            """
+        )
+        conexion.execute(
+            """
+            CREATE TABLE IF NOT EXISTS facturacion_kids_mensual (
+                anio INTEGER NOT NULL,
+                mes INTEGER NOT NULL,
+                importe REAL NOT NULL,
+                PRIMARY KEY (anio, mes)
+            )
+            """
+        )
+        conexion.execute(
+            """
+            CREATE TABLE IF NOT EXISTS firmas_idempotencia (
+                clave TEXT PRIMARY KEY,
+                creado TEXT NOT NULL
             )
             """
         )

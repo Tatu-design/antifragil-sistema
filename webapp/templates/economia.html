@@ -92,6 +92,10 @@
         </div>
 
         {% if mes %}
+        {% if mes.provisional %}
+        <p class="aviso-texto">⚠ Provisional — este mes tiene clases de CrossFit Kids sin facturación
+        mensual introducida todavía, así que la facturación y las horas de abajo no las incluyen aún.</p>
+        {% endif %}
         <div class="metricas">
           <div class="metrica">
             <span class="label">Facturación</span>
@@ -107,7 +111,7 @@
           </div>
         </div>
         {% else %}
-        <p class="empty">Todavía no hay ninguna semana cerrada este mes.</p>
+        <p class="empty">Todavía no hay ninguna sesión ni clase registrada este mes.</p>
         {% endif %}
       </div>
     </div>
@@ -123,6 +127,9 @@
         <div class="cabecera">
           <span class="nombre">{{ m.etiqueta }}</span>
         </div>
+        {% if m.provisional %}
+        <p class="aviso-texto">⚠ Provisional — falta introducir la facturación de CrossFit Kids de este mes.</p>
+        {% endif %}
         <div class="metricas" style="padding: 0.5rem 0 0;">
           <div class="metrica">
             <span class="label">Facturación</span>
