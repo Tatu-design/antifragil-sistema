@@ -22,6 +22,132 @@
   cuenta en sesiones pero su importe se reparte hacia atrás sobre las
   semanas del mes en cuanto Fernando indica la facturación mensual total.
 
+### Sprint de integridad y fiabilidad (2026-07-28)
+
+Petición explícita de Fernando (relayed desde un análisis de ChatGPT como
+segunda opinión sobre el proyecto): antes de seguir añadiendo funciones,
+garantizar que bonos, historial y economía nunca puedan descuadrarse
+silenciosamente. Rama `fix/integridad-fiabilidad`, sin merge todavía (a la
+espera de aprobación de Fernando). Diez problemas planteados, los diez
+confirmados como reales contra el código, y corregidos:
+
+**1. Zona horaria centralizada** (`zona_horaria.py`, `hoy_negocio()`/
+`ahora_negocio()`, `Europe/Madrid`): antes se usaba `date.today()`/
+`datetime.now()` directamente en `registrar_asistencia.py`, `webapp/app.py`,
+`verificar_semana.py`, `cierre_semanal/cli.py` — si el servidor corre en
+UTC, entre medianoche y ~1-2 de la madrugada en Madrid el servidor todavía
+estaría "ayer", pudiendo firmar sesiones con la fecha equivocada. Requiere
+el paquete `tzdata` (Windows no trae datos de zonas horarias con Python de
+serie) — añadido a `requirements.txt`.
+
+**2. Meses que cruzan semana**: `listar_meses`/`obtener_mes` agrupaban
+`semanas` por el `anio`/`mes` del LUNES de cada semana — una sesión del 1
+de agosto en la semana del 27 de julio-2 de agosto se contaba entera en
+julio. Corregido: ahora se calculan directamente desde `historial_sesiones`
+y `clases_grupo`, agrupando por la fecha real de cada fila
+(`economia/registro.py`, `_calcular_mes_desde_historial`). La vista
+SEMANAL (`obtener_semana`) no cambia — sigue mostrando ambas sesiones
+juntas en la misma semana natural, que es lo esperado.
+
+**3. Tarifa histórica**: `editar_sesion_pt`/`eliminar_sesion_pt` recalculaban
+la economía con `cargar_tarifas()` (la tarifa ACTUAL del cliente) en vez de
+la tarifa guardada en el momento de la sesión. `editar_historial`/
+`eliminar_historial` ahora devuelven también `tarifa`, y
+`registrar_asistencia.py` la usa siempre en vez de volver a consultarla.
+
+**4. CrossFit Kids inconsistente entre semana y mes**: la vista mensual no
+sumaba la facturación de Kids al total (la semanal sí), y ninguna de las
+dos sumaba sus horas a "Horas". Nueva tabla `facturacion_kids_mensual`
+(clave real año/mes, no ligada al lunes de una semana). El mes se marca
+`provisional` mientras haya clases de Kids sin facturación introducida
+todavía — la plantilla de Economía lo avisa antes del importe y las horas.
+
+**5. Operaciones atómicas**: firmar/editar/borrar una sesión, y firmar/
+deshacer una clase de grupo, hacían 3-4 guardados independientes (bono,
+historial, economía, avisos). Nuevo `basedatos.transaccion()` (gestor de
+contexto sobre una única conexión) — todos los repositorios implicados
+(`aplicar_actualizaciones`, `registrar_historial`, `editar_historial`,
+`eliminar_historial`, `marcar_pendiente_pago`, `registrar_semana`,
+`obtener_desglose_semana`, `obtener_semana`, `registrar_aviso`) aceptan
+ahora un parámetro `conexion` opcional para participar en la misma
+transacción que quien los llama. Un test provoca un fallo a mitad de
+`registrar_sesion_pt` y confirma que no queda nada guardado.
+
+**6. Ciclo de bono**: columna `ciclo_bono` nueva en `clientes` y
+`historial_sesiones` — cada renovación incrementa el ciclo del cliente, y
+cada sesión guarda a qué ciclo pertenece. Reproducido el bug exacto que
+describió Fernando (bono de 12, sesión 12 renueva, se firma la sesión 1
+del bono nuevo, se borra esa sesión 1 → el contador debía volver a "0",
+no a "12" del bono anterior) y confirmado con un test que fallaba antes
+del arreglo. Corrección real encontrada AL PROBAR el propio arreglo:
+al borrar la sesión que completó un bono, hay que devolver también el
+`ciclo_bono` del cliente al ciclo anterior antes de recalcular las
+sesiones completadas — si no, el recálculo mira el ciclo nuevo (que se
+queda vacío) y pone 0 en vez del número correcto del ciclo anterior.
+
+**7. Renombrado y validaciones**: renombrar un cliente con historial
+violaba la clave foránea (`historial_sesiones.cliente` apuntaba un
+instante al nombre viejo mientras `clientes.nombre` ya tenía el nuevo).
+Arreglado con `PRAGMA defer_foreign_keys = ON` — pero **con una condición
+no obvia**: solo funciona si se abre una transacción explícita (`BEGIN`)
+antes; si no, Python trata cada sentencia (incluidas las `SELECT` previas
+de validación) como su propia transacción y el aplazamiento se pierde
+antes de llegar a los `UPDATE`. Encontrado probando el propio arreglo, no
+por lectura de documentación. Añadidas validaciones de servidor: sesiones
+completadas no negativas ni por encima del programa, número de sesión
+entre 1 y el total, fechas válidas, tarifas y sesiones de programa
+positivas.
+
+**8. Doble envío**: además del botón desactivado en el navegador (que
+evita el doble toque físico, pero no un reintento de red ni dos pestañas),
+`clave_idempotencia` — un valor de un solo uso generado en cada carga de
+la página del perfil — impide guardar la misma petición de firma dos
+veces (tabla `firmas_idempotencia`). Recargar la página genera una clave
+nueva, así que una segunda sesión real sí se puede firmar sin problema.
+
+**9. Copia de seguridad consistente**: `/admin/backup` entregaba el
+archivo SQLite vivo directamente — en modo WAL, leerlo mientras otra
+petición escribe podría copiar un estado a medio guardar. Ahora usa
+`sqlite3.Connection.backup()` para generar una foto consistente en un
+archivo temporal, la envía, y la borra después.
+
+**10. Suite de regresión** (`tests/test_integridad.py`, `unittest`, sin
+dependencias nuevas): 17 pruebas, todas contra archivos SQLite temporales
+propios, nunca contra `datos/antifragil.db`. Cubre renovación normal,
+varias sesiones el mismo día, borrado/edición, tarifa histórica, cambio de
+semana/mes/año, CrossFit Kids, fallo a mitad de transacción, renombrado,
+valores inválidos, y comparación historial↔economía. Tres de los diez
+arreglos anteriores (6 y 7, y el caso general de #5) se corrigieron
+gracias a que la propia suite los hizo fallar primero — no se dieron por
+buenos solo por revisión de código.
+
+**Hallazgo de seguridad aparte (ver sección de abajo)**: el repositorio de
+GitHub creado el mismo día para darle acceso a ChatGPT llevaba siendo
+público desde su creación pese a haberse pedido `--private` explícitamente
+— corregido, sin secretos ni datos de clientes filtrados según revisión
+completa del historial de Git.
+
+**Arquitectura económica — análisis presentado, sin migración grande
+todavía** (pendiente de decisión de Fernando):
+
+- *Opción mínima (ya implementada en este sprint)*: `semanas`/`desglose`
+  siguen existiendo como agregado editable, pero cada operación que los
+  toca es ahora atómica y se verifica sola contra el historial real tras
+  cada cambio. Resuelve la causa raíz de los descuadres (operaciones no
+  atómicas) sin tocar la vista semanal ni migrar datos históricos.
+- *Opción simplificada*: eliminar `semanas`/`desglose` del todo y calcular
+  también la vista SEMANAL directamente desde `historial_sesiones`/
+  `clases_grupo`, igual que ya se hace ahora con la mensual. Elimina el
+  estado duplicado de raíz. Riesgo real: las semanas anteriores al
+  2026-07-22 (antes de firmar a mano) tienen huecos conocidos en el
+  historial (p. ej. el de Nikki) — recalcularlas desde ahí daría cifras
+  MÁS BAJAS que las ya cerradas y comunicadas a Fernando, una regresión
+  sobre datos históricos ya usados. Esfuerzo medio-alto.
+- **Recomendación**: quedarse con la opción mínima por ahora — el problema
+  real ya está resuelto y el riesgo de tocar cifras históricas cerradas no
+  se justifica todavía. Revisar la opción simplificada más adelante si
+  Fernando lo pide explícitamente.
+
 ### Migración de Excel a SQLite (2026-07-18)
 
 **El sistema real ya no usa Excel.** `datos/clientes.xlsx` y

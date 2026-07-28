@@ -194,3 +194,57 @@ sobra para probarlo antes del primer uso real"). Si esa condición se puede
 cumplir antes, no hace falta esperar al día que se dijo al principio —
 pero solo tras confirmar explícitamente con el usuario que el contexto ha
 cambiado, no unilateralmente.
+
+## 2026-07-28 — `PRAGMA defer_foreign_keys` no basta por sí solo: hace falta abrir la transacción a mano primero
+
+**Qué pasó:** Al arreglar el renombrado de un cliente con historial (que
+violaba la clave foránea porque `clientes.nombre` cambiaba antes de que
+`historial_sesiones.cliente` se actualizara a juego), añadí
+`conexion.execute("PRAGMA defer_foreign_keys = ON")` justo antes de los dos
+`UPDATE`. Seguía fallando con el mismo `IntegrityError`, incluso habiendo
+comprobado con `PRAGMA defer_foreign_keys` que el valor se había puesto a 1
+justo después de activarlo.
+
+**Por qué pasó:** El valor de `defer_foreign_keys` solo se respeta DENTRO
+de una transacción ya abierta. Python (`sqlite3`, modo de aislamiento por
+defecto) no abre una transacción implícita hasta la primera sentencia
+`INSERT`/`UPDATE`/`DELETE` — los `SELECT` y `PRAGMA` anteriores (las
+comprobaciones de validación, en este caso) se ejecutan cada uno como su
+propia mini-transacción autocommit, y `defer_foreign_keys` vuelve a su
+valor por defecto (desactivado) en cuanto esa mini-transacción termina.
+Para cuando llegaban los `UPDATE`, el aplazamiento ya se había perdido en
+silencio — sin ningún error visible hasta el `UPDATE` que de verdad rompía
+la referencia.
+
+**Qué se hace distinto a partir de ahora:** Si hace falta aplazar
+comprobaciones de clave foránea dentro de una operación con varias
+sentencias, abrir la transacción explícitamente con
+`conexion.execute("BEGIN")` ANTES de `PRAGMA defer_foreign_keys = ON`, y
+comprobarlo con una prueba real (no solo leyendo el valor del pragma justo
+después de activarlo) — un valor de pragma que "parece" puesto no garantiza
+que siga vigente unas sentencias más adelante.
+
+## 2026-07-28 — Un test que reproduce el bug exacto encontró un fallo real que la revisión de código no vio
+
+**Qué pasó:** Al añadir `ciclo_bono` para solucionar el bug de renovación
+que describió Fernando (borrar la sesión 1 de un bono nuevo no debía hacer
+que el contador volviera a mostrar el número del bono anterior), escribí
+la lógica, la revisé, y parecía correcta. El test que reproducía el
+escenario EXACTO que Fernando describió (no un caso genérico) falló: el
+contador volvía a poner 0 en vez de 11 al borrar la sesión que completaba
+el bono anterior — un caso relacionado pero distinto al que motivó el
+cambio, que la revisión manual no había cubierto.
+
+**Por qué pasó:** El código revertía el estado de "pendiente de pago" al
+deshacer una renovación, pero no revertía el `ciclo_bono` del cliente antes
+de recalcular las sesiones completadas — el recálculo miraba el ciclo
+nuevo (ya vacío tras el borrado) en vez del ciclo anterior. Una revisión de
+código centrada en "¿la lógica tiene sentido?" no sustituye a ejecutar el
+caso concreto que se está arreglando.
+
+**Qué se hace distinto a partir de ahora:** Para cualquier corrección de un
+bug con pasos de reproducción concretos (como los que dio Fernando en este
+sprint), escribir el test que reproduce ese escenario EXACTO antes de darlo
+por arreglado, y ejecutarlo — no basta con que el código "se lea bien". Esto
+ya evitó declarar como resuelto un arreglo que en realidad tenía un caso
+relacionado sin cubrir.
