@@ -81,6 +81,14 @@ No es un ejecutor ciego. El proyecto tiene una regla explícita contra el
 - **NUNCA tocar `main` directamente.** Toda nueva funcionalidad = rama nueva + PR.
 - **Commits semánticos**: `feat:`, `fix:`, `chore:`, `docs:`, `refactor:`
 - **Merge solo con aprobación explícita** de Fernando.
+- **Excepción explícita (decisión de Fernando, 2026-07-28):** proteger el
+  trabajo es responsabilidad de Claude, no algo que Fernando deba decidir
+  o recordar pedir. Claude puede hacer commit y `git push` al repositorio
+  privado de respaldo (`github.com/Tatu-design/antifragil-sistema`) sin
+  pedir permiso cada vez, en cualquier momento razonable (al terminar un
+  bloque de trabajo, al final de una sesión). Esto NO cambia el resto de
+  reglas: sigue sin tocarse `main` directamente, sigue sin hacer
+  `push --force`, y sigue sin mergear nada sin aprobación explícita.
 
 ### Reglas de código
 - Cambios pequeños y reversibles sobre grandes y arriesgados.

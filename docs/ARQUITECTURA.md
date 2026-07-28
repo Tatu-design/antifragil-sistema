@@ -195,6 +195,34 @@ Fernando planifique su semana, simplemente ya no hace falta leerlo para
 contar sesiones). La rutina en la nube (`trig_01JZ6et1nsACiTiu9Ho2rnt8`) no
 se ha borrado por si se retoma más adelante, pero no es la vía activa.
 
+### Protección del trabajo: responsabilidad de Claude, no de Fernando (2026-07-28)
+
+Tras montar la copia de la base de datos, Fernando preguntó "¿si se me
+rompe el ordenador, perdería la app?" — y dejó claro que proteger el
+trabajo es responsabilidad de Claude como experto técnico, no una decisión
+que él deba tomar o recordar pedir (no tiene conocimientos técnicos para
+evaluarlo). Esto cambia una regla del proyecto: hasta ahora, Claude nunca
+debía hacer `git commit`/`push` sin que Fernando lo pidiera explícitamente
+cada vez — ahora Claude lo hace por iniciativa propia, como parte de
+proteger el trabajo (ver excepción añadida en `.claude/CLAUDE.md`, sección
+Reglas de Git). El resto de reglas de Git no cambian: nunca tocar `main`
+directamente, nunca `push --force`, nunca mergear sin aprobación.
+
+Estado de la protección a partir de ahora:
+- **Código**: repositorio privado `github.com/Tatu-design/antifragil-sistema`
+  (creado el 2026-07-28 para darle acceso a ChatGPT, ver más abajo). Claude
+  hace commit y push ahí regularmente sin necesidad de que Fernando lo pida.
+  Límite honesto: esto depende de que haya una sesión de Claude Code activa
+  — no hay ninguna tarea en la nube vigilando el ordenador de Fernando (las
+  rutinas en la nube no tienen acceso al disco local, solo a repositorios ya
+  subidos), así que el código nuevo queda protegido en cuanto se sube, no
+  antes.
+- **Datos** (`antifragil.db`): copia automática a Google Drive, ahora
+  **diaria** (antes semanal, subido de frecuencia el mismo día tras esta
+  conversación) a las 03:00, vía la rutina en la nube. Solo avisa por email
+  (borrador de Gmail) si algo falla — si todo va bien no genera ningún
+  correo, para no llenar la bandeja de borradores cada día.
+
 ### Copia de seguridad semanal a Google Drive (2026-07-28)
 
 Fernando preguntó si los datos (sesiones, economía) quedan guardados para
