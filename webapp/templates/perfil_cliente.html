@@ -63,13 +63,9 @@
     {% if cliente.token and firmado and hay_sesion_pendiente %}
     <div class="qr-fondo" id="qr-fondo" role="dialog" aria-modal="true" aria-labelledby="qr-titulo">
       <div class="qr-dialogo">
-        <p class="qr-dialogo-titulo" id="qr-titulo">Confirmar sesión</p>
-        <p class="qr-dialogo-cliente">{{ nombre }}</p>
+        <p class="qr-dialogo-titulo">{{ nombre }}</p>
+        <p class="qr-dialogo-cliente" id="qr-titulo">Escanea para firmar tu sesión</p>
         <div class="qr-marco"><div id="qr-confirmar"></div></div>
-        <p class="qr-dialogo-pie">
-          Que lo escanee con la cámara de su móvil.<br>
-          Queda confirmada al instante, sin pulsar nada más.
-        </p>
         <button type="button" class="qr-cerrar" id="qr-cerrar">Cerrar</button>
       </div>
     </div>
