@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>{{ nombre }} — Antifrágil</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css', v=version_estaticos) }}" />
   <link rel="icon" href="{{ url_for('static', filename='favicon.png') }}" />
   <link rel="apple-touch-icon" href="{{ url_for('static', filename='favicon.png') }}" />
   <meta name="theme-color" content="#007563" />
@@ -61,13 +61,17 @@
     </div>
 
     {% if cliente.token and firmado and hay_sesion_pendiente %}
-    <div class="qr-tarjeta">
-      <p class="qr-tarjeta-titulo">Confirmar sesión</p>
-      <div class="qr-marco"><div id="qr-confirmar"></div></div>
-      <p class="qr-tarjeta-pie">
-        Que {{ nombre }} lo escanee con la cámara de su móvil.<br>
-        Queda confirmada al instante, sin pulsar nada más.
-      </p>
+    <div class="qr-fondo" id="qr-fondo" role="dialog" aria-modal="true" aria-labelledby="qr-titulo">
+      <div class="qr-dialogo">
+        <p class="qr-dialogo-titulo" id="qr-titulo">Confirmar sesión</p>
+        <p class="qr-dialogo-cliente">{{ nombre }}</p>
+        <div class="qr-marco"><div id="qr-confirmar"></div></div>
+        <p class="qr-dialogo-pie">
+          Que lo escanee con la cámara de su móvil.<br>
+          Queda confirmada al instante, sin pulsar nada más.
+        </p>
+        <button type="button" class="qr-cerrar" id="qr-cerrar">Cerrar</button>
+      </div>
     </div>
     <script src="{{ url_for('static', filename='js/qrcode.min.js') }}"></script>
     <script>
@@ -78,6 +82,20 @@
         colorDark: "#0f172a",
         colorLight: "#ffffff",
       });
+
+      (function () {
+        var fondo = document.getElementById("qr-fondo");
+        function cerrar() { fondo.remove(); }
+        document.getElementById("qr-cerrar").addEventListener("click", cerrar);
+        // Tocar fuera del recuadro también cierra, como en cualquier
+        // ventana emergente — pero no si se toca el QR en sí.
+        fondo.addEventListener("click", function (evento) {
+          if (evento.target === fondo) { cerrar(); }
+        });
+        document.addEventListener("keydown", function (evento) {
+          if (evento.key === "Escape") { cerrar(); }
+        });
+      })();
     </script>
     {% elif cliente.token and confirmaciones_hoy %}
     <div class="qr-confirmado">

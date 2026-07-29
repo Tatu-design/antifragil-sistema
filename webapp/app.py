@@ -75,6 +75,31 @@ app.secret_key = obtener_secret_key()
 # cambia de vez en cuando, no cada día.
 app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 60 * 60 * 24 * 7
 
+
+def _version_estaticos() -> str:
+    """Huella de la hoja de estilos, para añadirla al enlace del CSS en
+    las plantillas (`?v=...`).
+
+    Sin esto, la caché de una semana de arriba juega en contra al
+    desplegar un cambio de diseño: el navegador sigue usando el CSS
+    viejo hasta que caduque (o hasta un Ctrl+F5 manual), así que una
+    página nueva se ve sin estilos. Pasó de verdad el 2026-07-29 con la
+    tarjeta del QR. Como la huella cambia sola al cambiar el archivo, el
+    navegador descarga la versión nueva justo cuando toca, y sigue
+    reutilizando la guardada el resto del tiempo."""
+    try:
+        return str(int((Path(app.static_folder) / "style.css").stat().st_mtime))
+    except OSError:
+        return "0"
+
+
+VERSION_ESTATICOS = _version_estaticos()
+
+
+@app.context_processor
+def _inyectar_version_estaticos():
+    return {"version_estaticos": VERSION_ESTATICOS}
+
 # admin_procesar_dia no usa contraseña de sesión (lo llama una rutina
 # automática, no un navegador) — se protege con su propio token, comprobado
 # dentro de la propia función.
