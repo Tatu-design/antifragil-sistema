@@ -60,7 +60,7 @@
       <a class="boton-secundario" href="{{ url_for('editar', nombre=nombre) }}">Editar programa</a>
     </div>
 
-    {% if cliente.token and hay_sesion_pendiente %}
+    {% if cliente.token and firmado and hay_sesion_pendiente %}
     <div class="qr-tarjeta">
       <p class="qr-tarjeta-titulo">Confirmar sesión</p>
       <div class="qr-marco"><div id="qr-confirmar"></div></div>
