@@ -427,6 +427,21 @@ Módulo `firma_publica.py`:
   por tipo en `/avisos`, para poder limpiar de golpe un tipo de aviso que
   se dispara en cantidad — útil para este caso y para cualquier otro
   parecido en el futuro.
+
+  **Segunda corrección, mismo día — confirmar por sesión, no por día**:
+  Fernando preguntó qué pasaba si firmaba dos sesiones del mismo cliente
+  el mismo día (algo que ya podía hacer desde el 2026-07-24) — con el
+  diseño de entonces, `firmas_publicas` guardaba la confirmación por
+  (cliente, fecha), así que la primera confirmación "gastaba" el día
+  entero y la segunda sesión ya no se podía confirmar nunca. Arreglado
+  añadiendo `sesion_id` a `firmas_publicas` (referencia a
+  `historial_sesiones.id`, migración aditiva en `crear_esquema()`): cada
+  fila confirma una sesión concreta, no un día. `hay_sesion_hoy()` pasó a
+  `hay_sesion_pendiente_de_confirmar()` (mira si queda alguna sesión de
+  hoy sin su confirmación) y `confirmacion_de_hoy()` (una sola) pasó a
+  `confirmaciones_de_hoy()` (lista — puede haber varias). El QR/botón
+  reaparece automáticamente después de cada sesión nueva que Fernando
+  firme, aunque sea el mismo cliente el mismo día.
 - **Solo puede confirmar la sesión del cliente dueño del token**: la ruta
   `/mi/<token>/confirmar` resuelve el nombre a partir del token con
   `obtener_cliente_por_token()`, nunca de un dato del formulario.

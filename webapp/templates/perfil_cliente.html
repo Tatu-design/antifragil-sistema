@@ -60,11 +60,7 @@
       <a class="boton-secundario" href="{{ url_for('editar', nombre=nombre) }}">Editar programa</a>
     </div>
 
-    {% if cliente.token and confirmacion_hoy %}
-    <div class="lista" style="text-align:center; margin-bottom: 1.5rem; padding: 1.1rem;">
-      <p class="meta" style="margin:0; font-weight:700; color: var(--accent);">✓ El cliente confirmó su sesión de hoy a las {{ confirmacion_hoy.hora }}</p>
-    </div>
-    {% elif cliente.token and hay_sesion_hoy %}
+    {% if cliente.token and hay_sesion_pendiente %}
     <div class="lista" style="text-align:center; margin-bottom: 1.5rem; padding: 1.5rem;">
       <p style="margin:0 0 1rem; font-weight:700;">Que el cliente escanee para confirmar su sesión de hoy</p>
       <div id="qr-confirmar" style="display:flex; justify-content:center;"></div>
@@ -78,6 +74,13 @@
         height: 180,
       });
     </script>
+    {% elif cliente.token and confirmaciones_hoy %}
+    <div class="lista" style="text-align:center; margin-bottom: 1.5rem; padding: 1.1rem;">
+      <p class="meta" style="margin:0; font-weight:700; color: var(--accent);">
+        ✓ Confirmada{{ 's' if confirmaciones_hoy|length > 1 else '' }} hoy a las
+        {{ confirmaciones_hoy | reverse | map(attribute='hora') | join(', ') }}
+      </p>
+    </div>
     {% endif %}
 
     {% if cliente.token %}

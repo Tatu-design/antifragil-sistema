@@ -2,7 +2,10 @@
 (`/mi/<token>`, 2026-07-29) — ver `firma_publica.py`.
 
 Diseño: el cliente nunca crea una sesión, solo confirma la que Fernando ya
-firmó ese día. Reutiliza la misma base de casos que `test_integridad.py`.
+firmó. Cada sesión se confirma por separado (por su `id`), no una vez por
+día, para que firmar varias sesiones el mismo cliente el mismo día se
+pueda confirmar sesión a sesión. Reutiliza la misma base de casos que
+`test_integridad.py`.
 """
 
 import unittest
@@ -19,20 +22,20 @@ from zona_horaria import hoy_negocio
 
 class TestConfirmacionPublica(BaseIntegridadTestCase):
     def test_sin_sesion_hoy_no_hay_nada_que_confirmar(self):
-        self.assertFalse(fp.hay_sesion_hoy("Cliente", ruta=self.ruta))
+        self.assertFalse(fp.hay_sesion_pendiente_de_confirmar("Cliente", ruta=self.ruta))
         with self.assertRaises(ValueError):
             fp.confirmar_sesion_publica("Cliente", ruta=self.ruta)
 
     def test_confirmar_tras_firmar_crea_recibo_con_fecha_y_hora(self):
         ra.registrar_sesion_pt("Cliente", ruta=self.ruta)  # Fernando firma, fecha de hoy
-        self.assertTrue(fp.hay_sesion_hoy("Cliente", ruta=self.ruta))
+        self.assertTrue(fp.hay_sesion_pendiente_de_confirmar("Cliente", ruta=self.ruta))
 
         resultado = fp.confirmar_sesion_publica("Cliente", ruta=self.ruta)
         self.assertEqual(resultado["fecha"], hoy_negocio().isoformat())
         self.assertRegex(resultado["hora"], r"^\d{2}:\d{2}$")
 
-        recibo = fp.confirmacion_de_hoy("Cliente", ruta=self.ruta)
-        self.assertIsNotNone(recibo)
+        confirmaciones = fp.confirmaciones_de_hoy("Cliente", ruta=self.ruta)
+        self.assertEqual(len(confirmaciones), 1)
 
     def test_confirmar_no_toca_el_bono_ni_el_historial(self):
         ra.registrar_sesion_pt("Cliente", ruta=self.ruta)
@@ -46,9 +49,10 @@ class TestConfirmacionPublica(BaseIntegridadTestCase):
         self.assertEqual(hist_antes, hist_despues)
         self.assertEqual(cliente_antes["sesiones_completadas"], cliente_despues["sesiones_completadas"])
 
-    def test_no_permite_confirmar_dos_veces(self):
+    def test_no_permite_confirmar_dos_veces_la_misma_sesion(self):
         ra.registrar_sesion_pt("Cliente", ruta=self.ruta)
         fp.confirmar_sesion_publica("Cliente", ruta=self.ruta)
+        self.assertFalse(fp.hay_sesion_pendiente_de_confirmar("Cliente", ruta=self.ruta))
         with self.assertRaises(ValueError):
             fp.confirmar_sesion_publica("Cliente", ruta=self.ruta)
 
@@ -58,17 +62,35 @@ class TestConfirmacionPublica(BaseIntegridadTestCase):
         avisos = av.listar_avisos_pendientes(ruta=self.ruta)
         self.assertTrue(any(a["tipo"] == "confirmacion_cliente" and "Cliente" in a["detalle"] for a in avisos))
 
-    def test_fernando_firma_varias_veces_cliente_confirma_una_sola_vez(self):
-        """El límite de una confirmación al día es del cliente — Fernando
-        sigue pudiendo firmar varias sesiones el mismo día sin límite
-        (decisión del 2026-07-24, sin cambios)."""
+    def test_dos_sesiones_el_mismo_dia_se_confirman_una_a_una(self):
+        """El bug real que reportó Fernando: firmar dos sesiones el mismo
+        cliente el mismo día (algo que ya podía hacer) debía poder
+        confirmarse dos veces, una por sesión — no "gastar" el turno de
+        confirmar con la primera."""
         ra.registrar_sesion_pt("Cliente", ruta=self.ruta)
         ra.registrar_sesion_pt("Cliente", ruta=self.ruta)
         self.assertEqual(len(cr.obtener_historial("Cliente", ruta=self.ruta)), 2)
 
+        # Primera confirmación: queda pendiente la segunda sesión.
+        self.assertTrue(fp.hay_sesion_pendiente_de_confirmar("Cliente", ruta=self.ruta))
         fp.confirmar_sesion_publica("Cliente", ruta=self.ruta)
+        self.assertTrue(fp.hay_sesion_pendiente_de_confirmar("Cliente", ruta=self.ruta))
+
+        # Segunda confirmación: ya no queda ninguna pendiente.
+        fp.confirmar_sesion_publica("Cliente", ruta=self.ruta)
+        self.assertFalse(fp.hay_sesion_pendiente_de_confirmar("Cliente", ruta=self.ruta))
+
+        self.assertEqual(len(fp.confirmaciones_de_hoy("Cliente", ruta=self.ruta)), 2)
         with self.assertRaises(ValueError):
             fp.confirmar_sesion_publica("Cliente", ruta=self.ruta)
+
+    def test_fernando_puede_firmar_sin_limite_independiente_de_confirmaciones(self):
+        """El límite de "una sesión pendiente a la vez" es solo de cara al
+        cliente — Fernando sigue sin ningún límite (decisión del
+        2026-07-24, sin cambios)."""
+        for _ in range(4):
+            ra.registrar_sesion_pt("Cliente", ruta=self.ruta)
+        self.assertEqual(len(cr.obtener_historial("Cliente", ruta=self.ruta)), 4)
 
 
 class TestAvisoConfirmacionesPendientes(BaseIntegridadTestCase):
@@ -97,14 +119,13 @@ class TestAvisoConfirmacionesPendientes(BaseIntegridadTestCase):
         dia_sesion = fp.FECHA_INICIO_CONFIRMACIONES
         manana = dia_sesion + timedelta(days=1)
         ra.registrar_sesion_pt("Cliente", fecha=dia_sesion, ruta=self.ruta)
-        # El cliente sí confirmó ese día (se simula insertando directamente,
-        # ya que confirmar_sesion_publica solo entiende "hoy").
+        entrada_id = cr.obtener_historial("Cliente", ruta=self.ruta)[0]["id"]
         from basedatos import conectar
 
         with conectar(self.ruta) as conexion:
             conexion.execute(
-                "INSERT INTO firmas_publicas (cliente, fecha, hora) VALUES (?, ?, ?)",
-                ("Cliente", dia_sesion.isoformat(), "10:00"),
+                "INSERT INTO firmas_publicas (cliente, fecha, hora, sesion_id) VALUES (?, ?, ?, ?)",
+                ("Cliente", dia_sesion.isoformat(), "10:00", entrada_id),
             )
 
         with patch("firma_publica.hoy_negocio", return_value=manana):
@@ -112,6 +133,27 @@ class TestAvisoConfirmacionesPendientes(BaseIntegridadTestCase):
 
         avisos = av.listar_avisos_pendientes(ruta=self.ruta)
         self.assertFalse(any(a["tipo"] == "confirmacion_pendiente" for a in avisos))
+
+    def test_dos_sesiones_mismo_dia_una_confirmada_avisa_solo_de_la_otra(self):
+        dia_sesion = fp.FECHA_INICIO_CONFIRMACIONES
+        manana = dia_sesion + timedelta(days=1)
+        ra.registrar_sesion_pt("Cliente", fecha=dia_sesion, ruta=self.ruta)
+        ra.registrar_sesion_pt("Cliente", fecha=dia_sesion, ruta=self.ruta)
+        primera_id = min(h["id"] for h in cr.obtener_historial("Cliente", ruta=self.ruta))
+        from basedatos import conectar
+
+        with conectar(self.ruta) as conexion:
+            conexion.execute(
+                "INSERT INTO firmas_publicas (cliente, fecha, hora, sesion_id) VALUES (?, ?, ?, ?)",
+                ("Cliente", dia_sesion.isoformat(), "10:00", primera_id),
+            )
+
+        with patch("firma_publica.hoy_negocio", return_value=manana):
+            fp.avisar_confirmaciones_pendientes(ruta=self.ruta)
+
+        avisos = [a for a in av.listar_avisos_pendientes(ruta=self.ruta) if a["tipo"] == "confirmacion_pendiente"]
+        self.assertEqual(len(avisos), 1)
+        self.assertIn("sesión 2", avisos[0]["detalle"])
 
     def test_sesion_anterior_al_lanzamiento_nunca_genera_aviso(self):
         """La causa exacta de los 28 avisos de golpe: sesiones firmadas

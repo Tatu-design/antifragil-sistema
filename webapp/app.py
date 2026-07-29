@@ -47,7 +47,12 @@ from clientes.repositorio import (
     obtener_historial,
 )
 from economia.registro import listar_meses, obtener_mes, obtener_ultima_semana
-from firma_publica import avisar_confirmaciones_pendientes, confirmacion_de_hoy, confirmar_sesion_publica, hay_sesion_hoy
+from firma_publica import (
+    avisar_confirmaciones_pendientes,
+    confirmaciones_de_hoy,
+    confirmar_sesion_publica,
+    hay_sesion_pendiente_de_confirmar,
+)
 from procesar_dia import procesar_dia
 from registrar_asistencia import (
     editar_sesion_pt,
@@ -228,8 +233,8 @@ def perfil_cliente(nombre):
         entradas=obtener_historial(nombre),
         firmado=request.args.get("firmado"),
         borrado=request.args.get("borrado"),
-        hay_sesion_hoy=hay_sesion_hoy(nombre),
-        confirmacion_hoy=confirmacion_de_hoy(nombre),
+        hay_sesion_pendiente=hay_sesion_pendiente_de_confirmar(nombre),
+        confirmaciones_hoy=confirmaciones_de_hoy(nombre),
     )
 
 
@@ -364,8 +369,8 @@ def mi_perfil(token):
         nombre=nombre,
         cliente=filas[0],
         entradas=obtener_historial(nombre),
-        hay_sesion_hoy=hay_sesion_hoy(nombre),
-        confirmacion_hoy=confirmacion_de_hoy(nombre),
+        hay_sesion_pendiente=hay_sesion_pendiente_de_confirmar(nombre),
+        confirmaciones_hoy=confirmaciones_de_hoy(nombre),
     )
 
 

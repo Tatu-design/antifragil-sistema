@@ -237,3 +237,14 @@ def crear_esquema(ruta: Path = RUTA_POR_DEFECTO) -> None:
             )
             """
         )
+        columnas_firmas = {fila["name"] for fila in conexion.execute("PRAGMA table_info(firmas_publicas)")}
+        if "sesion_id" not in columnas_firmas:
+            # 2026-07-29, mismo día: al principio se confirmaba "el día",
+            # no la sesión concreta — si Fernando firmaba dos sesiones el
+            # mismo cliente el mismo día (algo que ya podía hacer desde el
+            # 2026-07-24), solo se podía confirmar una vez para todo el
+            # día. Ahora cada confirmación referencia la sesión concreta
+            # de `historial_sesiones` que confirma.
+            conexion.execute(
+                "ALTER TABLE firmas_publicas ADD COLUMN sesion_id INTEGER REFERENCES historial_sesiones(id)"
+            )

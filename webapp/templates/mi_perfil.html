@@ -44,12 +44,13 @@
       </div>
     </div>
 
-    {% if confirmacion_hoy %}
+    {% for confirmacion in confirmaciones_hoy %}
     <div class="aviso-guardado">
-      Ya has confirmado tu sesión de hoy<br>
-      Confirmada el {{ confirmacion_hoy.fecha }} a las {{ confirmacion_hoy.hora }}
+      Sesión confirmada el {{ confirmacion.fecha }} a las {{ confirmacion.hora }}
     </div>
-    {% elif hay_sesion_hoy %}
+    {% endfor %}
+
+    {% if hay_sesion_pendiente %}
     <form method="post" action="{{ url_for('mi_confirmar', token=token) }}"
           onsubmit="this.querySelector('button').disabled = true; this.querySelector('button').textContent = 'Guardando…';">
       <button type="submit" class="boton-firmar">✓ Confirmar mi sesión de hoy</button>
