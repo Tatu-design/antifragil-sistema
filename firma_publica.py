@@ -20,14 +20,18 @@ avisar en tiempo real, ver lección de la actualización diaria de
 Calendar), sino la próxima vez que Fernando abra la web, igual que
 funciona el resto de avisos."""
 
-from datetime import timedelta
+from datetime import date
 from pathlib import Path
 
 from avisos import registrar_aviso
 from basedatos import RUTA_POR_DEFECTO, conectar
 from zona_horaria import ahora_negocio, hoy_negocio
 
-DIAS_ATRAS_A_REVISAR = 14
+# El día en que se desplegó esta función — nunca se avisa de sesiones
+# anteriores a esta fecha, porque confirmar no era ni posible entonces
+# (si no, cada sesión antigua de la vida de la app aparecería como "sin
+# confirmar" de golpe, como pasó la primera vez que se probó esto).
+FECHA_INICIO_CONFIRMACIONES = date(2026, 7, 29)
 
 
 def hay_sesion_hoy(cliente: str, ruta: Path = RUTA_POR_DEFECTO) -> bool:
@@ -80,16 +84,17 @@ def confirmar_sesion_publica(cliente: str, ruta: Path = RUTA_POR_DEFECTO) -> dic
 
 
 def avisar_confirmaciones_pendientes(ruta: Path = RUTA_POR_DEFECTO) -> None:
-    """Revisa los últimos días (nunca hoy, para no avisar antes de que el
-    cliente haya tenido ocasión de confirmar) y deja un aviso por cada
-    sesión que Fernando firmó y el cliente nunca confirmó desde su enlace.
+    """Revisa desde `FECHA_INICIO_CONFIRMACIONES` hasta ayer (nunca hoy,
+    para no avisar antes de que el cliente haya tenido ocasión de
+    confirmar) y deja un aviso por cada sesión que Fernando firmó y el
+    cliente nunca confirmó desde su enlace.
 
     Pensada para llamarse en las páginas que Fernando abre de forma
     habitual (portada, avisos) — no hay una tarea programada detrás; el
     aviso aparece la próxima vez que entra a la web, como el resto de
     avisos del sistema."""
     hoy = hoy_negocio()
-    desde = (hoy - timedelta(days=DIAS_ATRAS_A_REVISAR)).isoformat()
+    desde = FECHA_INICIO_CONFIRMACIONES.isoformat()
     with conectar(ruta) as conexion:
         pendientes = conexion.execute(
             "SELECT DISTINCT h.cliente, h.fecha FROM historial_sesiones h "

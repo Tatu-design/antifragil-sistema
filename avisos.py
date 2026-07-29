@@ -74,3 +74,13 @@ def marcar_todos_leidos(ruta: Path = RUTA_POR_DEFECTO) -> None:
 def resolver_aviso(aviso_id: int, ruta: Path = RUTA_POR_DEFECTO) -> None:
     with conectar(ruta) as conexion:
         conexion.execute("UPDATE avisos SET resuelto = 1 WHERE id = ?", (aviso_id,))
+
+
+def resolver_avisos_por_tipo(tipo: str, ruta: Path = RUTA_POR_DEFECTO) -> int:
+    """Descarta de golpe todos los avisos pendientes de un mismo tipo —
+    para cuando una comprobación nueva genera muchos avisos de golpe (p.
+    ej. al lanzarla) y no tiene sentido descartarlos uno a uno. Devuelve
+    cuántos se han descartado."""
+    with conectar(ruta) as conexion:
+        cursor = conexion.execute("UPDATE avisos SET resuelto = 1 WHERE resuelto = 0 AND tipo = ?", (tipo,))
+        return cursor.rowcount

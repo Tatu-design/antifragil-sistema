@@ -28,7 +28,14 @@ from zona_horaria import hoy_negocio
 
 from flask import Flask, after_this_request, jsonify, redirect, render_template, request, send_file, session, url_for
 
-from avisos import contar_no_leidos, listar_avisos_pendientes, marcar_todos_leidos, registrar_aviso, resolver_aviso
+from avisos import (
+    contar_no_leidos,
+    listar_avisos_pendientes,
+    marcar_todos_leidos,
+    registrar_aviso,
+    resolver_aviso,
+    resolver_avisos_por_tipo,
+)
 from basedatos import RUTA_POR_DEFECTO, crear_esquema
 from clientes.repositorio import (
     actualizar_cliente,
@@ -627,12 +634,24 @@ def avisos():
     avisar_confirmaciones_pendientes()
     lista = listar_avisos_pendientes()
     marcar_todos_leidos()
-    return render_template("avisos.html", avisos=lista)
+    conteo_por_tipo: dict[str, int] = {}
+    for aviso in lista:
+        conteo_por_tipo[aviso["tipo"]] = conteo_por_tipo.get(aviso["tipo"], 0) + 1
+    return render_template("avisos.html", avisos=lista, conteo_por_tipo=conteo_por_tipo)
 
 
 @app.route("/avisos/<int:aviso_id>/resolver", methods=["POST"])
 def resolver_aviso_ruta(aviso_id):
     resolver_aviso(aviso_id)
+    return redirect(url_for("avisos"))
+
+
+@app.route("/avisos/resolver-tipo", methods=["POST"])
+def resolver_avisos_por_tipo_ruta():
+    """Descarta de golpe todos los avisos pendientes de un tipo — útil
+    cuando una comprobación nueva genera muchos avisos de golpe (pasó al
+    lanzar la de confirmaciones pendientes, 2026-07-29)."""
+    resolver_avisos_por_tipo(request.form["tipo"])
     return redirect(url_for("avisos"))
 
 

@@ -7,6 +7,7 @@ firmó ese día. Reutiliza la misma base de casos que `test_integridad.py`.
 
 import unittest
 from datetime import timedelta
+from unittest.mock import patch
 
 import avisos as av
 import clientes.repositorio as cr
@@ -71,33 +72,57 @@ class TestConfirmacionPublica(BaseIntegridadTestCase):
 
 
 class TestAvisoConfirmacionesPendientes(BaseIntegridadTestCase):
-    def test_sesion_de_ayer_sin_confirmar_genera_aviso(self):
-        ayer = hoy_negocio() - timedelta(days=1)
-        ra.registrar_sesion_pt("Cliente", fecha=ayer, ruta=self.ruta)
+    """`avisar_confirmaciones_pendientes` nunca mira sesiones anteriores a
+    `FECHA_INICIO_CONFIRMACIONES` (el día en que se lanzó esta función) —
+    si no, cada sesión antigua de toda la vida de la app aparecería como
+    "sin confirmar" de golpe (lo que le pasó de verdad a Fernando: 28
+    avisos el primer día). Por eso estos tests fijan el "hoy" del sistema
+    al día siguiente al lanzamiento, y la sesión al día del lanzamiento —
+    así el escenario es válido pase lo que pase con la fecha real."""
 
-        fp.avisar_confirmaciones_pendientes(ruta=self.ruta)
+    def test_sesion_del_dia_de_lanzamiento_sin_confirmar_genera_aviso(self):
+        dia_sesion = fp.FECHA_INICIO_CONFIRMACIONES
+        manana = dia_sesion + timedelta(days=1)
+        ra.registrar_sesion_pt("Cliente", fecha=dia_sesion, ruta=self.ruta)
+
+        with patch("firma_publica.hoy_negocio", return_value=manana):
+            fp.avisar_confirmaciones_pendientes(ruta=self.ruta)
 
         avisos = av.listar_avisos_pendientes(ruta=self.ruta)
         self.assertTrue(
-            any(a["tipo"] == "confirmacion_pendiente" and ayer.isoformat() in a["detalle"] for a in avisos)
+            any(a["tipo"] == "confirmacion_pendiente" and dia_sesion.isoformat() in a["detalle"] for a in avisos)
         )
 
-    def test_sesion_de_ayer_confirmada_no_genera_aviso(self):
-        ayer = hoy_negocio() - timedelta(days=1)
-        ra.registrar_sesion_pt("Cliente", fecha=ayer, ruta=self.ruta)
-        # El cliente sí confirmó ayer (se simula insertando directamente,
+    def test_sesion_confirmada_no_genera_aviso(self):
+        dia_sesion = fp.FECHA_INICIO_CONFIRMACIONES
+        manana = dia_sesion + timedelta(days=1)
+        ra.registrar_sesion_pt("Cliente", fecha=dia_sesion, ruta=self.ruta)
+        # El cliente sí confirmó ese día (se simula insertando directamente,
         # ya que confirmar_sesion_publica solo entiende "hoy").
-        import sqlite3
-
         from basedatos import conectar
 
         with conectar(self.ruta) as conexion:
             conexion.execute(
                 "INSERT INTO firmas_publicas (cliente, fecha, hora) VALUES (?, ?, ?)",
-                ("Cliente", ayer.isoformat(), "10:00"),
+                ("Cliente", dia_sesion.isoformat(), "10:00"),
             )
 
-        fp.avisar_confirmaciones_pendientes(ruta=self.ruta)
+        with patch("firma_publica.hoy_negocio", return_value=manana):
+            fp.avisar_confirmaciones_pendientes(ruta=self.ruta)
+
+        avisos = av.listar_avisos_pendientes(ruta=self.ruta)
+        self.assertFalse(any(a["tipo"] == "confirmacion_pendiente" for a in avisos))
+
+    def test_sesion_anterior_al_lanzamiento_nunca_genera_aviso(self):
+        """La causa exacta de los 28 avisos de golpe: sesiones firmadas
+        antes de que esta función existiera no deben avisar nunca, por muy
+        atrás que se mire."""
+        antes_del_lanzamiento = fp.FECHA_INICIO_CONFIRMACIONES - timedelta(days=5)
+        manana = fp.FECHA_INICIO_CONFIRMACIONES + timedelta(days=1)
+        ra.registrar_sesion_pt("Cliente", fecha=antes_del_lanzamiento, ruta=self.ruta)
+
+        with patch("firma_publica.hoy_negocio", return_value=manana):
+            fp.avisar_confirmaciones_pendientes(ruta=self.ruta)
 
         avisos = av.listar_avisos_pendientes(ruta=self.ruta)
         self.assertFalse(any(a["tipo"] == "confirmacion_pendiente" for a in avisos))
