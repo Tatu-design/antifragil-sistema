@@ -369,12 +369,11 @@ def mi_perfil(token):
         nombre=nombre,
         cliente=filas[0],
         entradas=obtener_historial(nombre),
-        hay_sesion_pendiente=hay_sesion_pendiente_de_confirmar(nombre),
         confirmaciones_hoy=confirmaciones_de_hoy(nombre),
     )
 
 
-@app.route("/mi/<token>/confirmar", methods=["GET", "POST"])
+@app.route("/mi/<token>/confirmar")
 def mi_confirmar(token):
     """El cliente confirma que la sesión que Fernando ya le firmó hoy es
     correcta. No crea ni modifica ninguna sesión ni toca el bono — solo
@@ -383,13 +382,13 @@ def mi_confirmar(token):
     así que solo se puede confirmar la sesión del cliente dueño del
     enlace.
 
-    Acepta también GET (no solo POST) a propósito, además del botón:
-    decisión de Fernando del 2026-07-29 de poder enseñarle al cliente un
-    código QR con este mismo enlace tras firmarle la sesión — escanearlo
-    abre la URL directamente y confirma en el acto, sin que el cliente
-    tenga que pulsar nada más. Es una excepción consciente a "GET no debe
-    tener efectos secundarios": la acción es segura de repetir (como
-    mucho, ya estaba confirmada) y el token ya hace de autorización."""
+    Solo por GET, y solo se llega aquí escaneando el QR que Fernando le
+    enseña tras firmarle la sesión (decisión del 2026-07-29: se quitó el
+    botón de confirmar de la página del cliente — confirmar es algo que
+    pasa delante de Fernando, no algo que el cliente haga por su cuenta
+    más tarde). Es una excepción consciente a "GET no debe tener efectos
+    secundarios": la acción es segura de repetir (como mucho ya estaba
+    confirmada) y el token ya hace de autorización."""
     encontrado = obtener_cliente_por_token(token)
     if encontrado is None:
         return render_template("error.html", mensaje="Este enlace no es válido. Pide uno nuevo a Fernando."), 404

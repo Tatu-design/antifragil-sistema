@@ -50,13 +50,6 @@
     </div>
     {% endfor %}
 
-    {% if hay_sesion_pendiente %}
-    <form method="post" action="{{ url_for('mi_confirmar', token=token) }}"
-          onsubmit="this.querySelector('button').disabled = true; this.querySelector('button').textContent = 'Guardando…';">
-      <button type="submit" class="boton-firmar">✓ Confirmar mi sesión de hoy</button>
-    </form>
-    {% endif %}
-
     <div class="lista">
       <div class="cabecera-seccion">
         <span>Historial de sesiones</span>

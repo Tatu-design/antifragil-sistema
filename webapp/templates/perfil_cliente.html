@@ -61,25 +61,31 @@
     </div>
 
     {% if cliente.token and hay_sesion_pendiente %}
-    <div class="lista" style="text-align:center; margin-bottom: 1.5rem; padding: 1.5rem;">
-      <p style="margin:0 0 1rem; font-weight:700;">Que el cliente escanee para confirmar su sesión de hoy</p>
-      <div id="qr-confirmar" style="display:flex; justify-content:center;"></div>
-      <p class="meta" style="margin: 0.75rem 0 0;">Al escanearlo, confirma directamente — no hace falta que pulse nada más</p>
+    <div class="qr-tarjeta">
+      <p class="qr-tarjeta-titulo">Confirmar sesión</p>
+      <div class="qr-marco"><div id="qr-confirmar"></div></div>
+      <p class="qr-tarjeta-pie">
+        Que {{ nombre }} lo escanee con la cámara de su móvil.<br>
+        Queda confirmada al instante, sin pulsar nada más.
+      </p>
     </div>
     <script src="{{ url_for('static', filename='js/qrcode.min.js') }}"></script>
     <script>
       new QRCode(document.getElementById("qr-confirmar"), {
         text: "{{ url_for('mi_confirmar', token=cliente.token, _external=True) }}",
-        width: 180,
-        height: 180,
+        width: 190,
+        height: 190,
+        colorDark: "#0f172a",
+        colorLight: "#ffffff",
       });
     </script>
     {% elif cliente.token and confirmaciones_hoy %}
-    <div class="lista" style="text-align:center; margin-bottom: 1.5rem; padding: 1.1rem;">
-      <p class="meta" style="margin:0; font-weight:700; color: var(--accent);">
-        ✓ Confirmada{{ 's' if confirmaciones_hoy|length > 1 else '' }} hoy a las
+    <div class="qr-confirmado">
+      <span>✓</span>
+      <span>
+        Confirmada{{ 's' if confirmaciones_hoy|length > 1 else '' }} hoy a las
         {{ confirmaciones_hoy | reverse | map(attribute='hora') | join(', ') }}
-      </p>
+      </span>
     </div>
     {% endif %}
 
