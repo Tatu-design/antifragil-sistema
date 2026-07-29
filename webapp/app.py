@@ -228,6 +228,8 @@ def perfil_cliente(nombre):
         entradas=obtener_historial(nombre),
         firmado=request.args.get("firmado"),
         borrado=request.args.get("borrado"),
+        hay_sesion_hoy=hay_sesion_hoy(nombre),
+        confirmacion_hoy=confirmacion_de_hoy(nombre),
     )
 
 
