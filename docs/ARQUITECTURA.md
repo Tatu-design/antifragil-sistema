@@ -403,17 +403,30 @@ Módulo `firma_publica.py`:
 - **Aviso a Fernando cuando el cliente confirma** (`avisos.py`, tipo
   `confirmacion_cliente`).
 - **Aviso a Fernando cuando el cliente NO confirma**: `avisar_confirmaciones_pendientes()`
-  revisa los últimos 14 días (nunca el día de hoy, para no avisar antes de
-  que el cliente haya tenido toda la jornada para confirmar) y deja un
-  aviso (`confirmacion_pendiente`) por cada sesión de un cliente que
-  Fernando firmó y nadie confirmó desde el enlace. No hay una tarea
-  programada detrás — no hay forma fiable de avisar en tiempo real, ya se
-  intentó con la actualización automática de Calendar en julio y no se
-  pudo verificar que funcionara (ver sección de más abajo). En vez de eso,
-  se llama sola en las dos páginas que Fernando abre de forma habitual
-  (`/` y `/avisos`) — el aviso aparece la próxima vez que entra a la web,
-  como el resto de avisos del sistema. Decisión explícita de Fernando:
-  "si me avisa cada vez que abro la app me vale".
+  revisa desde `FECHA_INICIO_CONFIRMACIONES` (el día en que se lanzó esta
+  función) hasta ayer (nunca el día de hoy, para no avisar antes de que el
+  cliente haya tenido toda la jornada para confirmar) y deja un aviso
+  (`confirmacion_pendiente`) por cada sesión de un cliente que Fernando
+  firmó y nadie confirmó desde el enlace. No hay una tarea programada
+  detrás — no hay forma fiable de avisar en tiempo real, ya se intentó con
+  la actualización automática de Calendar en julio y no se pudo verificar
+  que funcionara (ver sección de más abajo). En vez de eso, se llama sola
+  en las dos páginas que Fernando abre de forma habitual (`/` y `/avisos`)
+  — el aviso aparece la próxima vez que entra a la web, como el resto de
+  avisos del sistema. Decisión explícita de Fernando: "si me avisa cada
+  vez que abro la app me vale".
+
+  **Primera versión de esta comprobación, arreglada el mismo día**: al
+  principio miraba una ventana móvil de "los últimos 14 días" en vez de
+  desde el lanzamiento — el primer día que Fernando la usó le aparecieron
+  **28 avisos de golpe**, uno por cada sesión antigua que nunca pudo
+  confirmarse porque la función todavía no existía cuando se firmó.
+  Corregido acotando la revisión a partir de `FECHA_INICIO_CONFIRMACIONES`
+  (fecha fija, no una ventana relativa a "hoy"). De paso se añadió
+  `resolver_avisos_por_tipo()` (`avisos.py`) y un botón "Descartar todos"
+  por tipo en `/avisos`, para poder limpiar de golpe un tipo de aviso que
+  se dispara en cantidad — útil para este caso y para cualquier otro
+  parecido en el futuro.
 - **Solo puede confirmar la sesión del cliente dueño del token**: la ruta
   `/mi/<token>/confirmar` resuelve el nombre a partir del token con
   `obtener_cliente_por_token()`, nunca de un dato del formulario.
@@ -429,8 +442,54 @@ confirmación creado → una sesión de ayer sin confirmar genera el aviso de
 pendiente al re-ejecutar la comprobación (simulando abrir `/` o
 `/avisos`) → una sesión de hoy sin confirmar NO genera aviso todavía →
 Fernando puede editar y borrar la sesión aunque el cliente ya la haya
-confirmado. Tests de regresión en `tests/test_firma_publica.py` (9
+confirmado. Tests de regresión en `tests/test_firma_publica.py` (10
 pruebas).
+
+### Confirmar por QR en vez de por enlace (2026-07-29)
+
+Fernando propuso ir un paso más allá de la confirmación por enlace: un
+código QR que le enseña al cliente justo después de firmarle la sesión,
+de forma que confirmar pase a ser parte del propio momento con él (que
+siempre ocurre) en vez de depender de que el cliente entre luego por su
+cuenta a su enlace (que podía no pasar).
+
+**Decisión técnica clave — generar el QR en el navegador, no en el
+servidor**: la forma habitual (librería Python `qrcode`) habría requerido
+instalar un paquete nuevo en el servidor real de PythonAnywhere. Al
+comprobarlo, la API de PythonAnywhere no permite ejecutar `pip install`
+sin que antes se abra una consola manualmente en el navegador al menos
+una vez (se intentó por API, tanto sobre una consola ya existente como
+creando una nueva — las dos exigen ese primer arranque manual). Como el
+mismo día ya se había tumbado la web una vez por desplegar código que
+dependía de algo no instalado, se descartó ese camino: en vez de generar
+el QR como imagen en Python, se autoaloja una librería JavaScript sin
+dependencias (`davidshimjs/qrcodejs`, ~20&nbsp;KB, `webapp/static/js/qrcode.min.js`,
+descargada una sola vez, nunca cargada desde un CDN) y el QR se dibuja en
+el propio navegador de Fernando al cargar la página del cliente. Cero
+paquetes nuevos en el servidor, cero riesgo de repetir el incidente de
+esta mañana.
+
+**Diseño**: el QR codifica la URL de confirmación de ese cliente
+(`/mi/<token>/confirmar`) — el mismo destino que el botón manual del
+propio cliente, sin ninguna lógica de negocio nueva. La única pieza nueva
+de verdad es que esa ruta pasó a aceptar también `GET`, no solo `POST`:
+al escanear el QR, el móvil del cliente simplemente abre esa URL, lo que
+ya confirma en el acto — sin que tenga que pulsar ningún botón después.
+Es una excepción consciente a "un GET no debe tener efectos secundarios",
+asumida porque la acción es segura de repetir (como mucho ya estaba
+confirmada, `confirmar_sesion_publica` ya lo controla) y el token de la
+URL ya hace de autorización.
+
+El QR aparece en el perfil de administrador del cliente
+(`perfil_cliente.html`), junto al enlace personal — visible siempre que
+el cliente tenga token, no solo cuando ya se le ha firmado sesión hoy
+(es la misma imagen todos los días, no hace falta generarla de nuevo).
+
+Probado de punta a punta contra una base de datos temporal: el archivo
+JS se sirve correctamente, el perfil de administrador incluye el bloque
+del QR con la URL de confirmación correcta, y un `GET` directo a
+`/mi/<token>/confirmar` (simulando el escaneo) confirma la sesión sin
+duplicar nada en un segundo intento.
 
 ### Protección del trabajo: responsabilidad de Claude, no de Fernando (2026-07-28)
 
