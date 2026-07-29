@@ -364,50 +364,73 @@ firma pública — aunque en Git ninguna de las dos ramas se ha fusionado
 todavía a `main` (eso sigue pendiente de revisión y aprobación de
 Fernando, son cosas separadas: desplegar ≠ fusionar a `main`).
 
-### Firma pública de sesión desde el enlace personal del cliente (2026-07-28)
+### Confirmación pública de sesión desde el enlace personal del cliente (2026-07-29)
 
 Hasta ahora `/mi/<token>` (perfil público por cliente, milestone 4, ver más
 abajo) era de solo lectura. Fernando pidió que el propio cliente pudiera
-confirmar su sesión de PT de hoy desde ese mismo enlace, en vez de esperar
-a que Fernando lo hiciera desde su perfil de administrador — sin tocar
-nada del flujo de Fernando, que sigue funcionando exactamente igual.
+intervenir desde ese mismo enlace en relación con su sesión de hoy, sin
+tocar nada del flujo de Fernando, que sigue funcionando exactamente igual.
 
-**Diseño**: módulo nuevo `firma_publica.py`, que envuelve
-`registrar_sesion_pt()` (la misma función que ya usaba Fernando) sin
-modificarla, y añade solo lo específico del autoservicio:
+**Primer diseño, descartado el mismo día antes de darlo por bueno**: el
+cliente firmaba su propia sesión (creando una entrada nueva en su
+historial), reutilizando `registrar_sesion_pt()`, con un límite de una
+firma al día desde el enlace público. Al preguntarle a Fernando cómo
+debía comportarse si él YA había firmado la sesión de ese cliente desde su
+perfil, se detectó el riesgo real: el cliente podía firmar también la
+suya, y esa sesión se contaría dos veces por un solo entrenamiento — el
+mismo tipo de descuadre que el sprint de integridad del día anterior
+arregló para Felipe y Javi, solo que por una vía nueva. Se descartó antes
+de que ningún cliente real lo usara.
 
-- **Como mucho una firma por día desde el enlace público** — a diferencia
-  de Fernando, que puede firmar varias veces al día si hace falta (decisión
-  del 2026-07-24, sin cambios). Al ser una escritura sin supervisión
-  directa, se limita más que la de Fernando.
-- **Recibo permanente con fecha y hora**: tabla nueva `firmas_publicas`
-  (cliente, fecha, hora), aparte de `historial_sesiones` — se consultó no
-  añadir una columna `hora` a `historial_sesiones` (que no la tiene, solo
-  `fecha`) para no tocar el esquema ni el flujo ya probado de Fernando;
-  esta tabla nueva es de solo lectura para todo lo demás del sistema. El
-  cliente ve "Sesión firmada el {fecha} a las {hora}" cada vez que entra a
-  su enlace ese mismo día, en vez de un mensaje que desaparece al recargar.
-- **Aviso a Fernando** (`avisos.py`, tipo nuevo `firma_cliente`) cada vez
-  que un cliente firma su propia sesión — la capa de supervisión que
-  compensa que esta escritura ya no la hace Fernando directamente.
-- **Solo puede firmar la sesión del cliente dueño del token**: la ruta
-  `/mi/<token>/firmar` resuelve el nombre a partir del token con
+**Diseño definitivo, propuesto por Fernando**: el cliente nunca crea una
+sesión. Fernando sigue firmando exactamente igual que siempre
+(`registrar_sesion_pt`, sin ningún cambio). El cliente solo puede
+**confirmar** que la sesión que Fernando ya registró hoy es correcta —
+una anotación aparte que no toca el bono, el historial ni la economía en
+ningún caso, así que es matemáticamente imposible que duplique nada.
+Módulo `firma_publica.py`:
+
+- **El botón "Confirmar mi sesión de hoy" solo aparece si Fernando ya ha
+  firmado una sesión de ese cliente hoy** (`hay_sesion_hoy()`, consulta a
+  `historial_sesiones`). Si Fernando aún no ha firmado nada, el cliente no
+  ve ningún botón — no hay nada que confirmar todavía.
+- **Confirmar solo inserta una fila en `firmas_publicas`** (cliente,
+  fecha, hora) — la misma tabla del primer diseño, reutilizada con un
+  significado distinto (antes "creé una sesión", ahora "confirmo la
+  sesión de hoy"). No pasa por `registrar_sesion_pt` en absoluto.
+- **Recibo permanente**: "Confirmada el {fecha} a las {hora}", visible
+  cada vez que el cliente vuelve a entrar ese mismo día.
+- **Aviso a Fernando cuando el cliente confirma** (`avisos.py`, tipo
+  `confirmacion_cliente`).
+- **Aviso a Fernando cuando el cliente NO confirma**: `avisar_confirmaciones_pendientes()`
+  revisa los últimos 14 días (nunca el día de hoy, para no avisar antes de
+  que el cliente haya tenido toda la jornada para confirmar) y deja un
+  aviso (`confirmacion_pendiente`) por cada sesión de un cliente que
+  Fernando firmó y nadie confirmó desde el enlace. No hay una tarea
+  programada detrás — no hay forma fiable de avisar en tiempo real, ya se
+  intentó con la actualización automática de Calendar en julio y no se
+  pudo verificar que funcionara (ver sección de más abajo). En vez de eso,
+  se llama sola en las dos páginas que Fernando abre de forma habitual
+  (`/` y `/avisos`) — el aviso aparece la próxima vez que entra a la web,
+  como el resto de avisos del sistema. Decisión explícita de Fernando:
+  "si me avisa cada vez que abro la app me vale".
+- **Solo puede confirmar la sesión del cliente dueño del token**: la ruta
+  `/mi/<token>/confirmar` resuelve el nombre a partir del token con
   `obtener_cliente_por_token()`, nunca de un dato del formulario.
-- **Solo puede CREAR, nunca editar ni borrar**: `editar_sesion_pt`/
-  `eliminar_sesion_pt` siguen siendo accesibles solo desde el perfil de
-  administrador de Fernando (`/cliente/<nombre>/...`), sin cambios.
-- **Misma protección de doble toque y de reintento de red** que ya existía
-  para Fernando: botón desactivado al enviar, más `clave_idempotencia`
-  (generada en cada carga de `/mi/<token>`) reutilizando el mismo mecanismo
-  de `registrar_sesion_pt`.
+- **Editar y borrar siguen siendo solo de Fernando**, sin cambios.
 
 Probado de punta a punta contra una base de datos temporal (nunca
-`datos/antifragil.db`): primera firma → recibo visible al recargar →
-segundo intento el mismo día no crea una sesión nueva y se ve como mensaje,
-no como error → aviso `firma_cliente` creado → Fernando sigue pudiendo
-firmar una segunda sesión ese mismo día desde su perfil → Fernando puede
-editar y borrar la sesión que firmó el cliente, igual que cualquier otra.
-Tests de regresión en `tests/test_firma_publica.py` (7 pruebas).
+`datos/antifragil.db`): sin sesión de Fernando no hay botón → tras firmar
+Fernando aparece el botón → el cliente confirma y ve el recibo → el
+historial y el bono no cambian ni una unidad al confirmar → un segundo
+intento de confirmar no duplica nada y no se ve como error → Fernando
+puede firmar una segunda sesión el mismo día sin límite → aviso de
+confirmación creado → una sesión de ayer sin confirmar genera el aviso de
+pendiente al re-ejecutar la comprobación (simulando abrir `/` o
+`/avisos`) → una sesión de hoy sin confirmar NO genera aviso todavía →
+Fernando puede editar y borrar la sesión aunque el cliente ya la haya
+confirmado. Tests de regresión en `tests/test_firma_publica.py` (9
+pruebas).
 
 ### Protección del trabajo: responsabilidad de Claude, no de Fernando (2026-07-28)
 

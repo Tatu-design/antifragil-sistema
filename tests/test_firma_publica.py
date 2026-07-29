@@ -1,11 +1,12 @@
-"""Tests de la firma pública de sesión desde el enlace personal del cliente
-(`/mi/<token>`, 2026-07-28) — ver `firma_publica.py`.
+"""Tests de la confirmación pública desde el enlace personal del cliente
+(`/mi/<token>`, 2026-07-29) — ver `firma_publica.py`.
 
-Reutiliza la misma base de casos que `test_integridad.py` (un archivo
-SQLite temporal propio por test, nunca `datos/antifragil.db`).
+Diseño: el cliente nunca crea una sesión, solo confirma la que Fernando ya
+firmó ese día. Reutiliza la misma base de casos que `test_integridad.py`.
 """
 
 import unittest
+from datetime import timedelta
 
 import avisos as av
 import clientes.repositorio as cr
@@ -15,63 +16,99 @@ from tests.test_integridad import BaseIntegridadTestCase
 from zona_horaria import hoy_negocio
 
 
-class TestFirmaPublica(BaseIntegridadTestCase):
-    def test_firmar_crea_recibo_con_fecha_y_hora(self):
-        resultado = fp.firmar_sesion_publica("Cliente", "clave-1", ruta=self.ruta)
-        self.assertEqual(resultado["numero_sesion"], 1)
-
-        recibo = fp.firma_de_hoy("Cliente", ruta=self.ruta)
-        self.assertIsNotNone(recibo)
-        self.assertEqual(recibo["fecha"], hoy_negocio().isoformat())
-        self.assertRegex(recibo["hora"], r"^\d{2}:\d{2}$")
-
-    def test_firmar_avisa_a_fernando(self):
-        fp.firmar_sesion_publica("Cliente", "clave-1", ruta=self.ruta)
-        avisos = av.listar_avisos_pendientes(ruta=self.ruta)
-        self.assertTrue(any(a["tipo"] == "firma_cliente" and "Cliente" in a["detalle"] for a in avisos))
-
-    def test_no_permite_firmar_dos_veces_el_mismo_dia_desde_el_enlace(self):
-        fp.firmar_sesion_publica("Cliente", "clave-1", ruta=self.ruta)
+class TestConfirmacionPublica(BaseIntegridadTestCase):
+    def test_sin_sesion_hoy_no_hay_nada_que_confirmar(self):
+        self.assertFalse(fp.hay_sesion_hoy("Cliente", ruta=self.ruta))
         with self.assertRaises(ValueError):
-            fp.firmar_sesion_publica("Cliente", "clave-2", ruta=self.ruta)
+            fp.confirmar_sesion_publica("Cliente", ruta=self.ruta)
 
-        # Solo debe quedar UNA sesión en el historial, no dos.
-        hist = cr.obtener_historial("Cliente", ruta=self.ruta)
-        self.assertEqual(len(hist), 1)
+    def test_confirmar_tras_firmar_crea_recibo_con_fecha_y_hora(self):
+        ra.registrar_sesion_pt("Cliente", ruta=self.ruta)  # Fernando firma, fecha de hoy
+        self.assertTrue(fp.hay_sesion_hoy("Cliente", ruta=self.ruta))
 
-    def test_reintento_de_red_con_la_misma_clave_no_duplica_el_recibo(self):
-        fp.firmar_sesion_publica("Cliente", "clave-1", ruta=self.ruta)
-        # Aquí no debería poder pasar en la práctica (firma_de_hoy ya lo
-        # bloquearía), pero si dos peticiones llegan casi a la vez con la
-        # misma clave, registrar_sesion_pt ya las deduplica por su cuenta —
-        # se comprueba que no queda un segundo recibo ni una segunda sesión.
-        hist_antes = cr.obtener_historial("Cliente", ruta=self.ruta)
-        self.assertEqual(len(hist_antes), 1)
+        resultado = fp.confirmar_sesion_publica("Cliente", ruta=self.ruta)
+        self.assertEqual(resultado["fecha"], hoy_negocio().isoformat())
+        self.assertRegex(resultado["hora"], r"^\d{2}:\d{2}$")
 
-    def test_fernando_sigue_pudiendo_firmar_varias_veces_el_mismo_dia(self):
-        """El límite de una firma al día es solo del enlace público — el
-        botón de Fernando desde su perfil no tiene ese límite (decisión de
-        Fernando, 2026-07-24, sin cambios en este sprint)."""
-        fp.firmar_sesion_publica("Cliente", "clave-1", ruta=self.ruta)
+        recibo = fp.confirmacion_de_hoy("Cliente", ruta=self.ruta)
+        self.assertIsNotNone(recibo)
+
+    def test_confirmar_no_toca_el_bono_ni_el_historial(self):
         ra.registrar_sesion_pt("Cliente", ruta=self.ruta)
+        hist_antes = cr.obtener_historial("Cliente", ruta=self.ruta)
+        cliente_antes = cr.leer_clientes(self.ruta)["Cliente"]
 
-        hist = cr.obtener_historial("Cliente", ruta=self.ruta)
-        self.assertEqual(len(hist), 2)
+        fp.confirmar_sesion_publica("Cliente", ruta=self.ruta)
 
-    def test_fernando_puede_editar_y_borrar_una_sesion_firmada_por_el_cliente(self):
-        """El cliente solo puede CREAR su firma — editarla o borrarla sigue
-        siendo cosa exclusiva de Fernando desde su perfil de administrador."""
-        fp.firmar_sesion_publica("Cliente", "clave-1", ruta=self.ruta)
-        entrada_id = cr.obtener_historial("Cliente", ruta=self.ruta)[0]["id"]
+        hist_despues = cr.obtener_historial("Cliente", ruta=self.ruta)
+        cliente_despues = cr.leer_clientes(self.ruta)["Cliente"]
+        self.assertEqual(hist_antes, hist_despues)
+        self.assertEqual(cliente_antes["sesiones_completadas"], cliente_despues["sesiones_completadas"])
 
-        editado = ra.editar_sesion_pt(entrada_id, hoy_negocio().isoformat(), 1, ruta=self.ruta)
-        self.assertEqual(editado["numero_sesion"], 1)
+    def test_no_permite_confirmar_dos_veces(self):
+        ra.registrar_sesion_pt("Cliente", ruta=self.ruta)
+        fp.confirmar_sesion_publica("Cliente", ruta=self.ruta)
+        with self.assertRaises(ValueError):
+            fp.confirmar_sesion_publica("Cliente", ruta=self.ruta)
 
-        ra.eliminar_sesion_pt(entrada_id, ruta=self.ruta)
-        self.assertEqual(cr.obtener_historial("Cliente", ruta=self.ruta), [])
+    def test_confirmar_avisa_a_fernando(self):
+        ra.registrar_sesion_pt("Cliente", ruta=self.ruta)
+        fp.confirmar_sesion_publica("Cliente", ruta=self.ruta)
+        avisos = av.listar_avisos_pendientes(ruta=self.ruta)
+        self.assertTrue(any(a["tipo"] == "confirmacion_cliente" and "Cliente" in a["detalle"] for a in avisos))
 
-    def test_sin_firma_hoy_devuelve_none(self):
-        self.assertIsNone(fp.firma_de_hoy("Cliente", ruta=self.ruta))
+    def test_fernando_firma_varias_veces_cliente_confirma_una_sola_vez(self):
+        """El límite de una confirmación al día es del cliente — Fernando
+        sigue pudiendo firmar varias sesiones el mismo día sin límite
+        (decisión del 2026-07-24, sin cambios)."""
+        ra.registrar_sesion_pt("Cliente", ruta=self.ruta)
+        ra.registrar_sesion_pt("Cliente", ruta=self.ruta)
+        self.assertEqual(len(cr.obtener_historial("Cliente", ruta=self.ruta)), 2)
+
+        fp.confirmar_sesion_publica("Cliente", ruta=self.ruta)
+        with self.assertRaises(ValueError):
+            fp.confirmar_sesion_publica("Cliente", ruta=self.ruta)
+
+
+class TestAvisoConfirmacionesPendientes(BaseIntegridadTestCase):
+    def test_sesion_de_ayer_sin_confirmar_genera_aviso(self):
+        ayer = hoy_negocio() - timedelta(days=1)
+        ra.registrar_sesion_pt("Cliente", fecha=ayer, ruta=self.ruta)
+
+        fp.avisar_confirmaciones_pendientes(ruta=self.ruta)
+
+        avisos = av.listar_avisos_pendientes(ruta=self.ruta)
+        self.assertTrue(
+            any(a["tipo"] == "confirmacion_pendiente" and ayer.isoformat() in a["detalle"] for a in avisos)
+        )
+
+    def test_sesion_de_ayer_confirmada_no_genera_aviso(self):
+        ayer = hoy_negocio() - timedelta(days=1)
+        ra.registrar_sesion_pt("Cliente", fecha=ayer, ruta=self.ruta)
+        # El cliente sí confirmó ayer (se simula insertando directamente,
+        # ya que confirmar_sesion_publica solo entiende "hoy").
+        import sqlite3
+
+        from basedatos import conectar
+
+        with conectar(self.ruta) as conexion:
+            conexion.execute(
+                "INSERT INTO firmas_publicas (cliente, fecha, hora) VALUES (?, ?, ?)",
+                ("Cliente", ayer.isoformat(), "10:00"),
+            )
+
+        fp.avisar_confirmaciones_pendientes(ruta=self.ruta)
+
+        avisos = av.listar_avisos_pendientes(ruta=self.ruta)
+        self.assertFalse(any(a["tipo"] == "confirmacion_pendiente" for a in avisos))
+
+    def test_sesion_de_hoy_sin_confirmar_no_genera_aviso_todavia(self):
+        """No se avisa de hoy — el cliente todavía tiene toda la jornada
+        para confirmar."""
+        ra.registrar_sesion_pt("Cliente", ruta=self.ruta)
+        fp.avisar_confirmaciones_pendientes(ruta=self.ruta)
+        avisos = av.listar_avisos_pendientes(ruta=self.ruta)
+        self.assertFalse(any(a["tipo"] == "confirmacion_pendiente" for a in avisos))
 
 
 if __name__ == "__main__":

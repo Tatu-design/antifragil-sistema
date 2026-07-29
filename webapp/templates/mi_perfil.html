@@ -44,16 +44,15 @@
       </div>
     </div>
 
-    {% if firma_hoy %}
+    {% if confirmacion_hoy %}
     <div class="aviso-guardado">
-      Ya has firmado tu sesión de hoy<br>
-      Sesión firmada el {{ firma_hoy.fecha }} a las {{ firma_hoy.hora }}
+      Ya has confirmado tu sesión de hoy<br>
+      Confirmada el {{ confirmacion_hoy.fecha }} a las {{ confirmacion_hoy.hora }}
     </div>
-    {% elif cliente.sesiones_totales and cliente.sesiones_restantes > 0 %}
-    <form method="post" action="{{ url_for('mi_firmar', token=token) }}"
+    {% elif hay_sesion_hoy %}
+    <form method="post" action="{{ url_for('mi_confirmar', token=token) }}"
           onsubmit="this.querySelector('button').disabled = true; this.querySelector('button').textContent = 'Guardando…';">
-      <input type="hidden" name="clave_idempotencia" value="{{ clave_idempotencia }}">
-      <button type="submit" class="boton-firmar">✓ Confirmar que hice mi sesión de hoy</button>
+      <button type="submit" class="boton-firmar">✓ Confirmar mi sesión de hoy</button>
     </form>
     {% endif %}
 

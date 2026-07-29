@@ -40,7 +40,7 @@ from clientes.repositorio import (
     obtener_historial,
 )
 from economia.registro import listar_meses, obtener_mes, obtener_ultima_semana
-from firma_publica import firma_de_hoy, firmar_sesion_publica
+from firma_publica import avisar_confirmaciones_pendientes, confirmacion_de_hoy, confirmar_sesion_publica, hay_sesion_hoy
 from procesar_dia import procesar_dia
 from registrar_asistencia import (
     editar_sesion_pt,
@@ -68,7 +68,7 @@ app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 60 * 60 * 24 * 7
 # dentro de la propia función.
 RUTAS_PUBLICAS = {
     "login", "configurar_password", "static", "admin_procesar_dia", "admin_debug",
-    "admin_verificar_semana", "admin_backup", "mi_perfil", "mi_firmar",
+    "admin_verificar_semana", "admin_backup", "mi_perfil", "mi_confirmar",
 }
 
 
@@ -160,6 +160,7 @@ def _es_si(valor) -> bool:
 
 @app.route("/")
 def inicio():
+    avisar_confirmaciones_pendientes()
     clientes = leer_clientes()
     filas = _con_sesiones_restantes(clientes)
     guardado = request.args.get("guardado")
@@ -339,8 +340,9 @@ def guardar(nombre):
 def mi_perfil(token):
     """Página pública y personal de un cliente (milestone 4) — sin
     contraseña, solo con su enlace único. Ve su programa, sesiones y pagos
-    (solo lectura), y desde el 2026-07-28 puede confirmar él mismo su
-    sesión de hoy — ver `mi_firmar` más abajo."""
+    (solo lectura), y desde el 2026-07-29 puede confirmar que la sesión que
+    Fernando ya le firmó hoy es correcta — ver `mi_confirmar` más abajo.
+    El cliente nunca crea ninguna sesión por su cuenta, solo confirma."""
     encontrado = obtener_cliente_por_token(token)
     if encontrado is None:
         return render_template("error.html", mensaje="Este enlace no es válido. Pide uno nuevo a Fernando."), 404
@@ -353,39 +355,35 @@ def mi_perfil(token):
         nombre=nombre,
         cliente=filas[0],
         entradas=obtener_historial(nombre),
-        clave_idempotencia=uuid.uuid4().hex,
-        firma_hoy=firma_de_hoy(nombre),
+        hay_sesion_hoy=hay_sesion_hoy(nombre),
+        confirmacion_hoy=confirmacion_de_hoy(nombre),
     )
 
 
-@app.route("/mi/<token>/firmar", methods=["POST"])
-def mi_firmar(token):
-    """Confirma la sesión de PT de HOY para el propio cliente, desde su
-    enlace personal — nunca otra fecha. El nombre se resuelve siempre a
-    partir del token de la URL, nunca de un dato del formulario, así que
-    solo se puede firmar la sesión del cliente dueño de ese enlace.
-
-    Como mucho una firma por día desde aquí (decisión de Fernando,
-    2026-07-28 — distinto del botón de Fernando, que sí permite varias al
-    día). Si ya había firmado hoy, no es un error: `mi_perfil` ya sabe
-    mostrar el recibo en vez del botón, así que basta con volver ahí."""
+@app.route("/mi/<token>/confirmar", methods=["POST"])
+def mi_confirmar(token):
+    """El cliente confirma que la sesión que Fernando ya le firmó hoy es
+    correcta. No crea ni modifica ninguna sesión ni toca el bono — solo
+    queda anotado que el cliente lo confirmó. El nombre se resuelve
+    siempre a partir del token de la URL, nunca de un dato del formulario,
+    así que solo se puede confirmar la sesión del cliente dueño del
+    enlace."""
     encontrado = obtener_cliente_por_token(token)
     if encontrado is None:
         return render_template("error.html", mensaje="Este enlace no es válido. Pide uno nuevo a Fernando."), 404
     nombre, _cliente = encontrado
 
-    clave_idempotencia = request.form.get("clave_idempotencia")
     try:
-        firmar_sesion_publica(nombre, clave_idempotencia)
+        confirmar_sesion_publica(nombre)
     except sqlite3.OperationalError:
         return render_template(
             "error.html",
-            mensaje="No se pudo registrar la sesión: la base de datos está ocupada. Vuelve a intentarlo.",
+            mensaje="No se pudo guardar la confirmación: la base de datos está ocupada. Vuelve a intentarlo.",
         ), 409
     except ValueError:
-        # Ya había firmado hoy (o un reintento llega tarde) — no hace falta
-        # mostrar un error, la propia página vuelve a pintar el estado
-        # correcto (el recibo o el mensaje de "ya has firmado").
+        # Ya estaba confirmada, o Fernando todavía no ha firmado nada hoy
+        # (p. ej. dos pestañas abiertas) — no hace falta mostrar un error,
+        # la propia página vuelve a pintar el estado correcto.
         pass
 
     return redirect(url_for("mi_perfil", token=token))
@@ -626,6 +624,7 @@ def admin_debug():
 
 @app.route("/avisos")
 def avisos():
+    avisar_confirmaciones_pendientes()
     lista = listar_avisos_pendientes()
     marcar_todos_leidos()
     return render_template("avisos.html", avisos=lista)
