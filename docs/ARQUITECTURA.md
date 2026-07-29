@@ -321,6 +321,49 @@ Fernando planifique su semana, simplemente ya no hace falta leerlo para
 contar sesiones). La rutina en la nube (`trig_01JZ6et1nsACiTiu9Ho2rnt8`) no
 se ha borrado por si se retoma más adelante, pero no es la vía activa.
 
+### Incidente: caída del servidor real al desplegar solo parte de un cambio (2026-07-29)
+
+Al probar la firma pública (ver más abajo), se detectó que el sprint de
+integridad y fiabilidad del día anterior (2026-07-28, rama
+`fix/integridad-fiabilidad`) **nunca se había desplegado al servidor
+real** — solo existía como commits en el repositorio, sin llegar a
+`tatu17.pythonanywhere.com`. El despliegue a este servidor no sigue a
+Git automáticamente: se hace subiendo archivos sueltos por la API de
+PythonAnywhere (`sincronizar_servidor.py`), así que un cambio puede
+quedar commiteado sin estar realmente en producción.
+
+Al subir solo los 4 archivos de la firma pública (que ya asumían tener
+como base todo el sprint del día anterior — `zona_horaria.py`,
+`transaccion()`, `ciclo_bono`...), el servidor real se cayó
+(`ModuleNotFoundError: No module named 'zona_horaria'`, error 500 en
+toda la web, no solo en la función nueva). Diagnosticado leyendo el log
+de errores real del servidor vía la API de PythonAnywhere
+(`GET /api/v0/user/<usuario>/files/path/var/log/<dominio>.error.log`).
+
+**Arreglo**: en vez de revertir, se desplegaron TODOS los archivos de
+código que cambiaron desde la última versión que sí estaba en el
+servidor (14 archivos: todo el sprint de integridad + la firma pública),
+con aprobación explícita de Fernando para hacerlo directamente. El
+esquema de la base de datos real se migró solo (las migraciones de
+`crear_esquema()` son aditivas, se disparan al arrancar la app) sin
+tocar el archivo de datos del servidor directamente en ningún momento.
+Verificado tras el redespliegue: la web vuelve a responder (200), el
+flujo de firma pública funciona de punta a punta contra el cliente de
+prueba real del servidor, y no hay errores nuevos en el log.
+
+**Lección para la próxima vez que algo cambie en varios archivos a la
+vez**: antes de subir un cambio parcial al servidor, comprobar primero
+qué versión del código tiene realmente desplegada (no asumirlo por lo
+que hay en `main` — puede llevar días o semanas desincronizado de
+Git) y desplegar el conjunto completo de archivos que dependen entre
+sí, no solo los directamente relacionados con la función nueva.
+
+**Nota de estado**: a partir de este despliegue, el servidor real ya
+tiene en producción tanto el sprint de integridad y fiabilidad como la
+firma pública — aunque en Git ninguna de las dos ramas se ha fusionado
+todavía a `main` (eso sigue pendiente de revisión y aprobación de
+Fernando, son cosas separadas: desplegar ≠ fusionar a `main`).
+
 ### Firma pública de sesión desde el enlace personal del cliente (2026-07-28)
 
 Hasta ahora `/mi/<token>` (perfil público por cliente, milestone 4, ver más
