@@ -3,17 +3,20 @@ cálculo económico semanal.
 
 Uso:
     python -m cierre_semanal.cli previsualizar [YYYY-MM-DD] < eventos.json
-    python -m cierre_semanal.cli aplicar [YYYY-MM-DD] < eventos.json
 
 `YYYY-MM-DD` es cualquier día de la semana a procesar (por defecto, hoy).
 `eventos.json` debe ser el array de eventos tal cual lo devuelve el conector
 de Google Calendar (nunca retipeado a mano — ver lección del 2026-07-14).
 
-Los dos modos usan exactamente el mismo cálculo a partir de los mismos
-eventos, así que lo que se previsualiza es exactamente lo que se escribiría.
-"aplicar" actualiza los clientes Y registra la semana económica en
-`datos/antifragil.db` (SQLite) — solo debe invocarse tras confirmación
-explícita de Fernando.
+**Solo previsualización.** El modo `aplicar` está retirado desde la segunda
+auditoría (2026-07-30): escribía bonos y economía por lotes desde Calendar,
+un segundo camino capaz de descontar el mismo bono que la firma manual (la
+fuente activa desde el 2026-07-22) y de sobrescribir la economía de una
+semana ya firmada. Si se invoca, avisa y termina sin escribir nada.
+
+Calendar sigue siendo útil como COMPROBACIÓN: esta previsualización para
+mirar a mano, y `/admin/verificar-semana` para que las diferencias queden
+registradas como aviso.
 """
 
 import json
@@ -62,7 +65,7 @@ def calcular(eventos: list[dict], fecha_referencia: datetime) -> dict:
 
 def main() -> None:
     # En Windows, stdin/stdout no siempre son UTF-8 por defecto (cp1252),
-    # lo que corrompe nombres con tildes como "Rocío" — ver lección del
+    # lo que corrompe nombres con tildes como "Clienta Ángela" — ver lección del
     # 2026-07-15 en el log.
     sys.stdin.reconfigure(encoding="utf-8")
     sys.stdout.reconfigure(encoding="utf-8")
@@ -75,18 +78,30 @@ def main() -> None:
     calculo = calcular(eventos, fecha_referencia)
 
     if modo == "aplicar":
-        aplicar_actualizaciones(calculo["resultados"])
-        registrar_historial(calculo["historial"])
-        registrar_semana(
-            calculo["fecha_inicio"], calculo["fecha_fin"],
-            calculo["desglose_tarifas"], calculo["crossfit_kids"],
-        )
-        mensaje_servidor = sincronizar()
+        # BLOQUEADO en la segunda auditoría (2026-07-30).
+        #
+        # Este modo descontaba bonos y reescribía la semana económica por
+        # lotes desde Calendar. Desde el 2026-07-22 la fuente activa es la
+        # firma manual en la app, y tener dos caminos capaces de descontar el
+        # mismo bono es exactamente la causa de descuadre que esta auditoría
+        # venía a eliminar: `registrar_semana` aquí SUSTITUYE el desglose de
+        # la semana, así que aplicarlo hoy borraría de un golpe la economía
+        # de las sesiones firmadas a mano.
+        #
+        # La previsualización sigue disponible: es de solo lectura y sigue
+        # sirviendo para comparar Calendar con lo firmado.
         salida = {
-            "escrito": True,
-            "clientes_actualizados": list(calculo["resultados"].keys()),
-            "servidor": mensaje_servidor,
+            "escrito": False,
+            "error": "modo 'aplicar' retirado",
+            "detalle": (
+                "Las sesiones se firman una a una en la app (fuente activa desde el 2026-07-22). "
+                "Aplicar un cierre por lotes desde Calendar sobrescribiría la economía de esa semana. "
+                "Usa 'previsualizar' para comparar, o /admin/verificar-semana para que las diferencias "
+                "queden como aviso."
+            ),
         }
+        print(json.dumps(salida, ensure_ascii=False, indent=2))
+        raise SystemExit(1)
     else:
         salida = {
             "semana": f'{calculo["fecha_inicio"]} a {calculo["fecha_fin"]}',

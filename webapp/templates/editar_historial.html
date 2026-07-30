@@ -16,6 +16,7 @@
     <p class="subtitulo">{{ entrada.tipo_programa }}</p>
 
     <form class="formulario" method="post">
+      <input type="hidden" name="csrf" value="{{ token_csrf() }}">
       <label class="campo">
         <span>Fecha</span>
         <input type="text" name="fecha" value="{{ entrada.fecha }}" placeholder="AAAA-MM-DD" required />
@@ -30,6 +31,7 @@
     </form>
 
     <form method="post" action="{{ url_for('eliminar_historial_ruta', nombre=nombre, entrada_id=entrada.id) }}" style="margin-top: 1rem;">
+      <input type="hidden" name="csrf" value="{{ token_csrf() }}">
       <button type="submit" class="boton-secundario" style="width:100%;" onclick="return confirm('¿Borrar esta sesión del historial?');">Eliminar esta sesión</button>
     </form>
 

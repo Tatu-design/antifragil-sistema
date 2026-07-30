@@ -22,6 +22,108 @@
   cuenta en sesiones pero su importe se reparte hacia atrás sobre las
   semanas del mes en cuanto Fernando indica la facturación mensual total.
 
+### Segunda auditoría de integridad (2026-07-30)
+
+Rama `fix/integridad-fiabilidad-2`, salida de `fix/integridad-fiabilidad`.
+**Sin merge ni despliegue todavía**, a la espera de revisión de Fernando.
+Cierra los huecos que una segunda auditoría externa detectó sobre el primer
+sprint. Todo lo medido se hizo sobre una copia de producción; producción no
+se tocó en ningún momento.
+
+**1. Meses históricos que perdían facturación.** La vista mensual pasó a
+calcularse desde `historial_sesiones` (fecha real), pero el historial
+anterior al 2026-07-22 está incompleto: hay sesiones cobradas cuya fecha
+nunca se registró. Medido sobre la copia real: julio salía **112,50 € y 3
+horas por debajo** del cierre ya dado por bueno (3 sesiones de un cliente
+sin fila en el historial, en las semanas del 1 y del 20 de julio), y
+aparecía un junio de 355 €/10 h que la vista antigua nunca mostró (sus
+sesiones sí tienen fecha, pero ninguna fila de `semanas` las cubría).
+Solución: tabla `ajustes_mensuales` (anio, mes, origen, importe, horas,
+motivo) y `migrar_ajustes_legacy.py`, que **calcula la diferencia desde los
+propios datos** (economía guardada menos sesiones con fila) sin inventar
+ninguna fecha, solo para semanas que caen enteras dentro de un mes; las que
+cruzan dos meses dejan un aviso en vez de repartirse a ojo. El ajuste se
+suma al mes pero se muestra como **línea propia con su motivo** en Economía
+— la diferencia queda visible y documentada, nunca oculta. Verificado: tras
+aplicarlo, julio vuelve exactamente a 2.727,50 €/67 h, y repetirlo no
+acumula.
+
+**2. Migración real de `ciclo_bono`.** La migración del 2026-07-28 marcó
+todas las filas existentes como ciclo 1, sin distinguir bonos ya renovados
+antes. `migrar_ciclo_bono.py` recorre el historial de cada cliente por
+(fecha, id), detecta los reinicios de numeración, asigna los ciclos, ajusta
+`clientes.ciclo_bono` y **valida** el resultado contra `sesiones_completadas`
+y `pendiente_pago`. Lo ambiguo (un bono que arranca en un número distinto de
+1, un contador que no cuadra) genera un aviso en vez de adivinarse. Es
+idempotente. Sobre la copia real no cambia ningún ciclo (ningún cliente ha
+renovado dentro del historial registrado) pero **detectó una incoherencia
+real**: un cliente cuya última sesión registrada es la 14 mientras su
+contador marca 0.
+
+**3. Firmas simultáneas.** `registrar_sesion_pt` leía el programa y la
+tarifa FUERA de la transacción, así que dos firmas del mismo cliente a la
+vez podían leer el mismo estado y calcular el mismo número de sesión. Ahora
+todo (lectura del estado, idempotencia, cálculo, bono, historial, economía y
+avisos) ocurre dentro de una única transacción `BEGIN IMMEDIATE`
+(`basedatos.transaccion(inmediata=True)`), que coge el bloqueo de escritura
+antes de leer. En modo WAL esto no penaliza las lecturas normales; solo
+serializa a los escritores. Hay un test con dos hilos que firman a la vez.
+
+**4. Correcciones alrededor de una renovación.** Modificar o borrar una
+sesión de un bono ya cerrado, cuando existen sesiones de bonos posteriores,
+queda **bloqueado con un mensaje claro** en vez de recalcular en silencio
+toda la historia posterior (decisión para la v1: seguridad y simplicidad; un
+recálculo completo se diseñaría aparte y se presentaría antes de
+construirlo). El bono en curso se sigue pudiendo corregir con normalidad.
+
+**5. Un solo camino capaz de descontar bonos.** Se confirmó que el trigger
+antiguo de actualización diaria (`trig_01JZ6et1nsACiTiu9Ho2rnt8`) **seguía
+habilitado y se había disparado la noche del 2026-07-29** — desactivado.
+Además: `/admin/procesar-dia` responde 410 y ya no procesa nada,
+`/admin/debug` eliminada, y `cierre_semanal aplicar` bloqueado (escribía
+bonos y **sustituía** el desglose de la semana, así que habría borrado la
+economía de las sesiones firmadas a mano). `/admin/verificar-semana` sigue
+como comprobación de solo lectura y `/admin/backup` sin cambios.
+
+**6. CrossFit Kids entre meses.** El reparto usaba el mes del LUNES de cada
+semana y el conteo guardado en `semanas`. Ahora cada clase se valora al
+precio de SU mes (calculado desde `clases_grupo`) y se suma a la semana que
+de verdad la contiene, así que una semana con una clase el 31 de julio y
+otra el 1 de agosto suma la parte de cada mes por separado. Las horas de
+Kids se suman a la semana en cuanto hay facturación (antes no se sumaban
+nunca, lo que inflaba el precio medio por hora), y la semana se marca
+`provisional` mientras falte el importe.
+
+**7. Migración de esquemas antiguos.** Se reconstruyen por test las formas
+anteriores de la base de datos (historial con `UNIQUE(cliente, fecha)`, sin
+`tarifa`, sin `ciclo_bono`; `clientes` sin `ciclo_bono`; `semanas` con
+`facturacion_kids` sin `facturacion_kids_mensual`) y se ejecuta
+`crear_esquema` **dos veces**, comprobando filas, importes, columnas,
+`integrity_check` y `foreign_key_check`. Esto destapó un bug real: la
+reconstrucción que quita el `UNIQUE` recreaba la tabla **sin `ciclo_bono`**,
+perdiendo la columna y sus valores en silencio (el `ALTER TABLE` que la
+añade corre antes, así que un arreglo deshacía el otro). Corregido copiando
+el esquema completo y solo las columnas que la tabla vieja tenía.
+
+**8. Repositorio público.** Ver la sección de protección del trabajo y las
+reglas nuevas en `.claude/CLAUDE.md`. Se sustituyeron todos los nombres de
+clientes reales por `Cliente A` / `Pareja C`… en documentación y
+comentarios. No había credenciales, tokens ni URLs con token en archivos
+versionados.
+
+**9. Seguridad mínima.** Token CSRF en los 14 formularios de escritura
+(comprobado en `before_request`, con las rutas de máquina como única
+excepción porque no usan cookie); cookies `HttpOnly`, `SameSite=Lax` y
+`Secure` (desactivable con `ANTIFRAGIL_COOKIES_INSEGURAS=1` para probar en
+local); `secrets.compare_digest` para el token administrativo
+(`webapp.auth.token_admin_valido`); y la pantalla de alta de contraseña pide
+ahora `ANTIFRAGIL_SETUP_TOKEN` — antes, una instalación nueva dejaba que el
+primer visitante se quedara con el control.
+
+**10. Validación.** Suite ampliada a 56 pruebas (17 previas + 39 nuevas en
+`tests/test_auditoria2.py`), todas en verde, y GitHub Actions
+(`.github/workflows/tests.yml`) las ejecuta en cada push y PR.
+
 ### Sprint de integridad y fiabilidad (2026-07-28)
 
 Petición explícita de Fernando (relayed desde un análisis de ChatGPT como
@@ -140,7 +242,7 @@ todavía** (pendiente de decisión de Fernando):
   `clases_grupo`, igual que ya se hace ahora con la mensual. Elimina el
   estado duplicado de raíz. Riesgo real: las semanas anteriores al
   2026-07-22 (antes de firmar a mano) tienen huecos conocidos en el
-  historial (p. ej. el de Nikki) — recalcularlas desde ahí daría cifras
+  historial (p. ej. el de Cliente A) — recalcularlas desde ahí daría cifras
   MÁS BAJAS que las ya cerradas y comunicadas a Fernando, una regresión
   sobre datos históricos ya usados. Esfuerzo medio-alto.
 - **Recomendación**: quedarse con la opción mínima por ahora — el problema
@@ -335,8 +437,11 @@ Reglas de Git). El resto de reglas de Git no cambian: nunca tocar `main`
 directamente, nunca `push --force`, nunca mergear sin aprobación.
 
 Estado de la protección a partir de ahora:
-- **Código**: repositorio privado `github.com/Tatu-design/antifragil-sistema`
-  (creado el 2026-07-28 para darle acceso a ChatGPT, ver más abajo). Claude
+- **Código**: repositorio `github.com/Tatu-design/antifragil-sistema`
+  (creado el 2026-07-28 para darle acceso a ChatGPT). **Público por decisión
+  explícita de Fernando del 2026-07-30**, para que ChatGPT pueda auditarlo
+  sin fricción — ver las reglas de qué no puede commitearse nunca en
+  `.claude/CLAUDE.md`. Claude
   hace commit y push ahí regularmente sin necesidad de que Fernando lo pida.
   Límite honesto: esto depende de que haya una sesión de Claude Code activa
   — no hay ninguna tarea en la nube vigilando el ordenador de Fernando (las
@@ -399,7 +504,7 @@ las URL de editar/borrar cambiaron de `/historial/<fecha>/editar` a
 `/historial/<id>/editar`.
 
 Como la protección real contra un doble toque accidental (la causa
-original del descuadre de Felipe y Javi) ya no puede venir de "una sesión
+original del descuadre de Pareja C) ya no puede venir de "una sesión
 por día", se cambió el sitio donde vive esa protección: el botón "Firmar
 sesión de hoy" se desactiva y cambia de texto nada más pulsarlo (en el
 propio navegador, `perfil_cliente.html`), así un doble toque físico no
@@ -409,9 +514,9 @@ u horas después, se puede firmar sin problema.
 ### Avisos duplicados (2026-07-24)
 
 Fernando vio el mismo aviso de "discrepancia económica" (el hueco conocido
-de Nikki, ver más abajo) repetido varias veces seguidas en Avisos. Causa:
+de Cliente A, ver más abajo) repetido varias veces seguidas en Avisos. Causa:
 la comprobación de sincronización se ejecuta en cada firma, y como el
-hueco de Nikki seguía sin resolver, cada sesión que se firmaba esa semana
+hueco de Cliente A seguía sin resolver, cada sesión que se firmaba esa semana
 (de cualquier cliente) volvía a detectarlo y creaba un aviso nuevo en vez
 de reconocer que ya había avisado de lo mismo.
 
@@ -427,13 +532,13 @@ ya se habían creado, dejando solo uno.
 A petición de Fernando, se probaron a propósito varios ciclos completos
 (firmar → comprobar cliente + semana + mes → borrar → comprobar que todo
 vuelve exactamente a como estaba) contra una copia de la base de datos
-real, buscando huecos parecidos al de Felipe y Javi. Aparecieron tres
+real, buscando huecos parecidos al de Pareja C. Aparecieron tres
 reales, los tres arreglados:
 
 1. **Firmar dos veces el mismo día para el mismo cliente sobrescribía la
    sesión en el historial (por el `UNIQUE(cliente, fecha)`) pero sumaba la
    economía dos veces** — probablemente la causa real del descuadre de
-   Felipe y Javi de ayer. Ahora `registrar_sesion_pt` lo detecta y rechaza
+   Pareja C de ayer. Ahora `registrar_sesion_pt` lo detecta y rechaza
    con un mensaje claro ("ya tiene una sesión firmada ese día, edítala en
    vez de firmar otra vez") en lugar de dejarlo pasar en silencio.
 2. **Borrar la sesión que completó un bono (y lo renovó automáticamente)
@@ -475,7 +580,7 @@ independientes (no una única transacción) — si algo se interrumpe a medio
 camino, o se corrige un dato con una herramienta que no pasa por
 `registrar_asistencia.py` (p. ej. un `DELETE` manual durante una reparación
 de datos), la economía y el historial pueden quedar desincronizados sin que
-nada lo detecte. Comprobado: Felipe y Javi tenía 2 sesiones de más (120€)
+nada lo detecte. Comprobado: Pareja C tenía 2 sesiones de más (120€)
 contadas en la economía de esa semana sin fila correspondiente en el
 historial — coincide exactamente con la diferencia que reportó Fernando.
 
@@ -507,14 +612,14 @@ note el mismo día):
    ejecuta también esta comprobación como barrido periódico de las semanas
    recientes, además de la comprobación puntual de cada firma.
 
-**Pendiente, no urgente**: la comprobación también señala que Nikki tiene 2
+**Pendiente, no urgente**: la comprobación también señala que Cliente A tiene 2
 sesiones (37,50€ cada una) contadas en la economía de la semana del 20-26
 julio sin fila en el historial con fecha — pero esto coincide con lo que
 Fernando cree correcto (también las contaba en su propia hoja), así que no
 es un error económico, es un hueco de **historial** de antes del cambio a
 firma manual (2026-07-22): esas 2 sesiones existieron pero nunca quedó
 registrada la fecha exacta. No se ha tocado — si Fernando recuerda las
-fechas, se pueden añadir para que el perfil de Nikki muestre el historial
+fechas, se pueden añadir para que el perfil de Cliente A muestre el historial
 completo (hoy salta de la sesión 9 a la 12).
 
 ### Rendimiento: menos conexiones a la base de datos por petición (2026-07-24)

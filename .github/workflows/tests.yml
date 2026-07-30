@@ -1,0 +1,35 @@
+# Ejecuta la suite de pruebas en cada push y en cada pull request.
+#
+# Por qué: el proyecto se despliega subiendo archivos sueltos al servidor, y
+# ya hubo un despliegue parcial que tumbó la web (2026-07-29). Que las
+# pruebas corran solas en cada cambio da una red de seguridad antes de que
+# nada llegue a producción.
+#
+# No toca datos reales: la suite crea su propia base de datos temporal en
+# cada prueba, nunca `datos/antifragil.db` (que ni siquiera está en Git).
+
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Preparar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Ejecutar la suite
+        run: python -m unittest discover -s tests -v

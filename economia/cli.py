@@ -10,12 +10,21 @@ Uso:
 import json
 import sys
 
+from basedatos import crear_esquema
 from economia.registro import obtener_mes, obtener_semana, registrar_facturacion_kids
 
 
 def main() -> None:
     sys.stdin.reconfigure(encoding="utf-8")
     sys.stdout.reconfigure(encoding="utf-8")
+
+    # Igual que hace `webapp/app.py` al arrancar: asegurar que la base de
+    # datos tiene el esquema actual antes de consultarla. Sin esto, ejecutar
+    # este CLI contra una base de datos que todavía no se ha migrado falla
+    # con "no such table" (encontrado al validar la segunda auditoría sobre
+    # una copia de producción, 2026-07-30). `crear_esquema` es segura de
+    # repetir y no borra nada.
+    crear_esquema()
 
     comando = sys.argv[1]
 

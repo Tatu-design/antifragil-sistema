@@ -47,6 +47,7 @@
     {% endif %}
 
     <form method="post" action="{{ url_for('guardar', nombre=nombre) }}">
+      <input type="hidden" name="csrf" value="{{ token_csrf() }}">
       <input type="hidden" name="nombre" value="{{ despues.nombre }}" />
       <input type="hidden" name="tipo_programa" value="{{ despues.tipo_programa }}" />
       <input type="hidden" name="sesiones_completadas" value="{{ despues.sesiones_completadas }}" />

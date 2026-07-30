@@ -18,6 +18,8 @@ Desde el 2026-07-18, `clientes/repositorio.py` y `economia/registro.py`
 no solo esta web de aprendizaje.
 """
 
+import os
+import secrets
 import sqlite3
 import tempfile
 import uuid
@@ -49,7 +51,13 @@ from registrar_asistencia import (
     registrar_sesion_pt,
 )
 from verificar_semana import verificar_semana
-from webapp.auth import establecer_password, hay_password_configurada, obtener_admin_token, obtener_secret_key, verificar_password
+from webapp.auth import (
+    establecer_password,
+    hay_password_configurada,
+    obtener_secret_key,
+    token_admin_valido,
+    verificar_password,
+)
 
 crear_esquema()  # crea las tablas si es la primera vez que arranca en esta máquina (ej. un servidor nuevo)
 asegurar_tokens()  # da un enlace personal a clientes dados de alta antes del milestone 4
@@ -62,20 +70,84 @@ app.secret_key = obtener_secret_key()
 # cambia de vez en cuando, no cada día.
 app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 60 * 60 * 24 * 7
 
-# admin_procesar_dia no usa contraseña de sesión (lo llama una rutina
-# automática, no un navegador) — se protege con su propio token, comprobado
-# dentro de la propia función.
+# Cookies de sesión endurecidas (segunda auditoría, 2026-07-30):
+# - HttpOnly: el JavaScript de la página no puede leer la cookie, así que un
+#   script inyectado no puede robar la sesión.
+# - Secure: el navegador solo la manda por HTTPS, nunca en claro. Se puede
+#   desactivar con ANTIFRAGIL_COOKIES_INSEGURAS=1 para probar en local
+#   (http://localhost), donde no hay HTTPS.
+# - SameSite=Lax: la cookie no viaja en peticiones que vengan de otra web,
+#   que es la base de los ataques de formulario cruzado (CSRF).
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["SESSION_COOKIE_SECURE"] = os.environ.get("ANTIFRAGIL_COOKIES_INSEGURAS") != "1"
+
+# Rutas que no piden la contraseña de sesión. Las de máquina
+# (`/admin/verificar-semana`, `/admin/backup`) las llama una rutina
+# automática, no un navegador: se protegen con su propio token, comprobado
+# dentro de cada función. `mi_perfil` es el enlace personal de cada cliente
+# (su token hace de llave). `admin_procesar_dia` sigue en la lista solo para
+# poder responder 410 a lo que aún la llame — ya no procesa nada.
 RUTAS_PUBLICAS = {
-    "login", "configurar_password", "static", "admin_procesar_dia", "admin_debug",
+    "login", "configurar_password", "static", "admin_procesar_dia",
     "admin_verificar_semana", "admin_backup", "mi_perfil",
 }
+
+
+# Rutas de máquina (las llama una rutina automática con X-Admin-Token, no un
+# navegador con cookies): no pueden llevar token CSRF porque no hay
+# formulario ni sesión detrás, y no les hace falta — un ataque de formulario
+# cruzado se aprovecha de la cookie de sesión de la víctima, y aquí no hay
+# ninguna. Son las ÚNICAS excluidas de la comprobación CSRF.
+RUTAS_MAQUINA = {"admin_procesar_dia", "admin_verificar_semana", "admin_backup"}
+
+
+def token_csrf() -> str:
+    """Token de un solo uso por sesión, para incrustar en cada formulario de
+    escritura. Se guarda en la sesión (que va en una cookie firmada), así que
+    otra web no puede leerlo ni adivinarlo — y sin él no se acepta ningún
+    POST."""
+    if "csrf" not in session:
+        session["csrf"] = secrets.token_urlsafe(32)
+    return session["csrf"]
+
+
+@app.context_processor
+def _inyectar_token_csrf():
+    """Disponible en todas las plantillas como `token_csrf`."""
+    return {"token_csrf": token_csrf}
 
 
 @app.before_request
 def _requerir_login():
     """Se ejecuta antes de cada petición. Antes de que esta web sea visible
     desde internet, hace falta al menos una contraseña — si no, cualquiera
-    con el enlace podría ver y editar los datos de los clientes."""
+    con el enlace podría ver y editar los datos de los clientes.
+
+    Comprueba además el token CSRF en toda escritura (segunda auditoría,
+    2026-07-30): sin esto, otra web podía tener un formulario oculto que, al
+    visitarla con la sesión abierta, mandara un POST a esta app (borrar una
+    sesión, cambiar un cliente) usando la cookie del navegador sin que
+    Fernando se enterara."""
+    # `endpoint is None` = la URL no existe: se deja pasar para que Flask
+    # responda su 404 de siempre, en vez de un 400 de CSRF que haría parecer
+    # que la ruta existe.
+    if (
+        request.method in ("POST", "PUT", "PATCH", "DELETE")
+        and request.endpoint is not None
+        and request.endpoint not in RUTAS_MAQUINA
+    ):
+        esperado = session.get("csrf")
+        recibido = request.form.get("csrf") or request.headers.get("X-CSRF-Token") or ""
+        if not esperado or not secrets.compare_digest(recibido, esperado):
+            return render_template(
+                "error.html",
+                mensaje=(
+                    "La página había caducado y no se ha guardado nada, por seguridad. "
+                    "Vuelve atrás, recarga la página e inténtalo otra vez."
+                ),
+            ), 400
+
     if request.endpoint in RUTAS_PUBLICAS:
         return None
 
@@ -90,10 +162,33 @@ def _requerir_login():
 
 @app.route("/configurar-password", methods=["GET", "POST"])
 def configurar_password():
+    """Alta de la contraseña la primera vez.
+
+    Pide además el token de instalación (`ANTIFRAGIL_SETUP_TOKEN`) desde la
+    segunda auditoría (2026-07-30). Antes, una instalación nueva (un
+    servidor recién montado, o una base de datos restaurada sin la tabla de
+    configuración) dejaba esta pantalla abierta a cualquiera que llegara
+    primero: el visitante ponía su propia contraseña y se quedaba con el
+    control de los datos de los clientes. Ahora sin ese token no se puede
+    completar, así que una ventana de instalación abierta no basta para
+    entrar."""
     if hay_password_configurada():
         return redirect(url_for("login"))
 
+    token_esperado = os.environ.get("ANTIFRAGIL_SETUP_TOKEN")
+
     if request.method == "POST":
+        if not token_esperado:
+            return render_template(
+                "configurar_password.html",
+                error=(
+                    "Falta configurar ANTIFRAGIL_SETUP_TOKEN en el servidor. "
+                    "Sin esa clave de instalación no se puede crear la contraseña."
+                ),
+            ), 403
+        if not secrets.compare_digest(request.form.get("token_instalacion", ""), token_esperado):
+            return render_template("configurar_password.html", error="Clave de instalación incorrecta"), 403
+
         password = request.form["password"]
         password2 = request.form["password2"]
         if password != password2:
@@ -475,26 +570,29 @@ def deshacer_clase(tipo):
 
 @app.route("/admin/procesar-dia", methods=["POST"])
 def admin_procesar_dia():
-    """Llamada por la rutina automática diaria (una nube de Claude Code, no
-    un navegador): procesa las sesiones de un día y las suma a la semana en
-    curso. Protegida con un token de máquina, no con la contraseña de
-    Fernando — ver `webapp/auth.py` y decisión del 2026-07-21."""
-    token = request.headers.get("X-Admin-Token")
-    if token != obtener_admin_token():
-        return jsonify({"error": "token inválido"}), 401
+    """RETIRADA (segunda auditoría, 2026-07-30). Ya no procesa nada.
 
-    datos = request.get_json(force=True, silent=True) or {}
-    fecha = datos.get("fecha")
-    eventos = datos.get("eventos")
-    if not fecha or eventos is None:
-        return jsonify({"error": "faltan 'fecha' o 'eventos' en el cuerpo de la petición"}), 400
+    Era la actualización diaria automática desde Calendar: descontaba bonos
+    y sumaba economía por su cuenta. Desde el 2026-07-22 la fuente activa es
+    la firma manual, y Calendar quedó solo como comprobación — pero esta
+    ruta seguía viva y su rutina en la nube seguía disparándose cada noche
+    (confirmado: `trig_01JZ6et1nsACiTiu9Ho2rnt8` se disparó el 2026-07-29,
+    ya desactivado). Eran dos caminos distintos capaces de descontar el
+    mismo bono, justo lo que esta auditoría venía a eliminar.
 
-    try:
-        resultado = procesar_dia(eventos, fecha)
-    except sqlite3.OperationalError:
-        return jsonify({"error": "base de datos ocupada, reintenta"}), 409
-
-    return jsonify(resultado)
+    Se deja respondiendo 410 Gone en vez de borrarla: si algo antiguo
+    vuelve a llamarla, queda claro en el registro del servidor que se
+    intentó, en vez de fallar con un 404 confuso."""
+    return jsonify(
+        {
+            "error": "retirada",
+            "detalle": (
+                "La actualización diaria automática desde Calendar está retirada. "
+                "Las sesiones se firman a mano en la app; Calendar solo se usa como comprobación "
+                "en /admin/verificar-semana."
+            ),
+        }
+    ), 410
 
 
 @app.context_processor
@@ -511,8 +609,7 @@ def admin_verificar_semana():
     entre lo firmado en la app y lo que hay en Calendar se guarda como
     aviso. La llamo yo mismo cuando Fernando pide revisar la semana, con
     los eventos reales de Calendar (nunca inventados)."""
-    token = request.headers.get("X-Admin-Token")
-    if token != obtener_admin_token():
+    if not token_admin_valido(request.headers.get("X-Admin-Token")):
         return jsonify({"error": "token inválido"}), 401
 
     datos = request.get_json(force=True, silent=True) or {}
@@ -544,8 +641,7 @@ def admin_backup():
     (`sqlite3.Connection.backup`) para generar una "foto" consistente en un
     archivo temporal, se envía esa foto, y se borra después (sprint de
     integridad, 2026-07-28)."""
-    token = request.headers.get("X-Admin-Token")
-    if token != obtener_admin_token():
+    if not token_admin_valido(request.headers.get("X-Admin-Token")):
         return jsonify({"error": "token inválido"}), 401
 
     with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as archivo_temporal:
@@ -565,20 +661,11 @@ def admin_backup():
             return response
 
 
-@app.route("/admin/debug", methods=["POST"])
-def admin_debug():
-    """Ruta temporal de diagnóstico para la puesta en marcha de la
-    actualización diaria (2026-07-21) — la rutina en la nube manda aquí un
-    informe de qué ve disponible, para poder depurar sin que Fernando tenga
-    que mirar nada él mismo. Se puede borrar una vez la rutina funcione bien."""
-    token = request.headers.get("X-Admin-Token")
-    if token != obtener_admin_token():
-        return jsonify({"error": "token inválido"}), 401
-
-    datos = request.get_json(force=True, silent=True) or {}
-    mensaje = datos.get("mensaje", "(sin mensaje)")
-    registrar_aviso(hoy_negocio().isoformat(), "debug_rutina", mensaje)
-    return jsonify({"ok": True})
+# `/admin/debug` eliminada en la segunda auditoría (2026-07-30): era una
+# ruta temporal para depurar la puesta en marcha de la actualización diaria
+# de Calendar (2026-07-21). Esa actualización está retirada, así que la ruta
+# ya no tenía ningún uso — y era un punto de escritura más (creaba avisos)
+# accesible sin la contraseña de Fernando.
 
 
 @app.route("/avisos")

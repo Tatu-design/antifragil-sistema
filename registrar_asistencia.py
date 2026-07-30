@@ -24,8 +24,6 @@ from basedatos import RUTA_POR_DEFECTO, transaccion
 from calendar_integration.semana import get_week_range
 from clientes.repositorio import (
     aplicar_actualizaciones,
-    cargar_programas,
-    cargar_tarifas,
     editar_historial,
     eliminar_historial,
     marcar_pendiente_pago,
@@ -63,6 +61,37 @@ def _sumar_a_semana(fecha: date, tarifa: float | None, sesiones_extra: int, kids
     registrar_semana(inicio.date(), fin.date(), desglose, sesiones_kids, conexion=conexion)
 
 
+def _bloquear_si_hay_ciclos_posteriores(conexion, entrada_id: int, accion: str) -> None:
+    """Impide modificar o borrar una sesión de un bono ya cerrado cuando el
+    cliente tiene sesiones de un bono POSTERIOR (segunda auditoría,
+    2026-07-30).
+
+    Por qué se bloquea en vez de recalcular: cambiar una sesión de un ciclo
+    antiguo (p. ej. bajar la sesión 12 a la 11) obligaría a renumerar todas
+    las sesiones de todos los bonos siguientes y a rehacer sus renovaciones
+    y su economía. Es exactamente el tipo de recálculo masivo y silencioso
+    que este proyecto evita: para la v1 se prioriza seguridad y simplicidad,
+    con un mensaje claro de qué hacer. Si más adelante hace falta, se
+    diseñará aparte y se presentará antes de construirlo."""
+    fila = conexion.execute(
+        "SELECT cliente, ciclo_bono, numero_sesion FROM historial_sesiones WHERE id = ?", (entrada_id,)
+    ).fetchone()
+    if fila is None:
+        raise ValueError("Esa entrada del historial ya no existe")
+
+    posteriores = conexion.execute(
+        "SELECT COUNT(*) AS n FROM historial_sesiones WHERE cliente = ? AND ciclo_bono > ?",
+        (fila["cliente"], fila["ciclo_bono"]),
+    ).fetchone()["n"]
+
+    if posteriores:
+        raise ValueError(
+            f"No se puede {accion} la sesión {fila['numero_sesion']} de '{fila['cliente']}': pertenece a un "
+            f"bono ya cerrado y después hay {posteriores} sesiones de bonos posteriores que dependen de ella. "
+            f"Corrige primero las sesiones del bono actual, de la más reciente hacia atrás."
+        )
+
+
 def _comprobar_sincronizacion(inicio: date, fin: date, ruta: Path = RUTA_POR_DEFECTO) -> None:
     """Tras confirmarse la transacción de una operación que toca la
     economía de una semana, comprueba que el historial y `desglose` siguen
@@ -90,22 +119,47 @@ def registrar_sesion_pt(
     genera cada carga de la página) impide que una misma petición se
     guarde dos veces por un reintento de red o dos pestañas abiertas —
     sprint de integridad, 2026-07-28. Volver a cargar la página genera una
-    clave nueva, así que una segunda sesión real sí se puede firmar."""
+    clave nueva, así que una segunda sesión real sí se puede firmar.
+
+    **Todo ocurre dentro de una única transacción `BEGIN IMMEDIATE`**,
+    incluida la LECTURA del estado del cliente y el cálculo de qué número de
+    sesión le toca (segunda auditoría, 2026-07-30). Antes, el programa y la
+    tarifa se leían fuera de la transacción: dos firmas simultáneas del
+    mismo cliente (dos pestañas, o Fernando y el móvil a la vez) podían leer
+    las dos el mismo estado y calcular las dos el MISMO número de sesión,
+    dejando dos filas con el mismo número y el contador avanzando solo una
+    posición. `BEGIN IMMEDIATE` coge el bloqueo de escritura antes de leer,
+    así que la segunda firma espera y ve el estado ya actualizado."""
     fecha = fecha or hoy_negocio()
-    programas, incompletos = cargar_programas(ruta)
-
-    if nombre in incompletos:
-        raise ValueError(f"A '{nombre}' le faltan datos de programa por rellenar — revísalo en Editar cliente")
-    programa = programas.get(nombre)
-    if programa is None:
-        raise ValueError(f"'{nombre}' no tiene un programa asignado")
-
-    paso, numero_sesion = procesar_una_sesion(programa)
-    tarifa = cargar_tarifas(ruta).get(nombre)
-
     inicio_semana, fin_semana = get_week_range(datetime.combine(fecha, datetime.min.time()))
 
-    with transaccion(ruta) as conexion:
+    with transaccion(ruta, inmediata=True) as conexion:
+        # Estado del cliente leído DENTRO de la transacción bloqueante: es
+        # la base del cálculo de la siguiente sesión, así que no puede
+        # leerse antes de coger el bloqueo.
+        fila_cliente = conexion.execute(
+            "SELECT c.tipo_programa, c.sesiones_completadas, c.pendiente_pago, c.ciclo_bono, "
+            "       p.tarifa, p.sesiones_totales "
+            "FROM clientes c LEFT JOIN programas p ON p.nombre = c.tipo_programa "
+            "WHERE c.nombre = ?",
+            (nombre,),
+        ).fetchone()
+        if fila_cliente is None:
+            raise ValueError(f"'{nombre}' no tiene un programa asignado")
+        if fila_cliente["sesiones_totales"] is None or fila_cliente["tarifa"] is None:
+            raise ValueError(f"A '{nombre}' le faltan datos de programa por rellenar — revísalo en Editar cliente")
+
+        programa = {
+            "sesiones_restantes": fila_cliente["sesiones_totales"] - fila_cliente["sesiones_completadas"],
+            "sesiones_totales": fila_cliente["sesiones_totales"],
+            "pendiente_pago": bool(fila_cliente["pendiente_pago"]),
+            "tipo_programa": fila_cliente["tipo_programa"],
+        }
+        tarifa = fila_cliente["tarifa"]
+        ciclo_bono = fila_cliente["ciclo_bono"]
+
+        paso, numero_sesion = procesar_una_sesion(programa)
+
         if clave_idempotencia is not None:
             ya_procesada = conexion.execute(
                 "SELECT 1 FROM firmas_idempotencia WHERE clave = ?", (clave_idempotencia,)
@@ -128,9 +182,6 @@ def registrar_sesion_pt(
                 "INSERT INTO firmas_idempotencia (clave, creado) VALUES (?, ?)",
                 (clave_idempotencia, hoy_negocio().isoformat()),
             )
-
-        ciclo_fila = conexion.execute("SELECT ciclo_bono FROM clientes WHERE nombre = ?", (nombre,)).fetchone()
-        ciclo_bono = ciclo_fila["ciclo_bono"] if ciclo_fila else 1
 
         aplicar_actualizaciones({nombre: paso}, conexion=conexion)
         registrar_historial(
@@ -187,13 +238,15 @@ def editar_sesion_pt(
     tarifa actual del cliente (bug confirmado y corregido en el sprint de
     integridad, 2026-07-28: antes se recalculaba con `cargar_tarifas()`,
     que puede haber cambiado desde entonces)."""
-    with transaccion(ruta) as conexion:
+    with transaccion(ruta, inmediata=True) as conexion:
         fila_previa = conexion.execute(
             "SELECT fecha FROM historial_sesiones WHERE id = ?", (entrada_id,)
         ).fetchone()
         if fila_previa is None:
             raise ValueError("Esa entrada del historial ya no existe")
         fecha_original = fila_previa["fecha"]
+
+        _bloquear_si_hay_ciclos_posteriores(conexion, entrada_id, "editar")
 
         resultado = editar_historial(entrada_id, nueva_fecha, nuevo_numero_sesion, conexion=conexion)
 
@@ -228,7 +281,7 @@ def eliminar_sesion_pt(entrada_id: int, ruta: Path = RUTA_POR_DEFECTO) -> dict:
     deshace también — si no, el cliente se quedaría marcado "pendiente de
     pago" por un bono que, según el historial que queda, nunca llegó a
     completarse (decisión de Fernando, 2026-07-24)."""
-    with transaccion(ruta) as conexion:
+    with transaccion(ruta, inmediata=True) as conexion:
         previa = conexion.execute(
             "SELECT cliente, ciclo_bono, numero_sesion, sesiones_totales FROM historial_sesiones WHERE id = ?",
             (entrada_id,),
@@ -236,6 +289,8 @@ def eliminar_sesion_pt(entrada_id: int, ruta: Path = RUTA_POR_DEFECTO) -> dict:
         if previa is None:
             raise ValueError("Esa entrada del historial ya no existe")
         cliente, ciclo_de_la_entrada = previa["cliente"], previa["ciclo_bono"]
+
+        _bloquear_si_hay_ciclos_posteriores(conexion, entrada_id, "borrar")
 
         mas_reciente_del_ciclo = conexion.execute(
             "SELECT id FROM historial_sesiones WHERE cliente = ? AND ciclo_bono = ? "

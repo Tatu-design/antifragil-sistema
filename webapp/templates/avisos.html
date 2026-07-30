@@ -36,6 +36,7 @@
         <div class="programa">{{ aviso.tipo.replace('_', ' ') }}</div>
         <div class="meta">{{ aviso.detalle }}</div>
         <form method="post" action="{{ url_for('resolver_aviso_ruta', aviso_id=aviso.id) }}" style="margin-top: 0.5rem;">
+          <input type="hidden" name="csrf" value="{{ token_csrf() }}">
           <button type="submit" class="editar" style="background:none; border:none; padding:0; cursor:pointer; font:inherit;">Descartar →</button>
         </form>
       </div>

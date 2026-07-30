@@ -77,12 +77,27 @@ def obtener_secret_key(ruta: Path = RUTA_POR_DEFECTO) -> str:
 
 
 def obtener_admin_token(ruta: Path = RUTA_POR_DEFECTO) -> str:
-    """Clave para que la actualización diaria automática (una rutina en la
-    nube, sin sesión de navegador) pueda llamar a `/admin/procesar-dia` sin
-    tu contraseña personal — un token de máquina a máquina, no de usuario."""
+    """Clave para que las rutinas automáticas (sin sesión de navegador)
+    puedan llamar a las rutas de máquina (`/admin/verificar-semana`,
+    `/admin/backup`) sin tu contraseña personal — un token de máquina a
+    máquina, no de usuario."""
     existente = _leer_configuracion("admin_token", ruta)
     if existente:
         return existente
     nuevo = secrets.token_hex(32)
     _guardar_configuracion("admin_token", nuevo, ruta)
     return nuevo
+
+
+def token_admin_valido(recibido: str | None, ruta: Path = RUTA_POR_DEFECTO) -> bool:
+    """Compara el token recibido con el guardado usando
+    `secrets.compare_digest`, que tarda lo mismo acierte o falle.
+
+    Un `==` normal corta en cuanto encuentra el primer carácter distinto: el
+    tiempo de respuesta filtra cuántos caracteres del principio eran
+    correctos, y con suficientes intentos se puede adivinar el token carácter
+    a carácter. Es poco probable aquí, pero la comparación segura no cuesta
+    nada (segunda auditoría, 2026-07-30)."""
+    if not recibido:
+        return False
+    return secrets.compare_digest(recibido, obtener_admin_token(ruta))
