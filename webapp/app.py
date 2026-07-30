@@ -56,6 +56,7 @@ from firma_publica import (
 from procesar_dia import procesar_dia
 from registrar_asistencia import (
     editar_sesion_pt,
+    eliminar_cliente_con_historial,
     eliminar_sesion_pt,
     eliminar_ultima_clase_grupo,
     registrar_clase_grupo,
@@ -206,6 +207,7 @@ def inicio():
         "index.html",
         clientes=filas,
         guardado=guardado,
+        eliminado=request.args.get("eliminado"),
         total_clientes=len(filas),
         total_pendientes=pendientes,
     )
@@ -307,6 +309,44 @@ def guardar_nuevo():
         return render_template("error.html", mensaje=str(error)), 400
 
     return redirect(url_for("inicio", guardado=request.form["nombre"]))
+
+
+@app.route("/cliente/<nombre>/eliminar")
+def eliminar_cliente_confirmar(nombre):
+    """Pantalla de "vas a borrar esto" antes de retirar un cliente — misma
+    regla que el resto de escrituras del proyecto: nunca se borra nada
+    directamente desde un enlace (decisión de Fernando, 2026-07-29, para
+    poder retirar los clientes de prueba)."""
+    clientes = leer_clientes()
+    if nombre not in clientes:
+        return f"No existe el cliente '{nombre}'", 404
+
+    entradas = obtener_historial(nombre)
+    return render_template(
+        "eliminar_cliente.html",
+        nombre=nombre,
+        total_sesiones=len(entradas),
+        importe=sum(entrada["tarifa"] or 0 for entrada in entradas),
+    )
+
+
+@app.route("/cliente/<nombre>/eliminar/confirmar", methods=["POST"])
+def eliminar_cliente_ruta(nombre):
+    """Borra el cliente y todas sus sesiones, descontando su facturación de
+    cada semana afectada (ver `eliminar_cliente_con_historial`)."""
+    try:
+        resultado = eliminar_cliente_con_historial(nombre)
+    except sqlite3.OperationalError:
+        return render_template(
+            "error.html", mensaje="No se pudo borrar: la base de datos está ocupada. Reintenta."
+        ), 409
+    except ValueError as error:
+        return render_template("error.html", mensaje=str(error)), 400
+
+    mensaje = f"{nombre} — {resultado['sesiones_borradas']} sesiones"
+    if resultado["importe_descontado"]:
+        mensaje += f" y {resultado['importe_descontado']:.0f}€ descontados de la economía"
+    return redirect(url_for("inicio", eliminado=mensaje))
 
 
 @app.route("/cliente/<nombre>/editar")

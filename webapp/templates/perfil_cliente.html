@@ -109,6 +109,10 @@
     </p>
     {% endif %}
 
+    <p class="meta" style="margin-bottom: 1.5rem;">
+      <a class="editar" href="{{ url_for('eliminar_cliente_confirmar', nombre=nombre) }}">Borrar este cliente →</a>
+    </p>
+
     <div class="lista">
       <div class="cabecera-seccion">
         <span>Historial de sesiones</span>

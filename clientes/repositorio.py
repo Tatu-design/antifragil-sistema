@@ -239,6 +239,38 @@ def actualizar_cliente(
         ) from error
 
 
+def eliminar_cliente(nombre: str, ruta: Path = RUTA_POR_DEFECTO, conexion: sqlite3.Connection | None = None) -> None:
+    """Borra la ficha de un cliente. Se niega a hacerlo si todavía le
+    quedan sesiones en el historial — hay que borrarlas antes una a una
+    (`registrar_asistencia.eliminar_cliente_con_historial` lo hace) para
+    que su dinero se descuente también de la economía de cada semana. Sin
+    esa condición, borrar un cliente dejaría su facturación contada para
+    siempre en unas semanas cuyas sesiones ya no existen."""
+
+    def _hacer(conexion: sqlite3.Connection) -> None:
+        existe = conexion.execute("SELECT 1 FROM clientes WHERE nombre = ?", (nombre,)).fetchone()
+        if not existe:
+            raise ValueError(f"No existe el cliente '{nombre}'")
+
+        pendientes = conexion.execute(
+            "SELECT COUNT(*) AS n FROM historial_sesiones WHERE cliente = ?", (nombre,)
+        ).fetchone()["n"]
+        if pendientes:
+            raise ValueError(
+                f"'{nombre}' todavía tiene {pendientes} sesiones en su historial — hay que borrarlas antes "
+                "para que su facturación se descuente de la economía"
+            )
+
+        conexion.execute("DELETE FROM firmas_publicas WHERE cliente = ?", (nombre,))
+        conexion.execute("DELETE FROM clientes WHERE nombre = ?", (nombre,))
+
+    if conexion is not None:
+        _hacer(conexion)
+    else:
+        with conectar(ruta) as conexion:
+            _hacer(conexion)
+
+
 def registrar_historial(
     historial: dict[str, list[dict]], ruta: Path = RUTA_POR_DEFECTO, conexion: sqlite3.Connection | None = None
 ) -> None:
@@ -393,7 +425,13 @@ def eliminar_historial(
     """Borra una entrada del historial por su `id` (p. ej. un toque de más
     en "Firmar sesión" por error). Devuelve la entrada borrada (con su
     tarifa histórica) — para poder también deshacer su aportación
-    económica, ver `registrar_asistencia.py`."""
+    económica, ver `registrar_asistencia.py`.
+
+    Si el cliente había confirmado esa sesión desde su enlace personal, la
+    confirmación se borra con ella: `firmas_publicas.sesion_id` apunta a
+    esta fila, así que dejarla ahí rompía el borrado con un error de clave
+    foránea (encontrado por el test de borrado de cliente del 2026-07-29 —
+    afectaba también a borrar a mano una sesión ya confirmada)."""
 
     def _hacer(conexion: sqlite3.Connection) -> dict:
         fila = conexion.execute(
@@ -407,6 +445,7 @@ def eliminar_historial(
         entrada["id"] = entrada_id
         cliente = entrada["cliente"]
 
+        conexion.execute("DELETE FROM firmas_publicas WHERE sesion_id = ?", (entrada_id,))
         conexion.execute("DELETE FROM historial_sesiones WHERE id = ?", (entrada_id,))
         _sincronizar_completadas_con_ultima(conexion, cliente)
         return entrada

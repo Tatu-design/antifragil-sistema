@@ -27,6 +27,7 @@ from clientes.repositorio import (
     cargar_programas,
     cargar_tarifas,
     editar_historial,
+    eliminar_cliente,
     eliminar_historial,
     marcar_pendiente_pago,
     obtener_historial,
@@ -276,6 +277,36 @@ def eliminar_sesion_pt(entrada_id: int, ruta: Path = RUTA_POR_DEFECTO) -> dict:
 
     entrada["deshizo_renovacion"] = deshizo_renovacion
     return entrada
+
+
+def eliminar_cliente_con_historial(nombre: str, ruta: Path = RUTA_POR_DEFECTO) -> dict:
+    """Borra un cliente por completo: primero cada una de sus sesiones (con
+    `eliminar_sesion_pt`, que descuenta su facturación de la semana
+    correspondiente usando la tarifa histórica de cada una), y solo después
+    su ficha.
+
+    Se hace sesión a sesión, reutilizando la lógica ya probada, en vez de
+    un `DELETE` directo: borrar las filas a pelo dejaría su dinero contado
+    para siempre en `semanas`/`desglose` sin ninguna sesión detrás — el
+    tipo exacto de descuadre silencioso que el sprint de integridad del
+    2026-07-28 se dedicó a eliminar.
+
+    Devuelve cuántas sesiones se borraron y cuánto se descontó, para poder
+    enseñárselo a Fernando después (decisión de Fernando, 2026-07-29:
+    necesitaba poder retirar los clientes de prueba, cuyas sesiones
+    estaban contando como facturación real)."""
+    entradas = obtener_historial(nombre, ruta)
+    importe = sum(entrada["tarifa"] or 0 for entrada in entradas)
+
+    # De la más reciente a la más antigua: `eliminar_sesion_pt` deshace la
+    # renovación de bono cuando la sesión borrada es la última de su ciclo,
+    # así que el orden importa para que ese caso se detecte bien.
+    for entrada in entradas:
+        eliminar_sesion_pt(entrada["id"], ruta)
+
+    eliminar_cliente(nombre, ruta)
+
+    return {"sesiones_borradas": len(entradas), "importe_descontado": importe}
 
 
 def registrar_clase_grupo(tipo: str, fecha: date | None = None, ruta: Path = RUTA_POR_DEFECTO) -> None:

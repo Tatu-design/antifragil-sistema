@@ -33,6 +33,10 @@
     <div class="aviso-guardado">✔ Guardado: {{ guardado }}</div>
     {% endif %}
 
+    {% if eliminado %}
+    <div class="aviso-guardado">✔ Cliente borrado: {{ eliminado }}</div>
+    {% endif %}
+
     <div class="stats-resumen">
       <div class="stat-card">
         <div class="stat-label">Clientes activos</div>

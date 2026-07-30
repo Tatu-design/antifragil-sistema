@@ -506,6 +506,42 @@ del QR con la URL de confirmación correcta, y un `GET` directo a
 `/mi/<token>/confirmar` (simulando el escaneo) confirma la sesión sin
 duplicar nada en un segundo intento.
 
+### Borrar un cliente, revirtiendo su economía (2026-07-29)
+
+No existía forma de dar de baja a un cliente — Fernando lo pidió al
+querer retirar los dos clientes de prueba creados ese día. Al mirarlo
+apareció algo más urgente: sus 10 sesiones de prueba eran **el 100 % de
+la facturación registrada de la semana en curso** (350 €, 10 horas, sin
+ninguna sesión real todavía esa semana).
+
+**Diseño**: `registrar_asistencia.eliminar_cliente_con_historial()` borra
+primero cada sesión del cliente con `eliminar_sesion_pt()` (que ya
+descuenta la facturación de la semana correspondiente usando la tarifa
+histórica de cada sesión) y solo después su ficha, con
+`clientes.repositorio.eliminar_cliente()`. Se hace sesión a sesión, en
+vez de un `DELETE FROM clientes` directo, precisamente para no dejar su
+dinero contado para siempre en `semanas`/`desglose` sin ninguna sesión
+detrás — el descuadre silencioso que el sprint del 2026-07-28 se dedicó a
+eliminar. Como salvaguarda, `eliminar_cliente()` se niega a borrar la
+ficha si al cliente le queda alguna sesión en el historial.
+
+En la web: enlace "Borrar este cliente" en su perfil →
+`/cliente/<nombre>/eliminar`, una pantalla de confirmación que dice
+cuántas sesiones se van a borrar y cuánto dinero se va a descontar antes
+de tocar nada (misma regla que el resto de escrituras del proyecto) →
+solo al confirmar se borra, y la portada informa de lo retirado.
+
+**Bug de producción encontrado por estos tests**: `firmas_publicas.sesion_id`
+(añadido horas antes, ver sección de la confirmación por QR) apunta a
+`historial_sesiones.id`, así que borrar una sesión que el cliente ya
+había confirmado fallaba con un error de clave foránea — y no solo al
+borrar el cliente entero: **también al borrar a mano una sesión ya
+confirmada desde el perfil de administrador**, algo que Fernando habría
+encontrado en uso normal. Arreglado en `eliminar_historial()`, que ahora
+borra la confirmación asociada dentro de la misma transacción. Es el
+segundo caso del proyecto en que un test de una función nueva descubre un
+fallo en una ya existente (ver lección del 2026-07-28).
+
 ### Protección del trabajo: responsabilidad de Claude, no de Fernando (2026-07-28)
 
 Tras montar la copia de la base de datos, Fernando preguntó "¿si se me

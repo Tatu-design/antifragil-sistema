@@ -180,3 +180,67 @@ class TestAvisoConfirmacionesPendientes(BaseIntegridadTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestBorradoDeCliente(BaseIntegridadTestCase):
+    """Borrar un cliente debe descontar también su facturación de las
+    semanas afectadas — si no, su dinero seguiría contado para siempre sin
+    ninguna sesión detrás (decisión de Fernando, 2026-07-29, al retirar los
+    clientes de prueba, cuyas sesiones inflaban la semana en curso)."""
+
+    def test_borrar_cliente_revierte_su_economia(self):
+        import economia.registro as er
+
+        for dia in (3, 4):
+            ra.registrar_sesion_pt("Cliente", fecha=__import__("datetime").date(2026, 8, dia), ruta=self.ruta)
+
+        semana = er.obtener_semana("2026-08-03", ruta=self.ruta)
+        self.assertAlmostEqual(semana["facturacion_total"], 80.0)
+
+        resultado = ra.eliminar_cliente_con_historial("Cliente", ruta=self.ruta)
+        self.assertEqual(resultado["sesiones_borradas"], 2)
+        self.assertAlmostEqual(resultado["importe_descontado"], 80.0)
+
+        semana_despues = er.obtener_semana("2026-08-03", ruta=self.ruta)
+        self.assertAlmostEqual(semana_despues["facturacion_total"], 0.0)
+        self.assertEqual(semana_despues["horas_totales"], 0)
+        self.assertNotIn("Cliente", cr.leer_clientes(self.ruta))
+
+    def test_borrar_cliente_sin_sesiones(self):
+        resultado = ra.eliminar_cliente_con_historial("Cliente", ruta=self.ruta)
+        self.assertEqual(resultado["sesiones_borradas"], 0)
+        self.assertNotIn("Cliente", cr.leer_clientes(self.ruta))
+
+    def test_borrar_cliente_borra_tambien_sus_confirmaciones(self):
+        ra.registrar_sesion_pt("Cliente", ruta=self.ruta)
+        fp.confirmar_sesion_publica("Cliente", ruta=self.ruta)
+        self.assertEqual(len(fp.confirmaciones_de_hoy("Cliente", ruta=self.ruta)), 1)
+
+        ra.eliminar_cliente_con_historial("Cliente", ruta=self.ruta)
+        self.assertEqual(fp.confirmaciones_de_hoy("Cliente", ruta=self.ruta), [])
+
+    def test_no_deja_borrar_la_ficha_si_quedan_sesiones(self):
+        """Salvaguarda de bajo nivel: `eliminar_cliente` por su cuenta no
+        debe poder dejar sesiones huérfanas con su dinero contado."""
+        ra.registrar_sesion_pt("Cliente", ruta=self.ruta)
+        with self.assertRaises(ValueError):
+            cr.eliminar_cliente("Cliente", ruta=self.ruta)
+
+    def test_cliente_inexistente(self):
+        with self.assertRaises(ValueError):
+            cr.eliminar_cliente("No existe", ruta=self.ruta)
+
+    def test_borrar_una_sesion_ya_confirmada(self):
+        """Bug encontrado por los tests el 2026-07-29: si el cliente había
+        confirmado la sesión, `firmas_publicas.sesion_id` apuntaba a ella y
+        el borrado fallaba con un error de clave foránea — no solo al
+        borrar el cliente entero, también al borrar a mano esa sesión desde
+        el perfil de administrador."""
+        ra.registrar_sesion_pt("Cliente", ruta=self.ruta)
+        fp.confirmar_sesion_publica("Cliente", ruta=self.ruta)
+        entrada_id = cr.obtener_historial("Cliente", ruta=self.ruta)[0]["id"]
+
+        ra.eliminar_sesion_pt(entrada_id, ruta=self.ruta)
+
+        self.assertEqual(cr.obtener_historial("Cliente", ruta=self.ruta), [])
+        self.assertEqual(fp.confirmaciones_de_hoy("Cliente", ruta=self.ruta), [])
