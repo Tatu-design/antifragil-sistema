@@ -15,6 +15,7 @@
     <h1>Editar cliente</h1>
 
     <form class="formulario" method="post" action="{{ url_for('confirmar', nombre=nombre) }}">
+      <input type="hidden" name="csrf" value="{{ token_csrf() }}">
       <label class="campo">
         <span>Nombre</span>
         <input type="text" name="nombre" value="{{ nombre }}" required />

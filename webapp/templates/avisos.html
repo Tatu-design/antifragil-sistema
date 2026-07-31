@@ -28,6 +28,7 @@
       {% for tipo, n in conteo_por_tipo.items() %}
       {% if n > 1 %}
       <form method="post" action="{{ url_for('resolver_avisos_por_tipo_ruta') }}">
+        <input type="hidden" name="csrf" value="{{ token_csrf() }}">
         <input type="hidden" name="tipo" value="{{ tipo }}">
         <button type="submit" class="boton-secundario">Descartar todos — {{ tipo.replace('_', ' ') }} ({{ n }})</button>
       </form>
@@ -49,6 +50,7 @@
         <div class="programa">{{ aviso.tipo.replace('_', ' ') }}</div>
         <div class="meta">{{ aviso.detalle }}</div>
         <form method="post" action="{{ url_for('resolver_aviso_ruta', aviso_id=aviso.id) }}" style="margin-top: 0.5rem;">
+          <input type="hidden" name="csrf" value="{{ token_csrf() }}">
           <button type="submit" class="editar" style="background:none; border:none; padding:0; cursor:pointer; font:inherit;">Descartar →</button>
         </form>
       </div>

@@ -84,11 +84,27 @@ No es un ejecutor ciego. El proyecto tiene una regla explícita contra el
 - **Excepción explícita (decisión de Fernando, 2026-07-28):** proteger el
   trabajo es responsabilidad de Claude, no algo que Fernando deba decidir
   o recordar pedir. Claude puede hacer commit y `git push` al repositorio
-  privado de respaldo (`github.com/Tatu-design/antifragil-sistema`) sin
+  público de respaldo (`github.com/Tatu-design/antifragil-sistema`) sin
   pedir permiso cada vez, en cualquier momento razonable (al terminar un
   bloque de trabajo, al final de una sesión). Esto NO cambia el resto de
   reglas: sigue sin tocarse `main` directamente, sigue sin hacer
   `push --force`, y sigue sin mergear nada sin aprobación explícita.
+
+### El repositorio es PÚBLICO (decisión de Fernando, 2026-07-30)
+Fernando lo quiere público para que ChatGPT pueda auditarlo sin fricción.
+Todo lo que se commitea es visible por cualquiera, así que **antes de
+escribir nada en un archivo versionado**:
+
+- **Nunca** nombres ni alias de clientes reales → usar `Cliente A`,
+  `Cliente B`, `Pareja C`… (ya aplicado a todo el histórico de docs y
+  comentarios).
+- **Nunca** credenciales, tokens, URLs con token (`/mi/<token>`),
+  identificadores operativos que no hagan falta, ni bases de datos o copias
+  (`.gitignore` cubre `*.db`, `datos/config_servidor.json`).
+- **Cifras económicas reales**: solo las imprescindibles para explicar una
+  decisión técnica; nada de listados de facturación.
+- El historial de Git **no se reescribe** sin aprobación explícita de
+  Fernando.
 
 ### Reglas de código
 - Cambios pequeños y reversibles sobre grandes y arriesgados.

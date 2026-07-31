@@ -28,6 +28,7 @@
 
     <form method="post" action="{{ url_for('eliminar_cliente_ruta', nombre=nombre) }}"
           onsubmit="this.querySelector('button').disabled = true; this.querySelector('button').textContent = 'Borrando…';">
+      <input type="hidden" name="csrf" value="{{ token_csrf() }}">
       <button type="submit" class="boton">Sí, borrar a {{ nombre }}</button>
     </form>
   </div>

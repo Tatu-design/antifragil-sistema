@@ -32,19 +32,23 @@
 
     <div class="botones-clase">
       <form method="post" action="{{ url_for('firmar_clase', tipo='lidomare') }}" style="flex:1;">
+        <input type="hidden" name="csrf" value="{{ token_csrf() }}">
         <button type="submit" class="boton-clase">+1 CrossFit Lidomare hoy</button>
       </form>
       <form method="post" action="{{ url_for('firmar_clase', tipo='kids') }}" style="flex:1;">
+        <input type="hidden" name="csrf" value="{{ token_csrf() }}">
         <button type="submit" class="boton-clase">+1 CrossFit Kids hoy</button>
       </form>
     </div>
     <div class="botones-clase" style="margin-top:0.5rem;">
       <form method="post" action="{{ url_for('deshacer_clase', tipo='lidomare') }}" style="flex:1;"
             onsubmit="return confirm('¿Deshacer la última clase de CrossFit Lidomare registrada?');">
+        <input type="hidden" name="csrf" value="{{ token_csrf() }}">
         <button type="submit" class="boton-secundario" style="width:100%;">Deshacer última Lidomare</button>
       </form>
       <form method="post" action="{{ url_for('deshacer_clase', tipo='kids') }}" style="flex:1;"
             onsubmit="return confirm('¿Deshacer la última clase de CrossFit Kids registrada?');">
+        <input type="hidden" name="csrf" value="{{ token_csrf() }}">
         <button type="submit" class="boton-secundario" style="width:100%;">Deshacer última Kids</button>
       </form>
     </div>
@@ -59,6 +63,10 @@
         </div>
 
         {% if semana %}
+        {% if semana.provisional %}
+        <p class="aviso-texto">⚠ Provisional — esta semana tiene clases de CrossFit Kids sin facturación
+        mensual introducida todavía, así que la facturación y las horas de abajo no las incluyen aún.</p>
+        {% endif %}
         <div class="metricas">
           <div class="metrica">
             <span class="label">Facturación</span>
@@ -110,6 +118,13 @@
             <span class="valor">{{ "%.2f"|format(mes.precio_medio_hora) }} €</span>
           </div>
         </div>
+        {% if mes.ajuste_importe %}
+        <p class="aviso-texto">
+          Incluye un ajuste de {{ "%.2f"|format(mes.ajuste_importe) }} € y {{ mes.ajuste_horas }} h de
+          sesiones facturadas antes de que se registraran las fechas.
+          {% for a in mes.ajustes %}<br><span class="meta">{{ a.motivo }}</span>{% endfor %}
+        </p>
+        {% endif %}
         {% else %}
         <p class="empty">Todavía no hay ninguna sesión ni clase registrada este mes.</p>
         {% endif %}
@@ -144,6 +159,10 @@
             <span class="valor">{{ "%.2f"|format(m.precio_medio_hora) }} €</span>
           </div>
         </div>
+        {% if m.ajuste_importe %}
+        <p class="meta">Incluye {{ "%.2f"|format(m.ajuste_importe) }} € y {{ m.ajuste_horas }} h de
+        sesiones facturadas antes del registro de fechas.</p>
+        {% endif %}
       </div>
       {% endfor %}
       {% else %}

@@ -22,6 +22,7 @@
     {% endif %}
 
     <form class="formulario" method="post">
+      <input type="hidden" name="csrf" value="{{ token_csrf() }}">
       <label class="campo">
         <span>Contraseña</span>
         <input type="password" name="password" required autofocus />

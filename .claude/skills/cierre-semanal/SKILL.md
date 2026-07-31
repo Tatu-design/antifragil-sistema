@@ -42,19 +42,15 @@ regla de seguridad no negociable del proyecto.
      un cliente nuevo sin dar de alta, o un error de escritura).
    - `incompletos_datos`: clientes del Excel a los que les falta tipo de
      programa o sesiones completadas.
-6. **Esperar la confirmación explícita de Fernando** antes de continuar.
-   Si hay `sin_programa` o `incompletos_datos`, dejarlo claro y no asumir
-   nada por él.
-7. Solo si confirma, ejecutar:
-   ```
-   .venv/Scripts/python.exe -m cierre_semanal.cli aplicar 2026-07-13 < eventos_semana.json
-   ```
-   (misma fecha y mismo archivo de eventos que en el paso 4, para
-   garantizar que se escribe exactamente lo que se previsualizó). Esto
-   actualiza `datos/clientes.xlsx` Y registra la semana en
-   `datos/facturacion.xlsx`.
-8. Confirmar a Fernando qué clientes se actualizaron y el resumen económico
-   guardado.
+6. Presentar las diferencias a Fernando. **No hay paso de escritura**: el
+   modo `aplicar` está retirado desde la segunda auditoría (2026-07-30).
+   Las sesiones se firman una a una en la app (fuente activa desde el
+   2026-07-22); aplicar un cierre por lotes desde Calendar sobrescribiría
+   la economía de esa semana y podría descontar bonos por segunda vez.
+7. Si aparecen diferencias que hay que dejar registradas, usar la
+   comprobación de solo lectura `/admin/verificar-semana` (o el skill
+   `verificar-calendar`), que las guarda como aviso sin tocar clientes ni
+   economía.
 
 ## Consultar el registro económico
 

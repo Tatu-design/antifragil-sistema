@@ -142,8 +142,8 @@ nunca se guarda como tarifa fija.
 
 ## Regla de identificación de clientes
 
-Todos los PT empiezan exactamente por `PT + nombre o alias` (ej: `PT Nikki`,
-`PT Felipe`, `PT Sunil y Neha`). Cada cliente/pareja tiene un único alias
+Todos los PT empiezan exactamente por `PT + nombre o alias` (ej: `PT Cliente A`,
+`PT Pareja C`, `PT Pareja D`). Cada cliente/pareja tiene un único alias
 exacto.
 
 **Si no hay coincidencia exacta entre el título de Calendar y el alias

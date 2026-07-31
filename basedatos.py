@@ -43,7 +43,7 @@ def conectar(ruta: Path = RUTA_POR_DEFECTO) -> sqlite3.Connection:
 
 
 @contextmanager
-def transaccion(ruta: Path = RUTA_POR_DEFECTO):
+def transaccion(ruta: Path = RUTA_POR_DEFECTO, inmediata: bool = False):
     """Agrupa varios pasos de una operación de negocio (firmar sesión,
     editar, borrar, clase de grupo) en una única transacción atómica: si
     cualquier paso falla, no queda guardado ninguno (sprint de integridad,
@@ -53,9 +53,25 @@ def transaccion(ruta: Path = RUTA_POR_DEFECTO):
 
     Los repositorios que reciben un parámetro `conexion` reutilizan esta
     misma conexión en vez de abrir la suya propia — así todo el bloque
-    vive dentro de la misma transacción SQLite."""
+    vive dentro de la misma transacción SQLite.
+
+    `inmediata=True` abre la transacción con `BEGIN IMMEDIATE`: coge el
+    bloqueo de escritura ANTES de la primera lectura, en vez de esperar a
+    la primera escritura. Es lo que hace falta cuando la operación LEE un
+    estado y DECIDE a partir de él (p. ej. "¿cuál es la siguiente sesión de
+    este bono?"): sin esto, dos firmas simultáneas del mismo cliente pueden
+    leer las dos el mismo estado y calcular las dos el mismo número de
+    sesión (segunda auditoría, 2026-07-30). No penaliza las lecturas
+    normales — en modo WAL los lectores siguen sin bloquearse; solo se
+    serializan entre sí los escritores, que es justo lo que se busca."""
     conexion = conectar(ruta)
     try:
+        if inmediata:
+            # `isolation_level` por defecto haría que Python abriera la
+            # transacción por su cuenta en la primera escritura, demasiado
+            # tarde para proteger las lecturas previas.
+            conexion.isolation_level = None
+            conexion.execute("BEGIN IMMEDIATE")
         yield conexion
         conexion.commit()
     except Exception:
@@ -179,6 +195,19 @@ def crear_esquema(ruta: Path = RUTA_POR_DEFECTO) -> None:
             "SELECT sql FROM sqlite_master WHERE type='table' AND name='historial_sesiones'"
         ).fetchone()["sql"]
         if "UNIQUE" in definicion:
+            # La tabla nueva se crea con el esquema COMPLETO actual
+            # (incluida `ciclo_bono`) y se copia columna a columna sólo lo
+            # que la tabla vieja tenía de verdad.
+            #
+            # Antes, la tabla nueva se creaba sin `ciclo_bono` y el INSERT
+            # tampoco la copiaba: migrar una base con `UNIQUE` PERDÍA esa
+            # columna y sus valores en silencio (la volvía a crear el
+            # siguiente arranque, ya con todo a ciclo 1). Como el bloque de
+            # `ALTER TABLE` de arriba se ejecuta ANTES de esta
+            # reconstrucción, el orden hacía que el arreglo de un problema
+            # deshiciera el del otro — confirmado con un test de migración
+            # sobre el esquema antiguo (segunda auditoría, 2026-07-30).
+            columnas_viejas = {fila["name"] for fila in conexion.execute("PRAGMA table_info(historial_sesiones)")}
             conexion.execute(
                 """
                 CREATE TABLE historial_sesiones_nueva (
@@ -188,15 +217,22 @@ def crear_esquema(ruta: Path = RUTA_POR_DEFECTO) -> None:
                     tipo_programa TEXT NOT NULL,
                     numero_sesion INTEGER NOT NULL,
                     sesiones_totales INTEGER NOT NULL,
-                    tarifa REAL
+                    tarifa REAL,
+                    ciclo_bono INTEGER NOT NULL DEFAULT 1
                 )
                 """
             )
+            comunes = [
+                columna
+                for columna in (
+                    "id", "cliente", "fecha", "tipo_programa", "numero_sesion",
+                    "sesiones_totales", "tarifa", "ciclo_bono",
+                )
+                if columna in columnas_viejas
+            ]
+            lista = ", ".join(comunes)
             conexion.execute(
-                "INSERT INTO historial_sesiones_nueva "
-                "(id, cliente, fecha, tipo_programa, numero_sesion, sesiones_totales, tarifa) "
-                "SELECT id, cliente, fecha, tipo_programa, numero_sesion, sesiones_totales, tarifa "
-                "FROM historial_sesiones"
+                f"INSERT INTO historial_sesiones_nueva ({lista}) SELECT {lista} FROM historial_sesiones"
             )
             conexion.execute("DROP TABLE historial_sesiones")
             conexion.execute("ALTER TABLE historial_sesiones_nueva RENAME TO historial_sesiones")
@@ -248,3 +284,32 @@ def crear_esquema(ruta: Path = RUTA_POR_DEFECTO) -> None:
             conexion.execute(
                 "ALTER TABLE firmas_publicas ADD COLUMN sesion_id INTEGER REFERENCES historial_sesiones(id)"
             )
+
+        # Ajustes mensuales explícitos (segunda auditoría, 2026-07-30).
+        #
+        # La vista mensual se calcula desde `historial_sesiones`, pero el
+        # historial anterior al 2026-07-22 (cuando empezó la firma manual)
+        # está incompleto: hay sesiones que SÍ se facturaron y cuya fecha
+        # exacta nunca quedó registrada. Recalcular esos meses solo desde el
+        # historial rebajaría cierres ya dados por buenos.
+        #
+        # Estas filas conservan esa diferencia de forma explícita: se suman
+        # al mes, pero se muestran siempre como su propia línea con su
+        # motivo, nunca mezcladas sin más en el total (requisito de
+        # Fernando: la diferencia histórica debe quedar visible y
+        # documentada, nunca oculta). `origen` distingue de dónde sale cada
+        # ajuste, para poder recalcular los automáticos sin pisar uno puesto
+        # a mano.
+        conexion.execute(
+            """
+            CREATE TABLE IF NOT EXISTS ajustes_mensuales (
+                anio INTEGER NOT NULL,
+                mes INTEGER NOT NULL,
+                origen TEXT NOT NULL DEFAULT 'legacy',
+                importe REAL NOT NULL DEFAULT 0,
+                horas INTEGER NOT NULL DEFAULT 0,
+                motivo TEXT NOT NULL,
+                PRIMARY KEY (anio, mes, origen)
+            )
+            """
+        )

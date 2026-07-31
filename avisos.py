@@ -21,7 +21,7 @@ def registrar_aviso(
     firma (como la sincronización con la economía) crea un aviso repetido
     por cada sesión que se firma esa semana, aunque sea siempre el mismo
     hueco ya conocido — encontrado el 2026-07-24, cuando el aviso del hueco
-    de Nikki se repitió varias veces seguidas.
+    de Cliente A se repitió varias veces seguidas.
 
     `conexion`: para poder formar parte de la misma transacción atómica que
     firma una sesión (sprint de integridad, 2026-07-28)."""

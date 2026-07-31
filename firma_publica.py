@@ -7,7 +7,7 @@ real antes de desplegarlo del todo: si Fernando ya había firmado la sesión
 de ese cliente desde su perfil, y el cliente también confirmaba desde el
 suyo, se contaban dos sesiones por un solo entrenamiento — el mismo tipo
 de descuadre que el sprint de integridad del día anterior arregló para
-Felipe y Javi.
+Pareja C.
 
 Segundo diseño (mismo día): el cliente nunca crea nada, solo confirma la
 sesión que Fernando ya registró — pero la confirmación se guardaba por

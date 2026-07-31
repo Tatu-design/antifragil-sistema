@@ -25,6 +25,7 @@
     <p class="aviso-texto">Recuerda que en Google Calendar las sesiones de este cliente deben escribirse exactamente como "PT {{ nombre }}" para que el sistema las reconozca.</p>
 
     <form method="post" action="{{ url_for('guardar_nuevo') }}">
+      <input type="hidden" name="csrf" value="{{ token_csrf() }}">
       <input type="hidden" name="nombre" value="{{ nombre }}" />
       <input type="hidden" name="tipo_programa" value="{{ tipo_programa }}" />
       <input type="hidden" name="sesiones_completadas" value="{{ sesiones_completadas }}" />
