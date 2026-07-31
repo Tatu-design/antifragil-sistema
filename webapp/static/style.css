@@ -62,8 +62,18 @@
   --peligro: #c0283b;
   --peligro-velo: rgba(192, 40, 59, 0.10);
 
-  --cristal: rgba(255, 255, 255, 0.70);
-  --cristal-tenue: rgba(255, 255, 255, 0.40);
+  /* RENDIMIENTO (2026-07-31): el desenfoque del fondo (`backdrop-filter`)
+     es precioso pero carísimo — el navegador tiene que recalcularlo en cada
+     fotograma mientras se hace scroll, POR CADA elemento que lo lleve. Con
+     13 capas a la vez en la portada, la app iba a tirones en el móvil.
+
+     Ahora el desenfoque se reserva a lo que de verdad tiene contenido
+     deslizándose por debajo: la barra de pestañas y las ventanas
+     superpuestas. Todo lo que hace scroll usa un blanco algo más opaco,
+     que sobre un fondo suave como este se ve prácticamente igual y no
+     cuesta nada. */
+  --cristal: rgba(255, 255, 255, 0.82);
+  --cristal-tenue: rgba(255, 255, 255, 0.58);
   --cristal-borde: rgba(255, 255, 255, 0.72);
   --cristal-borde-firme: rgba(16, 24, 32, 0.10);
   --cristal-sombra: 0 8px 28px -14px rgba(16, 24, 32, 0.20),
@@ -134,8 +144,6 @@ body::before {
 .stat-card,
 .formulario {
   background: var(--cristal);
-  -webkit-backdrop-filter: var(--cristal-desenfoque);
-  backdrop-filter: var(--cristal-desenfoque);
   border: 1px solid var(--cristal-borde);
   border-radius: var(--radio);
   box-shadow: var(--cristal-sombra);
@@ -296,8 +304,6 @@ h1 {
   text-decoration: none;
   cursor: pointer;
   background: var(--cristal-tenue);
-  -webkit-backdrop-filter: blur(14px);
-  backdrop-filter: blur(14px);
   border: 1px solid var(--cristal-borde);
   box-shadow: 0 4px 14px -8px rgba(16, 24, 32, 0.28);
   transition: border-color 0.15s ease, background-color 0.15s ease;
@@ -402,8 +408,6 @@ h1 {
   color: var(--acento-oscuro);
   background: rgba(255, 255, 255, 0.55);
   border: 1px solid var(--cristal-borde);
-  -webkit-backdrop-filter: blur(14px);
-  backdrop-filter: blur(14px);
   text-decoration: none;
 }
 
@@ -664,8 +668,6 @@ h1 {
   padding: 14px;
   border-radius: var(--radio);
   background: var(--cristal);
-  -webkit-backdrop-filter: var(--cristal-desenfoque);
-  backdrop-filter: var(--cristal-desenfoque);
   border: 1px solid var(--cristal-borde);
   box-shadow: var(--cristal-sombra);
   transition: transform 0.15s ease, box-shadow 0.15s ease;
@@ -751,8 +753,6 @@ h1 {
   text-align: center;
   border-radius: var(--radio-grande);
   background: rgba(255, 255, 255, 0.82);
-  -webkit-backdrop-filter: var(--cristal-desenfoque);
-  backdrop-filter: var(--cristal-desenfoque);
   border: 1px solid var(--cristal-borde);
   box-shadow: 0 0 0 1px rgba(16, 24, 32, 0.05), 0 32px 80px -24px rgba(16, 24, 32, 0.28);
   animation: qr-dialogo-entra 0.22s cubic-bezier(0.2, 0.8, 0.3, 1);
