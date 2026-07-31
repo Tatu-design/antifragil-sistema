@@ -9,16 +9,16 @@
   <link rel="apple-touch-icon" href="{{ url_for('static', filename='favicon.png') }}" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="Antifrágil" />
-  <meta name="theme-color" content="#007563" />
+  <meta name="theme-color" content="#1fa99a" />
 </head>
 <body>
   <div class="page-ancha">
     <nav class="nav">
-      <img src="{{ url_for('static', filename='logo.png') }}" alt="Antifrágil" class="logo-nav" />
-      <a href="{{ url_for('inicio') }}" class="activo">Clientes</a>
-      <a href="{{ url_for('economia') }}">Economía</a>
-      <a href="{{ url_for('avisos') }}">Avisos{% if avisos_no_leidos %} <span class="pill pendiente">{{ avisos_no_leidos }}</span>{% endif %}</a>
-      <a href="{{ url_for('logout') }}" style="margin-left:auto;">Salir</a>
+      <img src="{{ url_for('static', filename='logo-marca.png') }}" alt="Antifrágil" class="logo-nav" />
+      <a href="{{ url_for('inicio') }}" class="activo"><svg class="icono icono-sm" aria-hidden="true"><use href="{{ url_for('static', filename='iconos.svg') }}#i-users"></use></svg>Clientes</a>
+      <a href="{{ url_for('economia') }}"><svg class="icono icono-sm" aria-hidden="true"><use href="{{ url_for('static', filename='iconos.svg') }}#i-euro"></use></svg>Economía</a>
+      <a href="{{ url_for('avisos') }}"><svg class="icono icono-sm" aria-hidden="true"><use href="{{ url_for('static', filename='iconos.svg') }}#i-bell"></use></svg>Avisos{% if avisos_no_leidos %} <span class="pill pendiente">{{ avisos_no_leidos }}</span>{% endif %}</a>
+      <a href="{{ url_for('logout') }}" style="margin-left:auto;"><svg class="icono icono-sm" aria-hidden="true"><use href="{{ url_for('static', filename='iconos.svg') }}#i-log-out"></use></svg>Salir</a>
     </nav>
 
     <div class="cabecera-pagina">
@@ -26,7 +26,7 @@
         <h1>Antifrágil · Clientes</h1>
         <p class="subtitulo">Vista en directo desde la base de datos</p>
       </div>
-      <a class="boton-nuevo" href="{{ url_for('nuevo') }}">+ Nuevo</a>
+      <a class="boton-nuevo" href="{{ url_for('nuevo') }}"><svg class="icono icono-sm" aria-hidden="true"><use href="{{ url_for('static', filename='iconos.svg') }}#i-plus"></use></svg>Nuevo</a>
     </div>
 
     {% if guardado %}

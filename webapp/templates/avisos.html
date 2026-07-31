@@ -7,17 +7,17 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css', v=version_estaticos) }}" />
   <link rel="icon" href="{{ url_for('static', filename='favicon.png') }}" />
   <link rel="apple-touch-icon" href="{{ url_for('static', filename='favicon.png') }}" />
-  <meta name="theme-color" content="#007563" />
+  <meta name="theme-color" content="#1fa99a" />
 </head>
 <body>
   <div class="page-ancha">
     <nav class="nav">
-      <img src="{{ url_for('static', filename='logo.png') }}" alt="Antifrágil" class="logo-nav" />
-      <a href="{{ url_for('inicio') }}">Clientes</a>
-      <a href="{{ url_for('economia') }}">Economía</a>
-      <a href="{{ url_for('avisos') }}" class="activo">Avisos</a>
+      <img src="{{ url_for('static', filename='logo-marca.png') }}" alt="Antifrágil" class="logo-nav" />
+      <a href="{{ url_for('inicio') }}"><svg class="icono icono-sm" aria-hidden="true"><use href="{{ url_for('static', filename='iconos.svg') }}#i-users"></use></svg>Clientes</a>
+      <a href="{{ url_for('economia') }}"><svg class="icono icono-sm" aria-hidden="true"><use href="{{ url_for('static', filename='iconos.svg') }}#i-euro"></use></svg>Economía</a>
+      <a href="{{ url_for('avisos') }}" class="activo"><svg class="icono icono-sm" aria-hidden="true"><use href="{{ url_for('static', filename='iconos.svg') }}#i-bell"></use></svg>Avisos</a>
       {# el contador se pone a 0 nada más entrar aquí, a propósito #}
-      <a href="{{ url_for('logout') }}" style="margin-left:auto;">Salir</a>
+      <a href="{{ url_for('logout') }}" style="margin-left:auto;"><svg class="icono icono-sm" aria-hidden="true"><use href="{{ url_for('static', filename='iconos.svg') }}#i-log-out"></use></svg>Salir</a>
     </nav>
 
     <h1>Avisos</h1>
