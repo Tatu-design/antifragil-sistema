@@ -42,7 +42,10 @@
 }
 
 :root {
-  --perla: #e7e5e0;
+  /* Fondo REAL de la app en el diseño (#F5F7F4). No confundir con el gris
+     del lienzo del editor (#e7e5e0), que es donde flota el marco del
+     teléfono — usarlo teñía toda la app de un tono equivocado. */
+  --perla: #f5f7f4;
   --tinta: #111315;
   --tinta-media: #3f4644;
   --tinta-suave: #6e7572;
@@ -69,7 +72,11 @@
 
   --radio: 16px;
   --radio-grande: 24px;
-  --columna: 30rem;
+  /* Ancho exacto del marco del diseño. */
+  --columna: 430px;
+  /* Hueco que deja la barra de pestañas inferior, para que el contenido no
+     quede escondido debajo. */
+  --alto-barra: 84px;
 }
 
 * { box-sizing: border-box; }
@@ -108,7 +115,9 @@ body::before {
   width: 100%;
   max-width: var(--columna);
   margin: 0 auto;
-  padding: 1.25rem 1rem 3rem;
+  /* 16px a los lados, como el diseño. Abajo se reserva el hueco de la barra
+     de pestañas para que la última tarjeta no quede tapada. */
+  padding: 0 16px calc(var(--alto-barra) + 16px);
 }
 
 /* ----- Iconos ----- */
@@ -365,37 +374,171 @@ h1 {
 .aviso-texto { background: var(--alerta-velo); color: var(--alerta); border: 1px solid rgba(245, 158, 11, 0.28); }
 .aviso-error { background: var(--peligro-velo); color: var(--peligro); border: 1px solid rgba(192, 40, 59, 0.25); }
 
-/* ----- Navegación ----- */
+/* ----- Cabecera de pantalla (valores exactos del diseño) ----- */
 
-.nav {
+.cabecera-app { padding: 6px 0 12px; }
+
+.cabecera-app-marca {
   display: flex;
   align-items: center;
-  gap: 0.9rem;
-  margin-bottom: 1.25rem;
-  padding: 0.55rem 0.9rem;
-  border-radius: 9999px;
-  background: var(--cristal);
-  -webkit-backdrop-filter: var(--cristal-desenfoque);
-  backdrop-filter: var(--cristal-desenfoque);
-  border: 1px solid var(--cristal-borde);
-  box-shadow: var(--cristal-sombra);
+  gap: 10px;
+  padding: 4px 0 10px;
 }
 
-.nav a {
+.logo-nav { height: 30px; width: auto; flex: none; display: block; }
+.logo-login { display: block; height: 34px; width: auto; margin: 0 auto 1rem; }
+
+/* La cápsula de la derecha en la cabecera (en el diseño, «Semana 31»). */
+.chip-cabecera {
+  margin-left: auto;
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
-  font-size: 0.8125rem;
-  font-weight: 600;
+  border-radius: 9999px;
+  padding: 3px 9px;
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--acento-oscuro);
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid var(--cristal-borde);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  text-decoration: none;
+}
+
+.cabecera-app h1 { font-size: 18px; font-weight: 900; line-height: 1.15; margin: 0; }
+.cabecera-app .subtitulo { font-size: 12px; margin: 1px 0 0; }
+
+/* ----- Barra de pestañas inferior ----- */
+
+.barra {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  pointer-events: none;
+}
+
+.barra-interior {
+  position: relative;
+  margin: 0 auto;
+  max-width: var(--columna);
+  padding: 4px 12px 16px;
+}
+
+/* El halo de color difuminado bajo la barra. */
+.barra-halo {
+  pointer-events: none;
+  position: absolute;
+  left: 24px;
+  right: 24px;
+  top: 4px;
+  bottom: 16px;
+  border-radius: 9999px;
+  opacity: 0.8;
+  filter: blur(28px);
+  z-index: -1;
+  background: linear-gradient(90deg, rgba(82, 214, 195, 0.60), rgba(120, 190, 255, 0.50) 46%, rgba(246, 199, 227, 0.58));
+}
+
+.barra-pestanas {
+  pointer-events: auto;
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  border-radius: 26px;
+  padding: 6px;
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.40), rgba(255, 255, 255, 0.20));
+  -webkit-backdrop-filter: blur(26px) saturate(210%) brightness(1.04);
+  backdrop-filter: blur(26px) saturate(210%) brightness(1.04);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 16px 40px -14px rgba(16, 24, 32, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    inset 0 -1px 0 rgba(16, 24, 32, 0.04);
+}
+
+.pestana {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border-radius: 20px;
+  padding: 8px 0;
+  min-height: 52px;
+  border: 0;
+  cursor: pointer;
+  background: transparent;
   color: var(--tinta-suave);
   text-decoration: none;
-  white-space: nowrap;
+  transition: all 0.15s;
 }
-.nav a:hover { color: var(--tinta); }
-.nav a.activo { color: var(--acento); font-weight: 700; }
 
-.logo-nav { height: 26px; width: auto; flex: none; }
-.logo-login { display: block; height: 34px; width: auto; margin: 0 auto 1rem; }
+.pestana:active { transform: scale(0.95); }
+.pestana .icono { width: 21px; height: 21px; }
+
+.pestana span {
+  font-size: 9px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.pestana.activa { background: var(--acento-velo); color: var(--acento-oscuro); }
+
+/* Contador de avisos sobre el icono de la pestaña. */
+.pestana-punto {
+  position: absolute;
+  transform: translate(10px, -8px);
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+  border-radius: 9999px;
+  background: var(--alerta);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 900;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ----- Panel deslizante ----- */
+
+.panel-fondo {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.40);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+
+.panel {
+  position: relative;
+  max-height: 92%;
+  width: 100%;
+  max-width: var(--columna);
+  overflow-y: auto;
+  border-top-left-radius: 24px;
+  border-top-right-radius: 24px;
+  border-top: 1px solid rgba(255, 255, 255, 0.70);
+  background: var(--perla);
+  padding: 20px 20px 32px;
+  animation: panel-entra 0.18s ease-out;
+}
+
+@keyframes panel-entra {
+  from { transform: translateY(24px); opacity: 0.6; }
+  to { transform: translateY(0); opacity: 1; }
+}
 
 /* ----- Estadísticas y métricas ----- */
 
@@ -512,7 +655,28 @@ h1 {
   background: linear-gradient(90deg, var(--acento-claro), var(--acento));
 }
 
-.tarjeta-cliente { display: block; text-decoration: none; color: inherit; }
+/* Cada cliente es una tarjeta de cristal propia, no una fila dentro de una
+   caja compartida («listas de tarjetas», como pone tu diseño). */
+.tarjeta-cliente {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  padding: 14px;
+  border-radius: var(--radio);
+  background: var(--cristal);
+  -webkit-backdrop-filter: var(--cristal-desenfoque);
+  backdrop-filter: var(--cristal-desenfoque);
+  border: 1px solid var(--cristal-borde);
+  box-shadow: var(--cristal-sombra);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.tarjeta-cliente:active { transform: scale(0.98); }
+
+.tarjeta-cliente:hover {
+  box-shadow: 0 12px 32px -14px rgba(16, 24, 32, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+}
 
 /* ----- Historial de sesiones ----- */
 
@@ -559,13 +723,10 @@ h1 {
 .comparativa .flecha { color: var(--tinta-suave); font-size: 0.8125rem; }
 .comparativa .despues { font-weight: 700; font-size: 0.9375rem; color: var(--acento-oscuro); }
 
-/* Rejilla de clientes de la portada: una columna en móvil, dos en cuanto
-   la pantalla lo permite. */
-.clientes-grid { display: grid; gap: 0.75rem; }
-
-@media (min-width: 34rem) {
-  .clientes-grid { grid-template-columns: 1fr 1fr; }
-}
+/* Lista de clientes: SIEMPRE una columna, tarjeta debajo de tarjeta.
+   El diseño no tiene puntos de ruptura por ancho de pantalla — meter dos
+   columnas al ensanchar era invención mía, no suya. */
+.clientes-grid { display: flex; flex-direction: column; gap: 10px; }
 
 /* ----- Ventana del QR de confirmación ----- */
 

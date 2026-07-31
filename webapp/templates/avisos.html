@@ -11,14 +11,12 @@
 </head>
 <body>
   <div class="page-ancha">
-    <nav class="nav">
-      <img src="{{ url_for('static', filename='logo-marca.png') }}" alt="Antifrágil" class="logo-nav" />
-      <a href="{{ url_for('inicio') }}"><svg class="icono icono-sm" aria-hidden="true"><use href="{{ url_for('static', filename='iconos.svg') }}#i-users"></use></svg>Clientes</a>
-      <a href="{{ url_for('economia') }}"><svg class="icono icono-sm" aria-hidden="true"><use href="{{ url_for('static', filename='iconos.svg') }}#i-euro"></use></svg>Economía</a>
-      <a href="{{ url_for('avisos') }}" class="activo"><svg class="icono icono-sm" aria-hidden="true"><use href="{{ url_for('static', filename='iconos.svg') }}#i-bell"></use></svg>Avisos</a>
-      {# el contador se pone a 0 nada más entrar aquí, a propósito #}
-      <a href="{{ url_for('logout') }}" style="margin-left:auto;"><svg class="icono icono-sm" aria-hidden="true"><use href="{{ url_for('static', filename='iconos.svg') }}#i-log-out"></use></svg>Salir</a>
-    </nav>
+    <header class="cabecera-app">
+      <div class="cabecera-app-marca">
+        <img src="{{ url_for('static', filename='logo-marca.png') }}" alt="Antifrágil" class="logo-nav" />
+        <a class="chip-cabecera" href="{{ url_for('logout') }}">Salir</a>
+      </div>
+    </header>
 
     <h1>Avisos</h1>
     <p class="subtitulo">Cosas que la actualización diaria no pudo procesar sola</p>
@@ -60,5 +58,25 @@
       {% endif %}
     </div>
   </div>
+
+    <nav class="barra" aria-label="Secciones">
+      <div class="barra-interior">
+        <div class="barra-halo" aria-hidden="true"></div>
+        <div class="barra-pestanas">
+          <a class="pestana" href="{{ url_for('inicio') }}">
+            <svg class="icono" aria-hidden="true"><use href="{{ url_for('static', filename='iconos.svg') }}#i-users"></use></svg>
+            <span>Clientes</span>
+          </a>
+          <a class="pestana" href="{{ url_for('economia') }}">
+            <svg class="icono" aria-hidden="true"><use href="{{ url_for('static', filename='iconos.svg') }}#i-euro"></use></svg>
+            <span>Economía</span>
+          </a>
+          <a class="pestana activa" href="{{ url_for('avisos') }}">
+            <svg class="icono" aria-hidden="true"><use href="{{ url_for('static', filename='iconos.svg') }}#i-bell"></use></svg>{% if avisos_no_leidos %}<span class="pestana-punto">{{ avisos_no_leidos }}</span>{% endif %}
+            <span>Avisos</span>
+          </a>
+        </div>
+      </div>
+    </nav>
 </body>
 </html>
