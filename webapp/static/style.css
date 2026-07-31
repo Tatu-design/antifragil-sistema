@@ -76,7 +76,11 @@
   --cristal-tenue: rgba(255, 255, 255, 0.58);
   --cristal-borde: rgba(255, 255, 255, 0.72);
   --cristal-borde-firme: rgba(16, 24, 32, 0.10);
-  --cristal-sombra: 0 8px 28px -14px rgba(16, 24, 32, 0.20),
+  /* Sombra más corta que la del diseño (28px de difuminado): cuanto mayor
+     es el radio, más área tiene que pintar el navegador, y esto se repite
+     en cada tarjeta de la lista. A este tamaño la diferencia no se aprecia
+     y el pintado es bastante más barato. */
+  --cristal-sombra: 0 3px 10px -5px rgba(16, 24, 32, 0.18),
     inset 0 1px 0 rgba(255, 255, 255, 0.55);
   --cristal-desenfoque: blur(20px) saturate(140%);
 
@@ -104,7 +108,14 @@ body {
   line-height: 1.5;
 }
 
-/* La aurora: luces suaves detrás de todo. Fija, no se mueve ni tapa nada. */
+/* La aurora: luces suaves detrás de todo.
+   El diseño usa cuatro degradados a pantalla completa; se dejan los DOS que
+   de verdad se ven (el verde de arriba y el lila de la derecha) más un rosa
+   tenue abajo. Cada degradado a pantalla completa es trabajo de pintado, y
+   esta capa cubre toda la ventana.
+
+   `background-attachment` NO se usa a propósito: una capa fija se pinta una
+   vez y el navegador la reutiliza al hacer scroll. */
 body::before {
   content: "";
   position: fixed;
@@ -114,8 +125,7 @@ body::before {
   background:
     radial-gradient(135% 100% at 6% -10%, rgba(82, 214, 195, 0.30) 0%, rgba(82, 214, 195, 0) 52%),
     radial-gradient(125% 90% at 100% 2%, rgba(199, 210, 254, 0.34) 0%, rgba(199, 210, 254, 0) 55%),
-    radial-gradient(120% 85% at 96% 98%, rgba(246, 199, 227, 0.26) 0%, rgba(246, 199, 227, 0) 55%),
-    radial-gradient(120% 80% at -4% 100%, rgba(221, 248, 111, 0.18) 0%, rgba(221, 248, 111, 0) 50%);
+    radial-gradient(120% 85% at 96% 98%, rgba(246, 199, 227, 0.22) 0%, rgba(246, 199, 227, 0) 58%);
 }
 
 /* ----- Estructura ----- */
@@ -432,19 +442,26 @@ h1 {
   padding: 4px 12px 16px;
 }
 
-/* El halo de color difuminado bajo la barra. */
+/* El halo de color bajo la barra.
+   El diseño lo consigue con `filter: blur(28px)` sobre una franja de color.
+   Aquí se dibuja YA difuminado con degradados radiales de bordes suaves: se
+   ve igual y no obliga al navegador a desenfocar una capa entera en cada
+   fotograma del scroll (la barra es fija y está siempre en pantalla, así
+   que ese coste se pagaba constantemente). */
 .barra-halo {
   pointer-events: none;
   position: absolute;
-  left: 24px;
-  right: 24px;
-  top: 4px;
-  bottom: 16px;
+  left: 8px;
+  right: 8px;
+  top: -6px;
+  bottom: 6px;
   border-radius: 9999px;
-  opacity: 0.8;
-  filter: blur(28px);
+  opacity: 0.75;
   z-index: -1;
-  background: linear-gradient(90deg, rgba(82, 214, 195, 0.60), rgba(120, 190, 255, 0.50) 46%, rgba(246, 199, 227, 0.58));
+  background:
+    radial-gradient(60% 120% at 18% 50%, rgba(82, 214, 195, 0.55) 0%, rgba(82, 214, 195, 0) 70%),
+    radial-gradient(60% 120% at 50% 50%, rgba(120, 190, 255, 0.45) 0%, rgba(120, 190, 255, 0) 70%),
+    radial-gradient(60% 120% at 84% 50%, rgba(246, 199, 227, 0.55) 0%, rgba(246, 199, 227, 0) 70%);
 }
 
 .barra-pestanas {
@@ -455,9 +472,12 @@ h1 {
   gap: 4px;
   border-radius: 26px;
   padding: 6px;
-  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.40), rgba(255, 255, 255, 0.20));
-  -webkit-backdrop-filter: blur(26px) saturate(210%) brightness(1.04);
-  backdrop-filter: blur(26px) saturate(210%) brightness(1.04);
+  /* El diseño pide aquí `blur(26px) saturate(210%) brightness(1.04)`: el
+     efecto más caro de toda la hoja, sobre un elemento fijo por el que
+     pasa el contenido al hacer scroll. Se sustituye por un blanco más
+     sólido: sobre este fondo pastel el resultado es casi idéntico y deja
+     de haber trabajo en cada fotograma. */
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.86));
   border: 1px solid rgba(255, 255, 255, 0.5);
   box-shadow: 0 16px 40px -14px rgba(16, 24, 32, 0.28),
     inset 0 1px 0 rgba(255, 255, 255, 0.85),
