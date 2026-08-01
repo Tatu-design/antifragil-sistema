@@ -33,3 +33,8 @@ jobs:
 
       - name: Ejecutar la suite
         run: python -m unittest discover -s tests -v
+
+      - name: Comprobar rendimiento
+        # Lo que la suite no ve: recursos que bloquean el dibujado, efectos
+        # caros del CSS, peso de la descarga y conexiones por pantalla.
+        run: python comprobar_rendimiento.py

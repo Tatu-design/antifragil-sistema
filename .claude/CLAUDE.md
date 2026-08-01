@@ -109,6 +109,14 @@ escribir nada en un archivo versionado**:
 ### Reglas de código
 - Cambios pequeños y reversibles sobre grandes y arriesgados.
 - Siempre comprobar que algo funciona antes de decir que está listo.
+- **Comprobar también que sigue yendo rápido.** Antes de dar por terminado
+  cualquier cambio que toque plantillas, CSS, JavaScript o consultas,
+  ejecutar `python comprobar_rendimiento.py` además de las pruebas. Mide lo
+  que los tests no ven (recursos que bloquean el dibujado, efectos caros,
+  peso de la descarga, conexiones por pantalla) y falla si algo se pasa.
+  Si una cifra empeora: o se corrige antes de entregar, o se dice
+  explícitamente por qué compensa. Nunca entregar sin saberlo — pasó dos
+  veces el 2026-08-01 y lo detectó Fernando, no yo.
 - No añadir funcionalidades que no se han pedido y que no están en el alcance de
   la v1 definido en `SYSTEM_VISION.md`.
 - No refactorizar código que funciona salvo que haya una razón clara.

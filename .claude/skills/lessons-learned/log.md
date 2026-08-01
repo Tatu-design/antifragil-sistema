@@ -302,3 +302,30 @@ Cuando el diseño los pida en más sitios, conseguir el mismo aspecto sin
 coste: un fondo algo más opaco, o un degradado dibujado ya difuminado en vez
 de desenfocar una capa. Y ante una queja de lentitud, medir primero servidor
 y consultas para no optimizar el sitio equivocado.
+
+## 2026-08-01 — Entregué dos veces un cambio que empeoraba la app sin saberlo
+
+**Qué pasó:** al aplicar el rediseño dejé 13 elementos desenfocando el
+fondo a la vez y la app se volvió lenta; Fernando tuvo que reportarlo.
+Después, al arreglar la señal de carga, subí el script a la cabecera y le
+quité el `defer`, con lo que el navegador dejaba de dibujar la página hasta
+descargarlo — y otra vez tuvo que ser él quien dijera "va especialmente
+lenta". Su corrección: *"no puede ser que hagas algo que hace peor el
+manejo de la app y no lo sepas, y sobre todo que no lo optimices antes de
+entregar el trabajo"*.
+
+**Por qué pasó:** antes de entregar comprobaba dos cosas —que funcionara y
+que las 74 pruebas pasaran— pero nunca que siguiera yendo igual de rápido.
+El rendimiento solo se medía cuando alguien se quejaba, y para entonces ya
+estaba en producción. Las pruebas automáticas no detectan esto: un
+`backdrop-filter` de más o un `<script>` que bloquea el dibujado no rompen
+ningún test.
+
+**Qué se hace distinto a partir de ahora:** existe
+`comprobar_rendimiento.py`, que mide lo que las pruebas no ven —recursos que
+bloquean el dibujado, efectos caros del CSS, peso de lo que se descarga,
+conexiones a la base de datos por pantalla— y falla si algo se pasa de los
+límites. **Se ejecuta antes de dar por terminado cualquier cambio que toque
+plantillas, CSS, JavaScript o consultas**, igual que se ejecutan las
+pruebas. Si un cambio empeora una cifra, o se corrige antes de entregar o se
+dice explícitamente por qué compensa — pero nunca se entrega sin saberlo.
