@@ -95,6 +95,13 @@
 
 * { box-sizing: border-box; }
 
+/* Lo marcado como `hidden` se esconde, pase lo que pase.
+   El navegador oculta `[hidden]` con `display: none`, pero CUALQUIER regla
+   propia que fije un `display` gana a esa. Sin esto, las tarjetas de cliente
+   (`display: block`) seguían viéndose al filtrar aunque el JavaScript las
+   marcara como ocultas — los filtros no hacían nada (2026-08-01). */
+[hidden] { display: none !important; }
+
 html { -webkit-text-size-adjust: 100%; }
 
 body {

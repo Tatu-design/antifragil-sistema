@@ -326,6 +326,18 @@ class TestPantallaYBloqueo(BaseEstados):
                         "No hay clientes pausados.", "No hay clientes cancelados."):
             self.assertIn(mensaje, html)
 
+    def test_lo_oculto_se_oculta_de_verdad(self):
+        """El filtro esconde tarjetas con el atributo `hidden`, pero
+        `.tarjeta-cliente` fija `display: block` y ESO GANA al atributo: sin
+        una regla que lo fuerce, pulsar un filtro no ocultaba nada
+        (2026-08-01, el fallo que reportó Fernando)."""
+        import re
+        css = Path("webapp/static/style.css").read_text(encoding="utf-8")
+        self.assertRegex(
+            css, r"\[hidden\][^{]*\{[^}]*display:\s*none\s*!important",
+            "falta la regla que hace que `hidden` gane a cualquier `display` propio",
+        )
+
     def test_los_filtros_son_botones_accesibles(self):
         html = self.cliente.get("/").get_data(as_text=True)
         self.assertIn('aria-pressed="true"', html)
