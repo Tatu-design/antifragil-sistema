@@ -22,6 +22,74 @@
   cuenta en sesiones pero su importe se reparte hacia atrás sobre las
   semanas del mes en cuanto Fernando indica la facturación mensual total.
 
+### Rediseño «Liquid Glass» y rendimiento de la interfaz (2026-07-31 / 08-01)
+
+Fernando rediseñó la app entera por su cuenta con una herramienta de
+diseño de Claude y entregó el resultado como proyecto HTML. **La estética
+la lleva él**; el papel de Claude aquí es portarla fielmente y sostener el
+rendimiento, no proponer alternativas visuales.
+
+**Antes de pintar, se unificaron las ramas** (`integracion/base-unificada`):
+producción corría el trabajo del QR mientras la segunda auditoría vivía en
+otra rama sin desplegar. Pintar sobre una de las dos habría obligado a
+fusionar después código pintado con código sin pintar. La fusión dejó dos
+conflictos (ambos por añadir cosas en el mismo sitio: `firmas_publicas` vs
+`ajustes_mensuales`, y la huella del CSS vs las cookies endurecidas) y
+destapó dos cosas sueltas: dos formularios creados después de la pasada de
+CSRF que se habían quedado sin token, y nombres reales de clientes que la
+rama del QR reintroducía en la documentación.
+
+**El sistema visual**: fondo `#F5F7F4` con una «aurora» de luces suaves
+fija detrás de todo, superficies traslúcidas, un solo acento (`#1FA99A`)
+reservado a lo interactivo y el color de estado aparte, radios de 16px,
+columna de 430px y barra de pestañas inferior. Tipografía **Geist**
+(variable, un solo archivo cubre todos los grosores) e **iconos Lucide**
+(hoja SVG propia de 14 símbolos) **servidos desde el propio servidor**: la
+maqueta los traía de Google y de un CDN, y este proyecto ya decidió en
+julio de 2026 no depender de terceros.
+
+**Primer intento fallido, y por qué**: se extrajeron los colores y medidas
+del archivo y se aplicaron sobre la estructura HTML existente. Fernando:
+*"te has inventado muchas cosas"*. Al medir contra su archivo aparecieron
+desviaciones objetivas — entre ellas usar como fondo el gris del lienzo del
+editor (`#e7e5e0`) en vez del de la app, 480px de ancho en vez de 430, y
+una lista de clientes en dos columnas que su diseño nunca tuvo (no usa
+puntos de ruptura por ancho). Ver la lección del 2026-08-01 en
+`.claude/skills/lessons-learned/log.md`.
+
+**Rendimiento — el efecto cristal es caro**: aplicar `backdrop-filter`
+literalmente dejó **13 elementos desenfocando el fondo a la vez** en la
+portada, y el navegador recalcula eso en cada fotograma del scroll. Medido
+primero para no optimizar el sitio equivocado: el servidor respondía en
+~0,5s y las consultas en 1-2 ms, así que no era el servidor. Se retiró el
+desenfoque de todo lo que hace scroll (blanco algo más opaco, visualmente
+casi idéntico sobre un fondo suave) y quedó solo en las ventanas
+superpuestas. Seguía pesado: faltaba lo peor, en la barra inferior, que es
+**fija y está siempre en pantalla** — llevaba a la vez `filter: blur(28px)`
+y `backdrop-filter: blur(26px) saturate(210%) brightness(1.04)`. El halo
+pasa a dibujarse ya difuminado con degradados radiales (mismo aspecto, cero
+cálculo). Además: logo de 70 KB que se mostraba a 30px → 8 KB, favicon 35
+KB → 13 KB. **La primera visita bajó de 175 KB a 92 KB y durante el scroll
+no queda ningún desenfoque.**
+
+**Señal de carga** (`webapp/static/carga.js`): cada navegación cuesta
+~0,5-0,7s por el plan de alojamiento, no por el código. Una línea de 3px
+arriba por la que pasa una luz de lado a lado mientras se espera. No finge
+un porcentaje a propósito — no se sabe cuánto tardará el servidor, y una
+barra que se llena y luego deja esperando se nota falsa. Tres iteraciones
+hasta acertar: la primera no se veía (se desvanecía 0,2s de una espera de
+0,6s), la segunda era ruidosa (girador sobre lo pulsado + bloqueo de
+pantalla) y encima **solo funcionaba en una navegación**: el fundido entre
+pantallas (`@view-transition`) congela la página anterior nada más pulsar,
+así que la animación se helaba justo al empezar. Ese fundido se retiró.
+
+Auditados después los 34 elementos navegables de las 14 pantallas, con tres
+causas más de que no saltara siempre: el script iba con `defer` al final del
+body (no escuchaba durante los primeros instantes de cada pantalla, ahora va
+en la cabecera), dos formularios de Economía preguntan «¿seguro?» y al
+cancelar dejaban la barra encendida para siempre, y no había salvavidas si
+se caía la red (ahora se apaga sola a los 15s).
+
 ### Segunda auditoría de integridad (2026-07-30)
 
 Rama `fix/integridad-fiabilidad-2`, salida de `fix/integridad-fiabilidad`.
