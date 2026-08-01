@@ -830,21 +830,74 @@ h1 {
   top: 0;
   left: 0;
   right: 0;
-  height: 3px;
+  height: 5px;
   z-index: 100;
   transform: scaleX(0);
   transform-origin: 0 50%;
-  transition: transform 0.15s ease-out, opacity 0.2s ease;
-  opacity: 0;
+  /* Sin desvanecido de entrada: con esperas de medio segundo, animar la
+     aparición se comía un tercio del tiempo visible y la barra no llegaba
+     a verse. Ahora aparece de golpe y lo único que se anima es su avance. */
+  transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.3, 1);
   pointer-events: none;
-  background: linear-gradient(90deg, var(--acento-claro), var(--acento) 55%, #78beff);
-  box-shadow: 0 0 8px rgba(31, 169, 154, 0.5);
+  overflow: hidden;
+  background: linear-gradient(90deg, var(--acento-claro), var(--acento) 45%, #78beff 80%, #f6c7e3);
+  box-shadow: 0 0 12px rgba(31, 169, 154, 0.75), 0 1px 4px rgba(16, 24, 32, 0.2);
 }
 
-.cargando.activa { opacity: 1; }
+/* Brillo que recorre la barra: deja claro que hay algo trabajando incluso
+   cuando el avance se frena. Se mueve con `transform`, sin repintar. */
+.cargando::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.85), transparent);
+  transform: translateX(-100%);
+  animation: cargando-brillo 1s linear infinite;
+}
 
-/* Mientras se espera, el cursor lo dice también (en ordenador). */
-.esperando, .esperando a, .esperando button { cursor: progress; }
+@keyframes cargando-brillo {
+  to { transform: translateX(100%); }
+}
+
+/* Mientras se espera: el cursor lo dice (en ordenador) y se ignoran más
+   toques, para que un segundo golpe impaciente no dispare otra cosa. */
+.esperando { cursor: progress; }
+.esperando .page, .esperando .page-ancha, .esperando .barra { pointer-events: none; }
+
+/* El elemento que has tocado se queda marcado, girando: la señal más clara
+   posible, porque es justo donde estás mirando. */
+.cargando-origen { position: relative; }
+
+.cargando-origen::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  width: 16px;
+  height: 16px;
+  margin-top: -8px;
+  border-radius: 50%;
+  border: 2px solid rgba(31, 169, 154, 0.25);
+  border-top-color: var(--acento);
+  animation: cargando-gira 0.6s linear infinite;
+}
+
+.pestana.cargando-origen::after {
+  top: 8px;
+  right: 50%;
+  margin: 0 -8px 0 0;
+}
+
+.boton.cargando-origen::after,
+.boton-firmar.cargando-origen::after,
+.boton-nuevo.cargando-origen::after {
+  border-color: rgba(255, 255, 255, 0.45);
+  border-top-color: #fff;
+}
+
+@keyframes cargando-gira {
+  to { transform: rotate(360deg); }
+}
 
 /* Respuesta inmediata al toque: pasa ANTES de que el servidor conteste, así
    que la app se siente viva aunque la red vaya lenta. */
