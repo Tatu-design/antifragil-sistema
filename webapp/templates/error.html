@@ -8,6 +8,7 @@
   <link rel="icon" href="{{ url_for('static', filename='favicon.png') }}" />
   <link rel="apple-touch-icon" href="{{ url_for('static', filename='favicon.png') }}" />
   <meta name="theme-color" content="#1fa99a" />
+  <script src="{{ url_for('static', filename='carga.js', v=version_estaticos) }}"></script>
 </head>
 <body>
   <div class="page">
@@ -15,6 +16,5 @@
     <h1>No se pudo guardar</h1>
     <div class="aviso-error">{{ mensaje }}</div>
   </div>
-  <script defer src="{{ url_for('static', filename='carga.js', v=version_estaticos) }}"></script>
 </body>
 </html>

@@ -10,6 +10,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="Antifrágil" />
   <meta name="theme-color" content="#1fa99a" />
+  <script src="{{ url_for('static', filename='carga.js', v=version_estaticos) }}"></script>
 </head>
 <body>
   <div class="page">
@@ -72,6 +73,5 @@
       {% endif %}
     </div>
   </div>
-  <script defer src="{{ url_for('static', filename='carga.js', v=version_estaticos) }}"></script>
 </body>
 </html>
