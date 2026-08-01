@@ -116,6 +116,11 @@ def avisar_confirmaciones_pendientes(ruta: Path = RUTA_POR_DEFECTO) -> None:
     avisos del sistema."""
     hoy = hoy_negocio()
     desde = FECHA_INICIO_CONFIRMACIONES.isoformat()
+
+    # Una única conexión para consultar Y registrar. Antes se abría una
+    # conexión nueva por cada aviso, y esto corre en CADA carga de la
+    # portada: con varias sesiones sin confirmar, eran varias aperturas de
+    # base de datos por visita (2026-08-01, revisando la lentitud).
     with conectar(ruta) as conexion:
         pendientes = conexion.execute(
             "SELECT h.cliente, h.fecha, h.numero_sesion FROM historial_sesiones h "
@@ -124,10 +129,11 @@ def avisar_confirmaciones_pendientes(ruta: Path = RUTA_POR_DEFECTO) -> None:
             (desde, hoy.isoformat()),
         ).fetchall()
 
-    for fila in pendientes:
-        registrar_aviso(
-            fila["fecha"],
-            "confirmacion_pendiente",
-            f"'{fila['cliente']}' no confirmó la sesión {fila['numero_sesion']} del {fila['fecha']} desde su enlace personal",
-            ruta,
-        )
+        for fila in pendientes:
+            registrar_aviso(
+                fila["fecha"],
+                "confirmacion_pendiente",
+                f"'{fila['cliente']}' no confirmó la sesión {fila['numero_sesion']} del {fila['fecha']} desde su enlace personal",
+                ruta,
+                conexion=conexion,
+            )

@@ -832,24 +832,21 @@ h1 {
    No finge un porcentaje: no sabemos cuánto va a tardar el servidor, y una
    barra que se llena y luego te deja esperando se nota falsa. El movimiento
    continuo dice "trabajando" sin prometer nada. */
-/* Va JUSTO ENCIMA de la barra de pestañas, no en el borde superior.
-   En el borde de arriba la tapaba la barra de direcciones del móvil
-   mientras navega — pasaba sobre todo en pantallas con scroll, como la
-   lista de clientes, y por eso parecía que solo funcionaba a veces
-   (2026-08-01). Aquí no la tapa nada, en ningún móvil, y además es donde
-   está el pulgar y la mirada. */
+/* Arriba del todo. Se probó ponerla encima de la barra de pestañas para
+   que no la tapara la barra de direcciones del móvil, pero en las
+   pantallas SIN barra de pestañas (perfil, formularios) quedaba flotando
+   en mitad del contenido — mal (2026-08-01). Vuelve arriba. */
 .cargando {
   position: fixed;
-  bottom: var(--alto-barra);
-  left: 12px;
-  right: 12px;
-  height: 4px;
-  border-radius: 9999px;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
   z-index: 100;
   overflow: hidden;
   pointer-events: none;
   display: none;
-  background: rgba(31, 169, 154, 0.16);
+  background: rgba(31, 169, 154, 0.14);
 }
 
 .cargando.activa { display: block; }

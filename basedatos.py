@@ -37,8 +37,12 @@ def conectar(ruta: Path = RUTA_POR_DEFECTO) -> sqlite3.Connection:
     # sincroniza con el servidor (`sincronizar_servidor.py`, y cualquier
     # copia de diagnóstico) sigue siendo siempre ese único archivo completo,
     # sin tener que acordarse de mover también un archivo -wal aparte.
-    conexion.execute("PRAGMA journal_mode = WAL")
-    conexion.execute("PRAGMA wal_autocheckpoint = 1")
+    # `journal_mode` y `wal_autocheckpoint` NO se ponen aquí: son
+    # propiedades que quedan grabadas en la propia base de datos, así que
+    # basta configurarlas una vez (`crear_esquema`). Repetirlas en cada
+    # conexión obligaba a tocar la cabecera del archivo y pedir bloqueos en
+    # cada una de las 4-5 conexiones que abre una página — trabajo inútil
+    # que se nota en un disco compartido como el del servidor (2026-08-01).
     return conexion
 
 
@@ -85,6 +89,16 @@ def crear_esquema(ruta: Path = RUTA_POR_DEFECTO) -> None:
     """Crea todas las tablas si no existen todavía. Segura de repetir — no
     borra datos existentes."""
     with conectar(ruta) as conexion:
+        # Modo WAL: las lecturas dejan de esperar a que termine una
+        # escritura en curso. Queda grabado en la base de datos, así que se
+        # configura aquí una sola vez y no en cada conexión.
+        #
+        # `wal_autocheckpoint = 1` vuelca cada guardado al archivo principal
+        # al momento, para que `antifragil.db` siga siendo un único archivo
+        # completo (lo copian `sincronizar_servidor.py` y las copias de
+        # seguridad, que no saben nada de archivos `-wal` aparte).
+        conexion.execute("PRAGMA journal_mode = WAL")
+        conexion.execute("PRAGMA wal_autocheckpoint = 1")
         conexion.execute(
             """
             CREATE TABLE IF NOT EXISTS programas (
