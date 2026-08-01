@@ -248,3 +248,57 @@ sprint), escribir el test que reproduce ese escenario EXACTO antes de darlo
 por arreglado, y ejecutarlo — no basta con que el código "se lea bien". Esto
 ya evitó declarar como resuelto un arreglo que en realidad tenía un caso
 relacionado sin cubrir.
+
+## 2026-08-01 — Extraer los colores de un diseño no es portarlo: hay que medir contra el archivo original
+
+**Qué pasó:** Fernando trajo un rediseño completo hecho con una herramienta
+de diseño, con su código. Saqué de él la paleta, la tipografía y las
+medidas, y las apliqué sobre la estructura HTML que ya tenía la app. Su
+respuesta: *"no ha quedado exactamente igual, te has inventado muchas
+cosas"*. Al medir contra su archivo aparecieron desviaciones objetivas: usé
+`#e7e5e0` (el gris del lienzo del editor, donde flota el marco del móvil)
+como fondo de la app en vez de `#F5F7F4`, que era el real; 480px de ancho en
+vez de 430; una barra de navegación arriba en vez de su barra de pestañas
+abajo; mi propia escala tipográfica en rem en vez de la suya en píxeles
+fijos. Y después, ya corregido eso, todavía quedaba una lista de clientes en
+dos columnas que él nunca pidió: su diseño no tiene ningún punto de ruptura
+por ancho de pantalla.
+
+**Por qué pasó:** confundí "aplicar el sistema visual" con "reconstruirlo a
+partir de sus ingredientes". Los ingredientes eran suyos, la composición era
+mía. Además tomé el color equivocado por no distinguir entre el lienzo del
+editor y la pantalla de la app dentro del marco.
+
+**Qué se hace distinto a partir de ahora:** cuando llegue un diseño con
+código, portarlo componente a componente **leyendo los valores del propio
+archivo** (fondo, anchos, radios, sombras, escala, estructura de la
+navegación), no derivándolos. Antes de dar nada por bueno, hacer una tabla
+"lo que dice su archivo / lo que he puesto yo" y revisar las diferencias una
+a una — eso fue lo que destapó los fallos, y solo cuando lo hice dejé de
+adivinar. Y ante un "no es igual", pedir que señale lo concreto o medirlo,
+nunca reinterpretar por segunda vez.
+
+## 2026-08-01 — Un efecto visual caro sobre un elemento fijo se paga en cada fotograma
+
+**Qué pasó:** tras aplicar el rediseño, Fernando reportó la app "muy muy
+lenta". Medí antes de tocar: el servidor respondía en ~0,5 s y las consultas
+tardaban 1-2 ms, así que no era el servidor. El problema era `backdrop-filter`
+(el desenfoque del fondo) puesto en **13 elementos a la vez** de la portada.
+Lo quité de todo lo que hace scroll y seguía pesado: quedaba lo peor, en la
+barra inferior, que es **fija y está siempre en pantalla** — llevaba a la vez
+un `filter: blur(28px)` y un `backdrop-filter: blur(26px) saturate(210%)
+brightness(1.04)`, recalculados en cada fotograma del scroll.
+
+**Por qué pasó:** apliqué los efectos del diseño literalmente, sin pensar en
+cuántos elementos los llevarían a la vez ni en cuáles estarían siempre
+visibles. Una maqueta enseña una pantalla quieta; la app tiene una lista que
+se desplaza.
+
+**Qué se hace distinto a partir de ahora:** `backdrop-filter` y `filter:
+blur` solo donde el efecto se aprecia de verdad y sobre pocos elementos —
+nunca en algo que se repite por cada fila de una lista, y con especial
+cuidado en elementos `position: fixed`, que están en pantalla todo el rato.
+Cuando el diseño los pida en más sitios, conseguir el mismo aspecto sin
+coste: un fondo algo más opaco, o un degradado dibujado ya difuminado en vez
+de desenfocar una capa. Y ante una queja de lentitud, medir primero servidor
+y consultas para no optimizar el sitio equivocado.
