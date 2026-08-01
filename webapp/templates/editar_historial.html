@@ -11,7 +11,7 @@
   <script defer src="{{ url_for('static', filename='carga.js', v=version_estaticos) }}"></script>
 </head>
 <body>
-  <div class="page">
+  <div class="page sin-barra">
     <a class="volver" href="{{ url_for('perfil_cliente', nombre=nombre) }}">← {{ nombre }}</a>
     <h1>Editar sesión</h1>
     <p class="subtitulo">{{ entrada.tipo_programa }}</p>

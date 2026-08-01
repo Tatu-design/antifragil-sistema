@@ -22,9 +22,27 @@ from basedatos import RUTA_POR_DEFECTO, conectar
 from programas.logica import ActualizacionPrograma
 
 
+ESTADOS_VALIDOS = ("activo", "pausado", "cancelado")
+
+ESTADO_POR_DEFECTO = "activo"
+
+
+def validar_estado(estado: str) -> str:
+    """Comprueba que el estado es uno de los tres permitidos.
+
+    `estado` describe la situación operativa del cliente y es INDEPENDIENTE
+    de `pendiente_pago`: se puede estar pausado debiendo dinero, o cancelado
+    y al día. Por eso no se mezclan en un solo campo."""
+    if estado not in ESTADOS_VALIDOS:
+        raise ValueError(
+            f"Estado de cliente no válido: '{estado}'. Debe ser uno de: {', '.join(ESTADOS_VALIDOS)}"
+        )
+    return estado
+
+
 def leer_clientes(ruta: Path = RUTA_POR_DEFECTO) -> dict[str, dict]:
     """Devuelve {cliente: {tipo_programa, tarifa, sesiones_totales,
-    sesiones_completadas, pendiente_pago, token}}.
+    sesiones_completadas, pendiente_pago, token, estado}}.
 
     Fernando anota las sesiones "completadas" (consumidas del bono actual),
     no las que le quedan. `a_programa` hace la conversión a "restantes"
@@ -34,7 +52,7 @@ def leer_clientes(ruta: Path = RUTA_POR_DEFECTO) -> dict[str, dict]:
         filas = conexion.execute(
             """
             SELECT c.nombre, c.tipo_programa, p.tarifa, p.sesiones_totales,
-                   c.sesiones_completadas, c.pendiente_pago, c.token
+                   c.sesiones_completadas, c.pendiente_pago, c.token, c.estado
             FROM clientes c
             JOIN programas p ON p.nombre = c.tipo_programa
             ORDER BY c.nombre
@@ -49,6 +67,7 @@ def leer_clientes(ruta: Path = RUTA_POR_DEFECTO) -> dict[str, dict]:
             "sesiones_completadas": fila["sesiones_completadas"],
             "pendiente_pago": "Sí" if fila["pendiente_pago"] else "No",
             "token": fila["token"],
+            "estado": fila["estado"] or ESTADO_POR_DEFECTO,
         }
         for fila in filas
     }
@@ -164,10 +183,15 @@ def crear_cliente(
         if existe:
             raise ValueError(f"Ya existe un cliente llamado '{nombre}'")
         _validar_sesiones_completadas(sesiones_completadas, tipo_programa, conexion)
+        # Todo cliente nuevo empieza activo: quien se da de alta viene a
+        # entrenar. No hay selector de estado en el alta a propósito.
         conexion.execute(
-            "INSERT INTO clientes (nombre, tipo_programa, sesiones_completadas, pendiente_pago, token) "
-            "VALUES (?, ?, ?, ?, ?)",
-            (nombre, tipo_programa, sesiones_completadas, int(pendiente_pago), secrets.token_urlsafe(24)),
+            "INSERT INTO clientes (nombre, tipo_programa, sesiones_completadas, pendiente_pago, token, estado) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (
+                nombre, tipo_programa, sesiones_completadas, int(pendiente_pago),
+                secrets.token_urlsafe(24), ESTADO_POR_DEFECTO,
+            ),
         )
 
 
@@ -178,11 +202,18 @@ def actualizar_cliente(
     sesiones_completadas: int,
     pendiente_pago: bool,
     ruta: Path = RUTA_POR_DEFECTO,
+    estado: str | None = None,
 ) -> None:
     """Edición manual de un cliente concreto (usada por la web app): nombre,
-    tipo de programa, sesiones completadas y pendiente de pago, sin pasar
-    por la lógica de renovación de `programas.procesar` — es una
+    tipo de programa, sesiones completadas, pendiente de pago y estado, sin
+    pasar por la lógica de renovación de `programas.procesar` — es una
     corrección puntual, no un cierre semanal.
+
+    `estado`: 'activo', 'pausado' o 'cancelado'. Si se deja en `None`, el
+    estado no se toca — así las llamadas anteriores a que existiera esta
+    columna siguen funcionando igual. Cambiar el estado NO altera programa,
+    sesiones, historial, economía, deuda ni token: solo dice si el cliente
+    está entrenando ahora mismo.
 
     Si `nuevo_nombre` es distinto de `nombre`, cambia también el nombre del
     cliente — y con él, el de todas sus filas en `historial_sesiones`, en
@@ -223,11 +254,19 @@ def actualizar_cliente(
                     raise ValueError(f"Ya existe un cliente llamado '{nuevo_nombre}'")
             _validar_sesiones_completadas(sesiones_completadas, tipo_programa, conexion)
 
-            conexion.execute(
-                "UPDATE clientes SET nombre = ?, tipo_programa = ?, sesiones_completadas = ?, pendiente_pago = ? "
-                "WHERE nombre = ?",
-                (nuevo_nombre, tipo_programa, sesiones_completadas, int(pendiente_pago), nombre),
-            )
+            if estado is None:
+                conexion.execute(
+                    "UPDATE clientes SET nombre = ?, tipo_programa = ?, sesiones_completadas = ?, "
+                    "pendiente_pago = ? WHERE nombre = ?",
+                    (nuevo_nombre, tipo_programa, sesiones_completadas, int(pendiente_pago), nombre),
+                )
+            else:
+                validar_estado(estado)
+                conexion.execute(
+                    "UPDATE clientes SET nombre = ?, tipo_programa = ?, sesiones_completadas = ?, "
+                    "pendiente_pago = ?, estado = ? WHERE nombre = ?",
+                    (nuevo_nombre, tipo_programa, sesiones_completadas, int(pendiente_pago), estado, nombre),
+                )
             if nuevo_nombre != nombre:
                 conexion.execute(
                     "UPDATE historial_sesiones SET cliente = ? WHERE cliente = ?", (nuevo_nombre, nombre)

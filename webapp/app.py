@@ -40,6 +40,8 @@ from avisos import (
 )
 from basedatos import RUTA_POR_DEFECTO, crear_esquema
 from clientes.repositorio import (
+    ESTADO_POR_DEFECTO,
+    ESTADOS_VALIDOS,
     actualizar_cliente,
     asegurar_tokens,
     crear_cliente,
@@ -47,6 +49,7 @@ from clientes.repositorio import (
     listar_tipos_programa,
     obtener_cliente_por_token,
     obtener_historial,
+    validar_estado,
 )
 from economia.registro import listar_meses, obtener_mes, obtener_ultima_semana
 from firma_publica import (
@@ -288,6 +291,7 @@ def _con_sesiones_restantes(clientes: dict) -> list[dict]:
                 "sesiones_completadas": completadas,
                 "sesiones_restantes": restantes,
                 "pendiente_pago": str(datos.get("pendiente_pago", "")).strip().lower() in ("sí", "si"),
+                "estado": datos.get("estado") or ESTADO_POR_DEFECTO,
             }
         )
     return filas
@@ -302,15 +306,24 @@ def inicio():
     avisar_confirmaciones_pendientes()
     clientes = leer_clientes()
     filas = _con_sesiones_restantes(clientes)
-    guardado = request.args.get("guardado")
-    pendientes = sum(1 for f in filas if f["pendiente_pago"])
+
+    # Los cuatro contadores son TOTALES generales y no cambian al filtrar:
+    # dicen cuántos hay de cada cosa, no cuántos se están viendo. «Pendientes
+    # de pago» cuenta a cualquiera que deba dinero, esté activo, pausado o
+    # cancelado — la deuda no desaparece por dejar de entrenar.
+    conteos = {
+        "activos": sum(1 for f in filas if f["estado"] == "activo"),
+        "pendientes": sum(1 for f in filas if f["pendiente_pago"]),
+        "pausados": sum(1 for f in filas if f["estado"] == "pausado"),
+        "cancelados": sum(1 for f in filas if f["estado"] == "cancelado"),
+    }
+
     return render_template(
         "index.html",
         clientes=filas,
-        guardado=guardado,
+        guardado=request.args.get("guardado"),
         eliminado=request.args.get("eliminado"),
-        total_clientes=len(filas),
-        total_pendientes=pendientes,
+        conteos=conteos,
     )
 
 
@@ -322,7 +335,25 @@ def firmar_sesion(nombre):
 
     `clave_idempotencia` (un valor de un solo uso generado al cargar la
     página del perfil) impide que un reintento de red o una doble pestaña
-    guarden la misma firma dos veces — sprint de integridad, 2026-07-28."""
+    guarden la misma firma dos veces — sprint de integridad, 2026-07-28.
+
+    Un cliente pausado o cancelado no puede firmar. Se comprueba AQUÍ, en el
+    servidor, además de ocultar el botón: esconder un botón no impide llamar
+    a la ruta directamente, y esta operación descuenta bono, escribe
+    historial y mueve dinero (2026-08-01)."""
+    cliente = leer_clientes().get(nombre)
+    if cliente is None:
+        return render_template("error.html", mensaje=f"No existe el cliente '{nombre}'"), 404
+
+    estado = cliente.get("estado") or ESTADO_POR_DEFECTO
+    if estado != "activo":
+        motivo = (
+            "No se puede firmar una sesión mientras el cliente está pausado."
+            if estado == "pausado"
+            else "No se puede firmar una sesión de un cliente cancelado."
+        )
+        return render_template("error.html", mensaje=motivo), 409
+
     clave_idempotencia = request.form.get("clave_idempotencia")
     try:
         resultado = registrar_sesion_pt(nombre, clave_idempotencia=clave_idempotencia)
@@ -355,6 +386,7 @@ def perfil_cliente(nombre):
     cliente["token"] = clientes[nombre].get("token")
     return render_template(
         "perfil_cliente.html",
+        puede_firmar=cliente["estado"] == "activo",
         nombre=nombre,
         cliente=cliente,
         clave_idempotencia=uuid.uuid4().hex,
@@ -400,6 +432,7 @@ def guardar_nuevo():
             tipo_programa=request.form["tipo_programa"],
             sesiones_completadas=int(request.form["sesiones_completadas"]),
             pendiente_pago=request.form["pendiente_pago"] == "si",
+            estado=request.form.get("estado") or ESTADO_POR_DEFECTO,
         )
     except sqlite3.OperationalError:
         return render_template(
@@ -461,6 +494,8 @@ def editar(nombre):
         nombre=nombre,
         cliente=cliente,
         pendiente_pago=_es_si(cliente.get("pendiente_pago")),
+        estado=cliente.get("estado") or ESTADO_POR_DEFECTO,
+        estados=ESTADOS_VALIDOS,
         tipos_programa=listar_tipos_programa(),
     )
 
@@ -476,6 +511,7 @@ def confirmar(nombre):
     nuevo_tipo_programa = request.form["tipo_programa"]
     nuevas_sesiones_completadas = int(request.form["sesiones_completadas"])
     nuevo_pendiente_pago = "pendiente_pago" in request.form  # una casilla marcada sí aparece en el formulario
+    nuevo_estado = validar_estado(request.form.get("estado") or ESTADO_POR_DEFECTO)
 
     return render_template(
         "confirmar.html",
@@ -485,12 +521,14 @@ def confirmar(nombre):
             "tipo_programa": actual.get("tipo_programa"),
             "sesiones_completadas": actual.get("sesiones_completadas"),
             "pendiente_pago": _es_si(actual.get("pendiente_pago")),
+            "estado": actual.get("estado") or ESTADO_POR_DEFECTO,
         },
         despues={
             "nombre": nuevo_nombre,
             "tipo_programa": nuevo_tipo_programa,
             "sesiones_completadas": nuevas_sesiones_completadas,
             "pendiente_pago": nuevo_pendiente_pago,
+            "estado": nuevo_estado,
         },
     )
 
@@ -504,6 +542,7 @@ def guardar(nombre):
             tipo_programa=request.form["tipo_programa"],
             sesiones_completadas=int(request.form["sesiones_completadas"]),
             pendiente_pago=request.form["pendiente_pago"] == "si",
+            estado=request.form.get("estado") or ESTADO_POR_DEFECTO,
         )
     except sqlite3.OperationalError:
         return render_template(

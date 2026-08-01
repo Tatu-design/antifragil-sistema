@@ -11,7 +11,7 @@
   <script defer src="{{ url_for('static', filename='carga.js', v=version_estaticos) }}"></script>
 </head>
 <body>
-  <div class="page">
+  <div class="page sin-barra">
     <a class="volver" href="{{ url_for('perfil_cliente', nombre=nombre) }}">← Volver a {{ nombre }}</a>
     <h1>Borrar a {{ nombre }}</h1>
     <p class="subtitulo">Todavía no se ha borrado nada. Esto es lo que va a pasar:</p>

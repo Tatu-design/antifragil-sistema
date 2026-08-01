@@ -22,6 +22,69 @@
   cuenta en sesiones pero su importe se reparte hacia atrás sobre las
   semanas del mes en cuanto Fernando indica la facturación mensual total.
 
+### Estados del cliente: activo, pausado y cancelado (2026-08-01)
+
+Hasta ahora un cliente que dejaba de entrenar solo se podía borrar. Fernando
+pidió poder **archivarlo sin perder nada**, y de paso simplificar la pantalla
+de clientes para convertirla en una herramienta de gestión.
+
+**Columna nueva `estado`** en `clientes`, con tres valores y ninguno más:
+`activo`, `pausado`, `cancelado` (validados en
+`clientes.repositorio.validar_estado`). Migración aditiva con `ALTER TABLE` y
+valor por defecto `activo`, comprobando antes con `PRAGMA table_info` — todos
+los clientes que ya existían quedan activos, que es lo que eran. Segura de
+repetir; no toca historial, semanas, desglose, programas, avisos ni clases de
+grupo.
+
+**`estado` es independiente de `pendiente_pago`**, a propósito: se puede
+estar pausado debiendo dinero, o cancelado y al día. La deuda no desaparece
+por dejar de entrenar, así que no se mezclan en un solo campo ni «pendiente»
+se convierte en un cuarto estado.
+
+**Qué NO cambia al pausar o cancelar**: ficha, programa, tarifa, sesiones
+completadas, historial, economía histórica, deuda y token/enlace personal.
+Volver a `activo` desde «Editar cliente» reactiva al cliente tal y como
+estaba — no se crea otra ficha ni se reinicia el bono. No hay flujo aparte de
+reactivación: el selector de estado basta.
+
+**Bloqueo de firma en dos niveles**: la interfaz no muestra el botón para
+pausados y cancelados, y **la ruta `POST /cliente/<nombre>/firmar` comprueba
+el estado igualmente** (responde 409 con un mensaje claro). Esconder un botón
+no impide llamar a la ruta, y esta operación descuenta bono, escribe
+historial y mueve dinero. Un intento bloqueado no altera nada.
+
+**Pantalla de clientes**: título único «Lista de clientes» (fuera el
+subtítulo), cuatro contadores que son también los filtros (Activos,
+Pendientes de pago, Pausados, Cancelados) en cuadrícula 2 × 2. Los contadores
+muestran siempre el total general y **no cambian al filtrar**: dicen cuántos
+hay, no cuántos se ven. «Pendientes de pago» incluye a cualquiera que deba
+dinero, esté activo, pausado o cancelado. El filtrado ocurre en el propio
+navegador con atributos `data-` (sin volver a consultar SQLite en cada
+pulsación, sin frameworks). Los filtros son `<button>` reales con
+`aria-pressed`, y el seleccionado se distingue por color, borde y una marca
+lateral — no solo por color. Las tarjetas dejan de mostrar programa y tarifa
+(siguen en el perfil y en la base de datos).
+
+**El «+» que faltaba en el móvil**: al aplicar el rediseño se sustituyó el
+«+» escrito como texto por un icono cargado desde un SVG externo
+(`<use href="/static/iconos.svg#i-plus">`). El archivo se servía bien, pero
+**varios navegadores móviles no pintan referencias a un SVG externo** — en el
+iPhone de Fernando el botón salía como «Nuevo» a secas y los iconos de la
+barra inferior aparecían como manchas negras (los atributos de trazo del
+archivo tampoco llegaban). Arreglado incrustando los símbolos en la propia
+página (`webapp/templates/_iconos.html`) y definiendo el trazo en el CSS
+(`.icono`), que funciona en todos los casos. Se eliminó `static/iconos.svg`.
+
+**Espacio inferior**: la barra de pestañas tapaba parcialmente la última
+tarjeta. El hueco reservado incluye ahora `env(safe-area-inset-bottom)`, y
+las pantallas sin barra (`.sin-barra`) no reservan ese espacio.
+
+Pruebas: `tests/test_estados_cliente.py` (30), cubriendo migración desde una
+base sin la columna y ejecutada dos veces, cambios de estado en ambos
+sentidos, independencia respecto al pago, conservación de todo al cancelar,
+reactivación sin ficha nueva, contadores, etiquetas, filtros accesibles y
+bloqueo de firma por interfaz y por ruta.
+
 ### Rediseño «Liquid Glass» y rendimiento de la interfaz (2026-07-31 / 08-01)
 
 Fernando rediseñó la app entera por su cuenta con una herramienta de

@@ -104,7 +104,7 @@ def revisar_efectos(problemas) -> None:
 
 def revisar_peso(problemas) -> None:
     print("\n3. Peso de la primera visita")
-    piezas = ["style.css", "carga.js", "iconos.svg", "logo-marca.png", "favicon.png"]
+    piezas = ["style.css", "carga.js", "logo-marca.png", "favicon.png"]
     piezas += [f"fonts/{f.name}" for f in sorted((ESTATICO / "fonts").glob("geist-*.woff2"))]
 
     total = 0

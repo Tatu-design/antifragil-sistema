@@ -11,7 +11,7 @@
   <script defer src="{{ url_for('static', filename='carga.js', v=version_estaticos) }}"></script>
 </head>
 <body>
-  <div class="page">
+  <div class="page sin-barra">
     <a class="volver" href="{{ url_for('inicio') }}">← Clientes</a>
 
     <h1>{{ nombre }}</h1>
@@ -50,8 +50,21 @@
       </div>
     </div>
 
+    {% if not puede_firmar %}
+    {# El estado se ve nada más entrar, para que no haya dudas de por qué no
+       aparece el botón de firmar. El servidor lo comprueba igualmente. #}
+    <div class="aviso-texto">
+      {% if cliente.estado == 'pausado' %}
+      Este cliente está <strong>pausado</strong>. No se pueden firmar sesiones mientras lo esté.
+      {% else %}
+      Este cliente está <strong>cancelado</strong>. No se pueden firmar sesiones.
+      {% endif %}
+      Su ficha, su bono y su historial se conservan intactos. Puedes reactivarlo en «Editar programa».
+    </div>
+    {% endif %}
+
     <div class="acciones-perfil">
-      {% if cliente.sesiones_totales %}
+      {% if cliente.sesiones_totales and puede_firmar %}
       <form method="post" action="{{ url_for('firmar_sesion', nombre=nombre) }}"
             onsubmit="this.querySelector('button').disabled = true; this.querySelector('button').textContent = 'Guardando…';">
         <input type="hidden" name="csrf" value="{{ token_csrf() }}">

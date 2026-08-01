@@ -135,14 +135,39 @@ body::before {
   width: 100%;
   max-width: var(--columna);
   margin: 0 auto;
-  /* 16px a los lados, como el diseño. Abajo se reserva el hueco de la barra
-     de pestañas para que la última tarjeta no quede tapada. */
-  padding: 0 16px calc(var(--alto-barra) + 16px);
+  /* 16px a los lados, como el diseño.
+     Abajo se reserva el hueco de la barra de pestañas MÁS la franja de
+     seguridad del móvil (la del gesto de inicio en iPhone, y equivalentes en
+     Android). Sin ese extra, la última tarjeta quedaba medio tapada por la
+     barra — confirmado en el iPhone de Fernando, 2026-08-01. En escritorio
+     `env()` vale 0, así que no sobra espacio. */
+  padding: 0 16px calc(var(--alto-barra) + 16px + env(safe-area-inset-bottom, 0px));
+}
+
+/* Las pantallas sin barra de pestañas no necesitan reservar ese hueco. */
+.page.sin-barra,
+.page-ancha.sin-barra {
+  padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
 }
 
 /* ----- Iconos ----- */
 
-.icono { width: 1.125rem; height: 1.125rem; flex: none; display: inline-block; vertical-align: -0.2em; }
+/* El trazo se define AQUÍ, no en el archivo de iconos: cuando el icono se
+   traía de un SVG externo, los atributos de aquel archivo no llegaban al
+   dibujo y salían rellenos de negro (la campana y el euro eran manchas en
+   el móvil de Fernando, 2026-08-01). Puesto en CSS funciona siempre. */
+.icono {
+  width: 1.125rem;
+  height: 1.125rem;
+  flex: none;
+  display: inline-block;
+  vertical-align: -0.2em;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
 .icono-sm { width: 0.9375rem; height: 0.9375rem; }
 .icono-lg { width: 1.375rem; height: 1.375rem; }
 
@@ -261,6 +286,74 @@ h1 {
 }
 .pill.aldia { background: var(--bien-velo); color: var(--bien); border: 1px solid rgba(16, 185, 129, 0.25); }
 .pill.pendiente { background: var(--alerta-velo); color: var(--alerta); border: 1px solid rgba(245, 158, 11, 0.28); }
+/* Pausado y cancelado se distinguen entre sí por color Y por texto, no solo
+   por color. Un cliente pausado o cancelado nunca muestra únicamente
+   «Al día»: sería confuso respecto a su situación real. */
+.pill.pausado { background: rgba(59, 130, 246, 0.10); color: var(--dato, #2563eb); border: 1px solid rgba(59, 130, 246, 0.28); }
+.pill.cancelado { background: rgba(110, 117, 114, 0.12); color: var(--tinta-suave); border: 1px solid rgba(110, 117, 114, 0.28); }
+
+.etiquetas { display: inline-flex; align-items: center; gap: 0.3rem; flex-wrap: wrap; justify-content: flex-end; }
+
+/* ----- Filtros de la lista de clientes ----- */
+
+/* Cuadrícula 2 × 2 en móvil: cuatro controles del mismo tamaño, cómodos
+   para el pulgar. Cada uno es un botón de verdad, así que funciona con
+   teclado sin añadir nada. */
+.filtros {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+  margin-bottom: 1.1rem;
+}
+
+.filtro {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+  width: 100%;
+  padding: 0.7rem 0.85rem;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  border-radius: var(--radio);
+  background: var(--cristal);
+  border: 1px solid var(--cristal-borde);
+  box-shadow: var(--cristal-sombra);
+  color: var(--tinta-suave);
+  transition: border-color 0.15s ease, color 0.15s ease, transform 0.12s ease;
+}
+
+.filtro:active { transform: scale(0.98); }
+
+.filtro-nombre {
+  font-size: 0.5625rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  line-height: 1.3;
+}
+
+.filtro-numero {
+  font-size: 1.375rem;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--tinta);
+  font-variant-numeric: tabular-nums;
+}
+
+.filtro-alerta .filtro-numero { color: var(--alerta); }
+
+/* El seleccionado se distingue por color, por borde y por una marca a la
+   izquierda: no depende solo del color. */
+.filtro.activo {
+  color: var(--acento-oscuro);
+  border-color: rgba(31, 169, 154, 0.55);
+  box-shadow: var(--cristal-sombra), inset 3px 0 0 var(--acento);
+}
+
+.filtro.activo .filtro-numero { color: var(--acento-oscuro); }
 
 /* ----- Botones ----- */
 
@@ -439,7 +532,9 @@ h1 {
   position: relative;
   margin: 0 auto;
   max-width: var(--columna);
-  padding: 4px 12px 16px;
+  /* La franja inferior de seguridad evita que la barra quede pegada al
+     borde en móviles con gesto de inicio. */
+  padding: 4px 12px calc(16px + env(safe-area-inset-bottom, 0px));
 }
 
 /* El halo de color bajo la barra.

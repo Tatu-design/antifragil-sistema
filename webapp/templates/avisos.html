@@ -11,6 +11,7 @@
   <script defer src="{{ url_for('static', filename='carga.js', v=version_estaticos) }}"></script>
 </head>
 <body>
+  {% include '_iconos.html' %}
   <div class="page-ancha">
     <header class="cabecera-app">
       <div class="cabecera-app-marca">
@@ -65,15 +66,15 @@
         <div class="barra-halo" aria-hidden="true"></div>
         <div class="barra-pestanas">
           <a class="pestana" href="{{ url_for('inicio') }}">
-            <svg class="icono" aria-hidden="true"><use href="{{ url_for('static', filename='iconos.svg') }}#i-users"></use></svg>
+            <svg class="icono" aria-hidden="true"><use href="#i-users"></use></svg>
             <span>Clientes</span>
           </a>
           <a class="pestana" href="{{ url_for('economia') }}">
-            <svg class="icono" aria-hidden="true"><use href="{{ url_for('static', filename='iconos.svg') }}#i-euro"></use></svg>
+            <svg class="icono" aria-hidden="true"><use href="#i-euro"></use></svg>
             <span>Economía</span>
           </a>
           <a class="pestana activa" href="{{ url_for('avisos') }}">
-            <svg class="icono" aria-hidden="true"><use href="{{ url_for('static', filename='iconos.svg') }}#i-bell"></use></svg>{% if avisos_no_leidos %}<span class="pestana-punto">{{ avisos_no_leidos }}</span>{% endif %}
+            <svg class="icono" aria-hidden="true"><use href="#i-bell"></use></svg>{% if avisos_no_leidos %}<span class="pestana-punto">{{ avisos_no_leidos }}</span>{% endif %}
             <span>Avisos</span>
           </a>
         </div>

@@ -11,7 +11,7 @@
   <script defer src="{{ url_for('static', filename='carga.js', v=version_estaticos) }}"></script>
 </head>
 <body>
-  <div class="page">
+  <div class="page sin-barra">
     <a class="volver" href="{{ url_for('inicio') }}">← Volver</a>
     <h1>Editar cliente</h1>
 
@@ -34,6 +34,17 @@
       <label class="campo">
         <span>Sesiones completadas (de {{ cliente.sesiones_totales }})</span>
         <input type="number" name="sesiones_completadas" value="{{ cliente.sesiones_completadas }}" min="0" required />
+      </label>
+
+      <label class="campo">
+        <span>Estado del cliente</span>
+        <select name="estado">
+          {% for opcion in estados %}
+          <option value="{{ opcion }}" {% if estado == opcion %}selected{% endif %}>{{ opcion|capitalize }}</option>
+          {% endfor %}
+        </select>
+        <span class="meta">Pausado o cancelado archiva al cliente sin perder nada: conserva programa,
+        sesiones, historial, deuda y su enlace personal. Puede volver a activo cuando quieras.</span>
       </label>
 
       <label class="campo-check">

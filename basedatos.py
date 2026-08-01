@@ -116,7 +116,8 @@ def crear_esquema(ruta: Path = RUTA_POR_DEFECTO) -> None:
                 sesiones_completadas INTEGER NOT NULL DEFAULT 0,
                 pendiente_pago INTEGER NOT NULL DEFAULT 0,
                 token TEXT,
-                ciclo_bono INTEGER NOT NULL DEFAULT 1
+                ciclo_bono INTEGER NOT NULL DEFAULT 1,
+                estado TEXT NOT NULL DEFAULT 'activo'
             )
             """
         )
@@ -124,6 +125,21 @@ def crear_esquema(ruta: Path = RUTA_POR_DEFECTO) -> None:
         columnas_clientes = {fila["name"] for fila in conexion.execute("PRAGMA table_info(clientes)")}
         if "ciclo_bono" not in columnas_clientes:
             conexion.execute("ALTER TABLE clientes ADD COLUMN ciclo_bono INTEGER NOT NULL DEFAULT 1")
+        if "estado" not in columnas_clientes:
+            # Situación operativa del cliente: 'activo', 'pausado' o
+            # 'cancelado' (2026-08-01). Un cliente que deja de entrenar NO se
+            # borra: se archiva, conservando ficha, programa, sesiones,
+            # historial, economía, deuda y enlace personal, y puede volver a
+            # activo sin crear otra ficha.
+            #
+            # Es independiente de `pendiente_pago`: se puede estar pausado y
+            # deber dinero, o cancelado y al día. Por eso una columna aparte
+            # y no un cuarto valor de pago.
+            #
+            # Todos los clientes que ya existen quedan en 'activo', que es lo
+            # que eran hasta ahora. `ALTER TABLE` con valor por defecto basta
+            # y no toca ningún otro dato.
+            conexion.execute("ALTER TABLE clientes ADD COLUMN estado TEXT NOT NULL DEFAULT 'activo'")
         conexion.execute(
             """
             CREATE TABLE IF NOT EXISTS semanas (

@@ -13,6 +13,7 @@
   <script defer src="{{ url_for('static', filename='carga.js', v=version_estaticos) }}"></script>
 </head>
 <body>
+  {% include '_iconos.html' %}
   <div class="page-ancha">
     <header class="cabecera-app">
       <div class="cabecera-app-marca">
@@ -22,11 +23,10 @@
     </header>
 
     <div class="cabecera-pagina">
-      <div>
-        <h1>Antifrágil · Clientes</h1>
-        <p class="subtitulo">Vista en directo desde la base de datos</p>
-      </div>
-      <a class="boton-nuevo" href="{{ url_for('nuevo') }}"><svg class="icono icono-sm" aria-hidden="true"><use href="{{ url_for('static', filename='iconos.svg') }}#i-plus"></use></svg>Nuevo</a>
+      <h1>Lista de clientes</h1>
+      <a class="boton-nuevo" href="{{ url_for('nuevo') }}">
+        <svg class="icono icono-sm" aria-hidden="true"><use href="#i-plus"></use></svg>Nuevo
+      </a>
     </div>
 
     {% if guardado %}
@@ -37,29 +37,58 @@
     <div class="aviso-guardado">✔ Cliente borrado: {{ eliminado }}</div>
     {% endif %}
 
-    <div class="stats-resumen">
-      <div class="stat-card">
-        <div class="stat-label">Clientes activos</div>
-        <div class="stat-valor">{{ total_clientes }}</div>
-      </div>
-      <div class="stat-card {% if total_pendientes %}stat-alerta{% endif %}">
-        <div class="stat-label">Pendientes de pago</div>
-        <div class="stat-valor">{{ total_pendientes }}</div>
-      </div>
+    {#
+      Los cuatro contadores son también los filtros. Muestran SIEMPRE el
+      total general de cada grupo: dicen cuántos clientes hay de cada cosa,
+      no cuántos se están viendo, así que no cambian al filtrar.
+    #}
+    <div class="filtros" role="group" aria-label="Filtrar clientes">
+      <button type="button" class="filtro activo" data-filtro="activos" aria-pressed="true">
+        <span class="filtro-nombre">Activos</span>
+        <span class="filtro-numero">{{ conteos.activos }}</span>
+      </button>
+      <button type="button" class="filtro{% if conteos.pendientes %} filtro-alerta{% endif %}"
+              data-filtro="pendientes" aria-pressed="false">
+        <span class="filtro-nombre">Pendientes de pago</span>
+        <span class="filtro-numero">{{ conteos.pendientes }}</span>
+      </button>
+      <button type="button" class="filtro" data-filtro="pausados" aria-pressed="false">
+        <span class="filtro-nombre">Pausados</span>
+        <span class="filtro-numero">{{ conteos.pausados }}</span>
+      </button>
+      <button type="button" class="filtro" data-filtro="cancelados" aria-pressed="false">
+        <span class="filtro-nombre">Cancelados</span>
+        <span class="filtro-numero">{{ conteos.cancelados }}</span>
+      </button>
     </div>
 
-    <div class="clientes-grid">
+    <div class="clientes-grid" id="lista-clientes">
       {% for cliente in clientes %}
-      <a class="tarjeta-cliente" href="{{ url_for('perfil_cliente', nombre=cliente.nombre) }}">
+      {#
+        Los `data-` de cada tarjeta permiten filtrar en el propio navegador,
+        sin volver a preguntar a la base de datos en cada pulsación.
+        `data-pendiente` es independiente del estado: se puede estar pausado
+        y deber dinero.
+      #}
+      <a class="tarjeta-cliente"
+         href="{{ url_for('perfil_cliente', nombre=cliente.nombre) }}"
+         data-estado="{{ cliente.estado }}"
+         data-pendiente="{{ 'si' if cliente.pendiente_pago else 'no' }}">
         <div class="cabecera">
           <span class="nombre">{{ cliente.nombre }}</span>
-          {% if cliente.pendiente_pago %}
-            <span class="pill pendiente">Pendiente</span>
-          {% else %}
-            <span class="pill aldia">Al día</span>
-          {% endif %}
+          <span class="etiquetas">
+            {% if cliente.estado == 'pausado' %}
+              <span class="pill pausado">Pausado</span>
+            {% elif cliente.estado == 'cancelado' %}
+              <span class="pill cancelado">Cancelado</span>
+            {% endif %}
+            {% if cliente.pendiente_pago %}
+              <span class="pill pendiente">{{ 'Pendiente de pago' if cliente.estado != 'activo' else 'Pendiente' }}</span>
+            {% elif cliente.estado == 'activo' %}
+              <span class="pill aldia">Al día</span>
+            {% endif %}
+          </span>
         </div>
-        <div class="programa">{{ cliente.tipo_programa or "sin programa asignado" }}</div>
         {% if cliente.sesiones_totales %}
         <div class="progreso-mini">
           <div class="progreso-mini-numeros">
@@ -71,31 +100,78 @@
           </div>
         </div>
         {% else %}
-        <div class="meta">Faltan datos por rellenar en el Excel</div>
+        <div class="meta">Faltan datos del programa</div>
         {% endif %}
       </a>
       {% endfor %}
     </div>
+
+    <p class="empty" id="lista-vacia" hidden></p>
   </div>
 
-    <nav class="barra" aria-label="Secciones">
-      <div class="barra-interior">
-        <div class="barra-halo" aria-hidden="true"></div>
-        <div class="barra-pestanas">
-          <a class="pestana activa" href="{{ url_for('inicio') }}">
-            <svg class="icono" aria-hidden="true"><use href="{{ url_for('static', filename='iconos.svg') }}#i-users"></use></svg>
-            <span>Clientes</span>
-          </a>
-          <a class="pestana" href="{{ url_for('economia') }}">
-            <svg class="icono" aria-hidden="true"><use href="{{ url_for('static', filename='iconos.svg') }}#i-euro"></use></svg>
-            <span>Economía</span>
-          </a>
-          <a class="pestana" href="{{ url_for('avisos') }}">
-            <svg class="icono" aria-hidden="true"><use href="{{ url_for('static', filename='iconos.svg') }}#i-bell"></use></svg>{% if avisos_no_leidos %}<span class="pestana-punto">{{ avisos_no_leidos }}</span>{% endif %}
-            <span>Avisos</span>
-          </a>
-        </div>
+  <nav class="barra" aria-label="Secciones">
+    <div class="barra-interior">
+      <div class="barra-halo" aria-hidden="true"></div>
+      <div class="barra-pestanas">
+        <a class="pestana activa" href="{{ url_for('inicio') }}">
+          <svg class="icono" aria-hidden="true"><use href="#i-users"></use></svg>
+          <span>Clientes</span>
+        </a>
+        <a class="pestana" href="{{ url_for('economia') }}">
+          <svg class="icono" aria-hidden="true"><use href="#i-euro"></use></svg>
+          <span>Economía</span>
+        </a>
+        <a class="pestana" href="{{ url_for('avisos') }}">
+          <svg class="icono" aria-hidden="true"><use href="#i-bell"></use></svg>{% if avisos_no_leidos %}<span class="pestana-punto">{{ avisos_no_leidos }}</span>{% endif %}
+          <span>Avisos</span>
+        </a>
       </div>
-    </nav>
+    </div>
+  </nav>
+
+  <script>
+    /* Filtrado en el propio navegador: las tarjetas ya están todas en la
+       página, así que cambiar de filtro solo esconde y muestra. No se vuelve
+       a preguntar a la base de datos en cada pulsación. */
+    (function () {
+      var VACIOS = {
+        activos: "No hay clientes activos.",
+        pendientes: "No hay clientes pendientes de pago.",
+        pausados: "No hay clientes pausados.",
+        cancelados: "No hay clientes cancelados."
+      };
+      var botones = document.querySelectorAll(".filtro");
+      var tarjetas = document.querySelectorAll("#lista-clientes .tarjeta-cliente");
+      var vacio = document.getElementById("lista-vacia");
+
+      function coincide(tarjeta, filtro) {
+        if (filtro === "pendientes") return tarjeta.getAttribute("data-pendiente") === "si";
+        // activos -> activo, pausados -> pausado, cancelados -> cancelado
+        return tarjeta.getAttribute("data-estado") === filtro.slice(0, -1);
+      }
+
+      function aplicar(filtro) {
+        var visibles = 0;
+        Array.prototype.forEach.call(tarjetas, function (tarjeta) {
+          var mostrar = coincide(tarjeta, filtro);
+          tarjeta.hidden = !mostrar;
+          if (mostrar) visibles++;
+        });
+        Array.prototype.forEach.call(botones, function (boton) {
+          var seleccionado = boton.getAttribute("data-filtro") === filtro;
+          boton.classList.toggle("activo", seleccionado);
+          boton.setAttribute("aria-pressed", seleccionado ? "true" : "false");
+        });
+        vacio.textContent = VACIOS[filtro];
+        vacio.hidden = visibles > 0;
+      }
+
+      Array.prototype.forEach.call(botones, function (boton) {
+        boton.addEventListener("click", function () { aplicar(boton.getAttribute("data-filtro")); });
+      });
+
+      aplicar("activos"); // al abrir la pantalla, solo los que entrenan
+    })();
+  </script>
 </body>
 </html>

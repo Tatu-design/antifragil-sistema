@@ -11,7 +11,7 @@
   <script defer src="{{ url_for('static', filename='carga.js', v=version_estaticos) }}"></script>
 </head>
 <body>
-  <div class="page">
+  <div class="page sin-barra">
     <a class="volver" href="{{ url_for('editar', nombre=nombre) }}">← Volver a editar</a>
     <h1>Confirmar cambios</h1>
     <p class="subtitulo">Todavía no se ha guardado nada. Revisa:</p>
@@ -41,7 +41,18 @@
         <span class="flecha">→</span>
         <span class="despues">{{ "Sí" if despues.pendiente_pago else "No" }}</span>
       </div>
+      <div class="fila">
+        <span class="etiqueta">Estado</span>
+        <span class="antes">{{ antes.estado|capitalize }}</span>
+        <span class="flecha">→</span>
+        <span class="despues">{{ despues.estado|capitalize }}</span>
+      </div>
     </div>
+
+    {% if antes.estado != despues.estado and despues.estado != 'activo' %}
+    <p class="aviso-texto">⚠ Al pasar a {{ despues.estado }}, este cliente dejará de poder firmar sesiones.
+    No se borra nada: conserva su ficha, su programa, sus sesiones, su historial y su enlace personal.</p>
+    {% endif %}
 
     {% if antes.nombre != despues.nombre %}
     <p class="aviso-texto">⚠ Vas a cambiar el nombre. Recuerda renombrar también las sesiones en Google Calendar.</p>
@@ -53,6 +64,7 @@
       <input type="hidden" name="tipo_programa" value="{{ despues.tipo_programa }}" />
       <input type="hidden" name="sesiones_completadas" value="{{ despues.sesiones_completadas }}" />
       <input type="hidden" name="pendiente_pago" value="{{ 'si' if despues.pendiente_pago else 'no' }}" />
+      <input type="hidden" name="estado" value="{{ despues.estado }}" />
       <button type="submit" class="boton">Confirmar y guardar</button>
     </form>
   </div>
