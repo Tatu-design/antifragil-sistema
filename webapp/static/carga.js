@@ -5,104 +5,85 @@
  * percibe como que la app se ha quedado colgada.
  *
  * Cómo funciona: al pulsar un enlace o enviar un formulario, el navegador
- * sigue mostrando ESTA página hasta que llega la siguiente. Ese es
- * justamente el hueco que hay que rellenar. La página nueva llega limpia,
- * así que no hace falta apagar nada.
+ * sigue mostrando ESTA página hasta que llega la siguiente. Ese hueco es el
+ * que se rellena. La página nueva llega limpia, así que no hay que apagar
+ * nada.
  *
- * Tres señales a la vez, porque una sola no se veía (2026-08-01):
- *   1. Barra de progreso arriba, que aparece de golpe (sin desvanecido) y
- *      lleva un brillo recorriéndola.
- *   2. Un girador sobre el elemento que has tocado — es donde estás
- *      mirando, así que es la señal que antes se percibe.
- *   3. La página deja de aceptar toques, para que un segundo golpe
- *      impaciente no dispare otra cosa.
+ * Historia (2026-08-01), para no repetir los errores:
+ *   - Primer intento: barra de 3px con desvanecido de entrada de 0,2s y
+ *     avance desde el 8%. Con esperas de 0,6s no daba tiempo a verla.
+ *   - Segundo intento: barra gorda + girador sobre lo pulsado + bloqueo de
+ *     la pantalla. Demasiado ruidoso, y encima solo se veía en una
+ *     navegación concreta: el fundido entre pantallas
+ *     (`@view-transition`) congelaba la página vieja nada más pulsar, así
+ *     que la animación se helaba justo al empezar. Ese fundido se retiró.
+ *   - Ahora: una sola señal, discreta y siempre igual se toque lo que se
+ *     toque.
  *
- * Rendimiento: todo se anima con `transform`, que resuelve la tarjeta
- * gráfica sin repintar. Es deliberado — este proyecto acaba de quitar los
- * efectos que costaban trabajo en cada fotograma (ver style.css).
+ * Rendimiento: se anima con `transform`, que resuelve la tarjeta gráfica
+ * sin repintar. Deliberado: este proyecto acaba de quitar los efectos que
+ * costaban trabajo en cada fotograma (ver style.css).
  */
 
 (function () {
   "use strict";
 
-  var barra;
-  var avance = 0;
-  var reloj = null;
+  var barra = null;
 
-  function crearBarra() {
-    if (barra) return barra;
-    barra = document.createElement("div");
-    barra.className = "cargando";
-    barra.setAttribute("role", "progressbar");
-    barra.setAttribute("aria-label", "Cargando");
-    document.body.appendChild(barra);
-    return barra;
-  }
-
-  function pintar() {
-    crearBarra().style.transform = "scaleX(" + avance + ")";
-  }
-
-  function arrancar(origen) {
-    if (origen && origen.classList) origen.classList.add("cargando-origen");
-    if (reloj) return; // ya está en marcha
-
-    document.documentElement.classList.add("esperando");
-    crearBarra();
-    // Salto inicial grande y visible: con esperas de medio segundo, empezar
-    // en el 8% hacía que la barra no llegara a leerse.
-    avance = 0.35;
-    pintar();
-
-    // Sigue avanzando, cada vez más despacio, sin llegar nunca al final: el
-    // 100% lo marca la llegada de la página, no un temporizador que se lo
-    // inventaría (una barra que se completa y te deja esperando, miente).
-    reloj = setInterval(function () {
-      avance += (0.92 - avance) * 0.18;
-      pintar();
-    }, 90);
-  }
-
-  function parar() {
-    if (reloj) {
-      clearInterval(reloj);
-      reloj = null;
+  function encender() {
+    if (!barra) {
+      barra = document.createElement("div");
+      barra.className = "cargando";
+      barra.setAttribute("role", "progressbar");
+      barra.setAttribute("aria-label", "Cargando");
+      (document.body || document.documentElement).appendChild(barra);
     }
-    avance = 0;
-    document.documentElement.classList.remove("esperando");
-    var marcado = document.querySelector(".cargando-origen");
-    if (marcado) marcado.classList.remove("cargando-origen");
-    if (barra) barra.style.transform = "scaleX(0)";
+    barra.classList.add("activa");
   }
 
-  function esNavegacionNormal(evento, enlace) {
+  function apagar() {
+    if (barra) barra.classList.remove("activa");
+  }
+
+  /* Sube por el árbol hasta encontrar el enlace. No se usa `closest` a
+     secas porque al tocar un icono el elemento pulsado es un <svg>, y en
+     algunos navegadores móviles ahí `closest` no se comporta igual. */
+  function enlaceDe(elemento) {
+    while (elemento && elemento !== document.documentElement) {
+      if (elemento.tagName && elemento.tagName.toLowerCase() === "a") return elemento;
+      elemento = elemento.parentNode;
+    }
+    return null;
+  }
+
+  function navegaDeVerdad(evento, enlace) {
+    var destino = enlace.getAttribute("href");
     return (
       !evento.defaultPrevented &&
-      evento.button === 0 &&
       !evento.metaKey && !evento.ctrlKey && !evento.shiftKey && !evento.altKey &&
+      (evento.button === undefined || evento.button === 0) &&
       enlace.target !== "_blank" &&
-      enlace.origin === window.location.origin &&
       !enlace.hasAttribute("download") &&
-      // Un ancla dentro de la misma página no carga nada.
-      enlace.getAttribute("href") &&
-      enlace.getAttribute("href").charAt(0) !== "#"
+      destino &&
+      destino.charAt(0) !== "#" &&
+      destino.indexOf("javascript:") !== 0 &&
+      enlace.hostname === window.location.hostname
     );
   }
 
+  // En fase de captura: así se enciende aunque algo más adelante en la
+  // página decida detener el evento.
   document.addEventListener("click", function (evento) {
-    var enlace = evento.target.closest ? evento.target.closest("a[href]") : null;
-    if (enlace && esNavegacionNormal(evento, enlace)) arrancar(enlace);
-  });
+    var enlace = enlaceDe(evento.target);
+    if (enlace && navegaDeVerdad(evento, enlace)) encender();
+  }, true);
 
   document.addEventListener("submit", function (evento) {
-    if (evento.defaultPrevented) return;
-    var formulario = evento.target;
-    var boton = formulario.querySelector("button[type=submit], button:not([type])");
-    arrancar(boton || formulario);
-  });
+    if (!evento.defaultPrevented) encender();
+  }, true);
 
-  // Al volver con el botón "atrás", el navegador puede restaurar esta misma
-  // página tal cual la dejamos, a medio cargar. Se limpia.
-  window.addEventListener("pageshow", parar);
-  window.addEventListener("pagehide", parar);
+  // Al volver con el botón "atrás" el navegador puede restaurar esta misma
+  // página tal cual la dejamos, con la señal encendida. Se apaga.
+  window.addEventListener("pageshow", apagar);
+  window.addEventListener("pagehide", apagar);
 })();

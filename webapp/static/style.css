@@ -825,78 +825,44 @@ h1 {
    Se anima con `transform`, que resuelve la tarjeta gráfica sin repintar
    nada: no reintroduce el coste por fotograma que se quitó de la barra
    inferior y de las tarjetas. */
+/* Una única señal, siempre la misma se toque lo que se toque: una línea
+   fina arriba por la que pasa una luz de lado a lado, sin parar, hasta que
+   llega la pantalla nueva.
+
+   No finge un porcentaje: no sabemos cuánto va a tardar el servidor, y una
+   barra que se llena y luego te deja esperando se nota falsa. El movimiento
+   continuo dice "trabajando" sin prometer nada. */
 .cargando {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
-  height: 5px;
+  height: 3px;
   z-index: 100;
-  transform: scaleX(0);
-  transform-origin: 0 50%;
-  /* Sin desvanecido de entrada: con esperas de medio segundo, animar la
-     aparición se comía un tercio del tiempo visible y la barra no llegaba
-     a verse. Ahora aparece de golpe y lo único que se anima es su avance. */
-  transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.3, 1);
-  pointer-events: none;
   overflow: hidden;
-  background: linear-gradient(90deg, var(--acento-claro), var(--acento) 45%, #78beff 80%, #f6c7e3);
-  box-shadow: 0 0 12px rgba(31, 169, 154, 0.75), 0 1px 4px rgba(16, 24, 32, 0.2);
+  pointer-events: none;
+  display: none;
+  background: rgba(31, 169, 154, 0.14);
 }
 
-/* Brillo que recorre la barra: deja claro que hay algo trabajando incluso
-   cuando el avance se frena. Se mueve con `transform`, sin repintar. */
-.cargando::after {
+.cargando.activa { display: block; }
+
+.cargando::before {
   content: "";
   position: absolute;
-  inset: 0;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.85), transparent);
-  transform: translateX(-100%);
-  animation: cargando-brillo 1s linear infinite;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 42%;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, transparent, var(--acento-claro) 30%, var(--acento) 70%, transparent);
+  box-shadow: 0 0 10px rgba(31, 169, 154, 0.6);
+  animation: cargando-recorre 1.05s ease-in-out infinite;
 }
 
-@keyframes cargando-brillo {
-  to { transform: translateX(100%); }
-}
-
-/* Mientras se espera: el cursor lo dice (en ordenador) y se ignoran más
-   toques, para que un segundo golpe impaciente no dispare otra cosa. */
-.esperando { cursor: progress; }
-.esperando .page, .esperando .page-ancha, .esperando .barra { pointer-events: none; }
-
-/* El elemento que has tocado se queda marcado, girando: la señal más clara
-   posible, porque es justo donde estás mirando. */
-.cargando-origen { position: relative; }
-
-.cargando-origen::after {
-  content: "";
-  position: absolute;
-  top: 50%;
-  right: 12px;
-  width: 16px;
-  height: 16px;
-  margin-top: -8px;
-  border-radius: 50%;
-  border: 2px solid rgba(31, 169, 154, 0.25);
-  border-top-color: var(--acento);
-  animation: cargando-gira 0.6s linear infinite;
-}
-
-.pestana.cargando-origen::after {
-  top: 8px;
-  right: 50%;
-  margin: 0 -8px 0 0;
-}
-
-.boton.cargando-origen::after,
-.boton-firmar.cargando-origen::after,
-.boton-nuevo.cargando-origen::after {
-  border-color: rgba(255, 255, 255, 0.45);
-  border-top-color: #fff;
-}
-
-@keyframes cargando-gira {
-  to { transform: rotate(360deg); }
+@keyframes cargando-recorre {
+  from { transform: translateX(-110%); }
+  to { transform: translateX(340%); }
 }
 
 /* Respuesta inmediata al toque: pasa ANTES de que el servidor conteste, así
@@ -922,21 +888,21 @@ h1 {
   touch-action: manipulation;
 }
 
-/* Fundido suave entre pantallas en los navegadores que lo soportan. Los que
-   no, simplemente cambian de página como siempre. */
-@view-transition { navigation: auto; }
-
-::view-transition-old(root),
-::view-transition-new(root) {
-  animation-duration: 0.18s;
-}
+/* El fundido entre pantallas (`@view-transition`) se retiró el 2026-08-01:
+   congela la página anterior en cuanto pulsas, así que la señal de carga se
+   quedaba helada justo al aparecer y no se veía en casi ninguna
+   navegación. Bonito sobre el papel, pero tapaba lo que de verdad hacía
+   falta: saber que la app está trabajando. */
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }
-  @view-transition { navigation: none; }
+  /* La señal de carga es la excepción: si se congela, deja de informar. */
+  .cargando::before {
+    animation-duration: 1.05s !important;
+  }
 }
 
 .sr-only {
