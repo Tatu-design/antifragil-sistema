@@ -819,11 +819,71 @@ h1 {
   to { opacity: 1; transform: none; }
 }
 
+/* ----- Señal de carga ----- */
+
+/* Barra fina arriba del todo mientras se espera a la pantalla siguiente.
+   Se anima con `transform`, que resuelve la tarjeta gráfica sin repintar
+   nada: no reintroduce el coste por fotograma que se quitó de la barra
+   inferior y de las tarjetas. */
+.cargando {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  z-index: 100;
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+  transition: transform 0.15s ease-out, opacity 0.2s ease;
+  opacity: 0;
+  pointer-events: none;
+  background: linear-gradient(90deg, var(--acento-claro), var(--acento) 55%, #78beff);
+  box-shadow: 0 0 8px rgba(31, 169, 154, 0.5);
+}
+
+.cargando.activa { opacity: 1; }
+
+/* Mientras se espera, el cursor lo dice también (en ordenador). */
+.esperando, .esperando a, .esperando button { cursor: progress; }
+
+/* Respuesta inmediata al toque: pasa ANTES de que el servidor conteste, así
+   que la app se siente viva aunque la red vaya lenta. */
+.tarjeta-cliente:active,
+.pestana:active,
+.boton:active,
+.boton-firmar:active,
+.boton-secundario:active,
+.boton-clase:active,
+.boton-nuevo:active {
+  transform: scale(0.97);
+}
+
+.tarjeta-cliente,
+.pestana,
+.boton,
+.boton-firmar,
+.boton-secundario,
+.boton-clase,
+.boton-nuevo {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* Fundido suave entre pantallas en los navegadores que lo soportan. Los que
+   no, simplemente cambian de página como siempre. */
+@view-transition { navigation: auto; }
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.18s;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }
+  @view-transition { navigation: none; }
 }
 
 .sr-only {

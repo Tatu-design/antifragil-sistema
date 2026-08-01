@@ -109,7 +109,11 @@ def _version_estaticos() -> str:
     navegador descarga la versión nueva justo cuando toca, y sigue
     reutilizando la guardada el resto del tiempo."""
     try:
-        return str(int((Path(app.static_folder) / "style.css").stat().st_mtime))
+        estatico = Path(app.static_folder)
+        # Se mira la fecha del archivo más reciente entre la hoja de estilos
+        # y el script de carga: si solo se toca uno de los dos, la huella
+        # tiene que cambiar igualmente para que el navegador lo descargue.
+        return str(int(max((estatico / n).stat().st_mtime for n in ("style.css", "carga.js"))))
     except OSError:
         return "0"
 
