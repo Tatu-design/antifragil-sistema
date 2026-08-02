@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Editar datos de {{ nombre }} — Antifrágil</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css', v=version_estaticos) }}" />
+  <link rel="icon" href="{{ url_for('static', filename='favicon.png') }}" />
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='favicon.png') }}" />
+  <meta name="theme-color" content="#1fa99a" />
+  <script defer src="{{ url_for('static', filename='carga.js', v=version_estaticos) }}"></script>
+</head>
+<body>
+  {% include '_iconos.html' %}
+  <div class="page sin-barra">
+    <a class="volver" href="{{ url_for('perfil_cliente', nombre=nombre) }}">
+      <svg class="icono icono-sm" aria-hidden="true"><use href="#i-arrow-left"></use></svg>{{ nombre }}
+    </a>
+    <h1>Editar datos</h1>
+    <p class="subtitulo">Quién es el cliente y en qué situación está. El bono se edita aparte.</p>
+
+    <form class="formulario" method="post" action="{{ url_for('confirmar', nombre=nombre) }}">
+      <input type="hidden" name="csrf" value="{{ token_csrf() }}">
+      {# El bono no se toca desde aquí: se reenvía tal cual está para que el
+         guardado no lo altere. #}
+      <input type="hidden" name="tipo_programa" value="{{ cliente.tipo_programa }}" />
+      <input type="hidden" name="sesiones_completadas" value="{{ cliente.sesiones_completadas }}" />
+      {% if cliente.pendiente_pago in ('Sí', 'si', 'Si', 'sí') %}
+      <input type="hidden" name="pendiente_pago" value="on" />
+      {% endif %}
+
+      <label class="campo">
+        <span>Nombre del cliente</span>
+        <input type="text" name="nombre" value="{{ nombre }}" required />
+      </label>
+
+      <label class="campo">
+        <span>Estado del cliente</span>
+        <select name="estado">
+          {% for opcion in estados %}
+          <option value="{{ opcion }}" {% if estado == opcion %}selected{% endif %}>{{ opcion|capitalize }}</option>
+          {% endfor %}
+        </select>
+        <span class="meta">Pausado o cancelado archiva al cliente sin perder nada: conserva bono,
+        sesiones, historial, deuda y su enlace personal. Puede volver a activo cuando quieras.</span>
+      </label>
+
+      <button type="submit" class="boton">Revisar cambios</button>
+    </form>
+
+    <div class="zona-peligrosa">
+      <p class="zona-peligrosa-titulo">Zona peligrosa</p>
+      {% if tiene_historial %}
+      <p class="meta">Este cliente tiene sesiones y datos económicos, así que no se puede borrar sin
+      perderlos. Si ha dejado de entrenar, ponlo como <strong>Cancelado</strong> aquí arriba: desaparece
+      de la lista de activos y conserva todo su historial.</p>
+      {% else %}
+      <p class="meta">Este cliente no tiene ninguna sesión registrada, así que puede borrarse
+      definitivamente. Si ya ha entrenado alguna vez, es preferible cancelarlo para no perder su historial.</p>
+      <a class="boton-secundario boton-peligro" href="{{ url_for('eliminar_cliente_confirmar', nombre=nombre) }}">
+        <svg class="icono icono-sm" aria-hidden="true"><use href="#i-trash-2"></use></svg>
+        Borrar este cliente
+      </a>
+      {% endif %}
+    </div>
+  </div>
+</body>
+</html>

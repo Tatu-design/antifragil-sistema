@@ -193,6 +193,24 @@ def crear_cliente(
                 secrets.token_urlsafe(24), ESTADO_POR_DEFECTO,
             ),
         )
+        # Su bono en curso queda registrado ya, sin esperar a la primera
+        # sesión: así la ficha lo enseña desde el alta. Sin fechas todavía —
+        # no se inventa un inicio que aún no ha ocurrido.
+        fila = conexion.execute("SELECT ciclo_bono FROM clientes WHERE nombre = ?", (nombre,)).fetchone()
+        programa = conexion.execute(
+            "SELECT tarifa, sesiones_totales FROM programas WHERE nombre = ?", (tipo_programa,)
+        ).fetchone()
+        conexion.execute(
+            "INSERT INTO programas_cliente "
+            "(cliente, ciclo_bono, tipo_programa, tarifa, sesiones_totales, pagado) "
+            "VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(cliente, ciclo_bono) DO NOTHING",
+            (
+                nombre, fila["ciclo_bono"], tipo_programa,
+                programa["tarifa"] if programa else None,
+                (programa["sesiones_totales"] if programa else 0) or 0,
+                int(not pendiente_pago),
+            ),
+        )
 
 
 def actualizar_cliente(
@@ -271,6 +289,11 @@ def actualizar_cliente(
                 conexion.execute(
                     "UPDATE historial_sesiones SET cliente = ? WHERE cliente = ?", (nuevo_nombre, nombre)
                 )
+                # Los bonos del cliente también apuntan a su nombre: si no se
+                # renombran a la vez, quedarían huérfanos.
+                conexion.execute(
+                    "UPDATE programas_cliente SET cliente = ? WHERE cliente = ?", (nuevo_nombre, nombre)
+                )
     except sqlite3.IntegrityError as error:
         raise ValueError(
             f"No se pudo renombrar a '{nuevo_nombre}': hay datos de otra tabla que todavía "
@@ -301,6 +324,7 @@ def eliminar_cliente(nombre: str, ruta: Path = RUTA_POR_DEFECTO, conexion: sqlit
             )
 
         conexion.execute("DELETE FROM firmas_publicas WHERE cliente = ?", (nombre,))
+        conexion.execute("DELETE FROM programas_cliente WHERE cliente = ?", (nombre,))
         conexion.execute("DELETE FROM clientes WHERE nombre = ?", (nombre,))
 
     if conexion is not None:
@@ -334,11 +358,14 @@ def registrar_historial(
             for entrada in entradas:
                 conexion.execute(
                     "INSERT INTO historial_sesiones "
-                    "(cliente, fecha, tipo_programa, numero_sesion, sesiones_totales, tarifa, ciclo_bono) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    "(cliente, fecha, hora, tipo_programa, numero_sesion, sesiones_totales, tarifa, ciclo_bono) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                     (
                         cliente,
                         entrada["fecha"],
+                        # Las sesiones antiguas no tienen hora y se quedan sin
+                        # ella: no se inventa (2026-08-02).
+                        entrada.get("hora"),
                         entrada["tipo_programa"],
                         entrada["numero_sesion"],
                         entrada["sesiones_totales"],
@@ -360,7 +387,7 @@ def obtener_historial(nombre: str, ruta: Path = RUTA_POR_DEFECTO) -> list[dict]:
     Incluye la tarifa con la que se facturó esa sesión en su momento."""
     with conectar(ruta) as conexion:
         filas = conexion.execute(
-            "SELECT id, fecha, tipo_programa, numero_sesion, sesiones_totales, tarifa, ciclo_bono "
+            "SELECT id, fecha, hora, tipo_programa, numero_sesion, sesiones_totales, tarifa, ciclo_bono "
             "FROM historial_sesiones WHERE cliente = ? ORDER BY fecha DESC, id DESC",
             (nombre,),
         ).fetchall()
@@ -552,6 +579,129 @@ def aplicar_actualizaciones(
                 "UPDATE clientes SET sesiones_completadas = ?, pendiente_pago = ?, ciclo_bono = ? WHERE nombre = ?",
                 (sesiones_completadas, int(actualizacion.pendiente_pago), nuevo_ciclo, nombre),
             )
+
+    if conexion is not None:
+        _hacer(conexion)
+    else:
+        with conectar(ruta) as conexion:
+            _hacer(conexion)
+
+
+def obtener_programas_cliente(nombre: str, ruta: Path = RUTA_POR_DEFECTO) -> list[dict]:
+    """Los bonos concretos que ha tenido un cliente, del más reciente al más
+    antiguo, cada uno con SUS sesiones (2026-08-02).
+
+    Agrupa por `ciclo_bono`, no por nombre de programa: si alguien contrata
+    tres veces seguidas el mismo bono, salen como tres bonos distintos y sus
+    sesiones no se mezclan.
+
+    La tarifa que se devuelve es la HISTÓRICA del bono, guardada cuando se
+    contrató — cambiar la tarifa actual del cliente no altera lo que muestran
+    los bonos ya cerrados."""
+    with conectar(ruta) as conexion:
+        ficha = conexion.execute(
+            "SELECT c.ciclo_bono, c.tipo_programa, c.pendiente_pago, p.tarifa, p.sesiones_totales "
+            "FROM clientes c LEFT JOIN programas p ON p.nombre = c.tipo_programa "
+            "WHERE c.nombre = ?",
+            (nombre,),
+        ).fetchone()
+        if ficha is None:
+            return []
+        ciclo_actual = ficha["ciclo_bono"]
+
+        bonos = conexion.execute(
+            "SELECT ciclo_bono, tipo_programa, tarifa, sesiones_totales, fecha_inicio, fecha_fin, pagado "
+            "FROM programas_cliente WHERE cliente = ? ORDER BY ciclo_bono DESC",
+            (nombre,),
+        ).fetchall()
+
+        sesiones = conexion.execute(
+            "SELECT id, ciclo_bono, fecha, hora, numero_sesion, sesiones_totales, tipo_programa, tarifa "
+            "FROM historial_sesiones WHERE cliente = ? ORDER BY fecha DESC, id DESC",
+            (nombre,),
+        ).fetchall()
+
+    por_ciclo: dict[int, list[dict]] = {}
+    for sesion in sesiones:
+        por_ciclo.setdefault(sesion["ciclo_bono"], []).append(dict(sesion))
+
+    resultado = []
+    for bono in bonos:
+        datos = dict(bono)
+        datos["es_actual"] = bono["ciclo_bono"] == ciclo_actual
+        datos["sesiones"] = por_ciclo.get(bono["ciclo_bono"], [])
+        resultado.append(datos)
+
+    if not any(bono["es_actual"] for bono in resultado):
+        sesiones_actuales = por_ciclo.get(ciclo_actual, [])
+        resultado.insert(0, {
+            "ciclo_bono": ciclo_actual,
+            "tipo_programa": ficha["tipo_programa"],
+            "tarifa": ficha["tarifa"],
+            "sesiones_totales": ficha["sesiones_totales"] or 0,
+            "fecha_inicio": sesiones_actuales[-1]["fecha"] if sesiones_actuales else None,
+            "fecha_fin": None,
+            "pagado": int(not ficha["pendiente_pago"]),
+            "es_actual": True,
+            "sesiones": sesiones_actuales,
+        })
+    return resultado
+
+
+def registrar_programa_cliente(
+    cliente: str,
+    ciclo_bono: int,
+    tipo_programa: str,
+    tarifa: float | None,
+    sesiones_totales: int,
+    fecha_inicio: str | None = None,
+    conexion: sqlite3.Connection | None = None,
+    ruta: Path = RUTA_POR_DEFECTO,
+) -> None:
+    """Da de alta el bono de un cliente si todavía no existe (al crearlo o al
+    renovar). No pisa uno ya guardado: sus fechas y su tarifa histórica se
+    conservan.
+
+    `conexion`: para formar parte de la misma transacción atómica que la
+    firma de la sesión que provoca la renovación."""
+
+    def _hacer(conexion: sqlite3.Connection) -> None:
+        conexion.execute(
+            "INSERT INTO programas_cliente "
+            "(cliente, ciclo_bono, tipo_programa, tarifa, sesiones_totales, fecha_inicio, fecha_fin, pagado) "
+            "VALUES (?, ?, ?, ?, ?, ?, NULL, 0) "
+            # Si el bono ya existe no se toca nada, salvo estrenar su fecha de
+            # inicio: al renovar se crea sin fecha (todavía no se ha
+            # entrenado), y es la primera sesión la que la estrena.
+            "ON CONFLICT(cliente, ciclo_bono) DO UPDATE SET "
+            "  fecha_inicio = COALESCE(programas_cliente.fecha_inicio, excluded.fecha_inicio)",
+            (cliente, ciclo_bono, tipo_programa, tarifa, sesiones_totales, fecha_inicio),
+        )
+
+    if conexion is not None:
+        _hacer(conexion)
+    else:
+        with conectar(ruta) as conexion:
+            _hacer(conexion)
+
+
+def cerrar_programa_cliente(
+    cliente: str,
+    ciclo_bono: int,
+    fecha_fin: str,
+    pagado: bool,
+    conexion: sqlite3.Connection | None = None,
+    ruta: Path = RUTA_POR_DEFECTO,
+) -> None:
+    """Marca un bono como terminado, guardando cuándo acabó y si quedó
+    pagado. Se llama al renovar: es el único momento en que se sabe con
+    certeza cómo quedó el bono que se cierra."""
+
+    def _hacer(conexion: sqlite3.Connection) -> None:
+        conexion.execute(
+            "UPDATE programas_cliente SET fecha_fin = ?, pagado = ? WHERE cliente = ? AND ciclo_bono = ?",
+            (fecha_fin, int(pagado), cliente, ciclo_bono),
+        )
 
     if conexion is not None:
         _hacer(conexion)

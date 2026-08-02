@@ -202,6 +202,12 @@ def crear_esquema(ruta: Path = RUTA_POR_DEFECTO) -> None:
         columnas = {fila["name"] for fila in conexion.execute("PRAGMA table_info(historial_sesiones)")}
         if "tarifa" not in columnas:
             conexion.execute("ALTER TABLE historial_sesiones ADD COLUMN tarifa REAL")
+        if "hora" not in columnas:
+            # Hora de firma (HH:MM), a partir del 2026-08-02. Las sesiones
+            # anteriores se quedan en NULL a propósito: no se sabe a qué hora
+            # fueron y no se va a inventar — la pantalla muestra solo la
+            # fecha cuando falta.
+            conexion.execute("ALTER TABLE historial_sesiones ADD COLUMN hora TEXT")
         if "ciclo_bono" not in columnas:
             # Sprint de integridad 2026-07-28: sin esto, el historial no
             # distingue a qué bono (antes o después de una renovación)
@@ -266,6 +272,39 @@ def crear_esquema(ruta: Path = RUTA_POR_DEFECTO) -> None:
             )
             conexion.execute("DROP TABLE historial_sesiones")
             conexion.execute("ALTER TABLE historial_sesiones_nueva RENAME TO historial_sesiones")
+        # Cada bono concreto que ha contratado un cliente (2026-08-02).
+        #
+        # Un cliente puede contratar tres veces seguidas el mismo programa;
+        # agrupar el historial por `tipo_programa` los mezclaría. La clave es
+        # (cliente, ciclo_bono): `ciclo_bono` ya distingue cada renovación
+        # desde el sprint de integridad del 2026-07-28, y `historial_sesiones`
+        # ya lo guarda en cada fila.
+        #
+        # Deliberadamente NO se añade un `programa_cliente_id` a las
+        # sesiones: sería un segundo enlace diciendo lo mismo que
+        # (cliente, ciclo_bono), con el riesgo de que ambos se desincronicen
+        # al editar o borrar. Además, toda la lógica de renovación y borrado
+        # ya razona con `ciclo_bono`, así que no hay que reescribirla — y ahí
+        # es justo donde vive el peligro para la economía.
+        #
+        # Esta tabla es DESCRIPTIVA: guarda los metadatos del bono (tarifa
+        # con la que se contrató, fechas, si quedó pagado). La economía se
+        # sigue calculando desde `historial_sesiones`, como siempre.
+        conexion.execute(
+            """
+            CREATE TABLE IF NOT EXISTS programas_cliente (
+                cliente TEXT NOT NULL REFERENCES clientes(nombre),
+                ciclo_bono INTEGER NOT NULL,
+                tipo_programa TEXT NOT NULL,
+                tarifa REAL,
+                sesiones_totales INTEGER NOT NULL,
+                fecha_inicio TEXT,
+                fecha_fin TEXT,
+                pagado INTEGER,
+                PRIMARY KEY (cliente, ciclo_bono)
+            )
+            """
+        )
         conexion.execute(
             """
             CREATE TABLE IF NOT EXISTS clases_grupo (

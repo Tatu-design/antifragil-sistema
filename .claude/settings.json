@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \"import ast; [ast.parse\\(open\\(f,encoding='utf-8'\\).read\\(\\)\\) for f in \\('clientes/repositorio.py','registrar_asistencia.py'\\)]; print\\('  sintaxis correcta'\\)\")",
+      "Bash(python -c ' *)"
+    ]
+  }
+}

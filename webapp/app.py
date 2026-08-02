@@ -49,6 +49,7 @@ from clientes.repositorio import (
     listar_tipos_programa,
     obtener_cliente_por_token,
     obtener_historial,
+    obtener_programas_cliente,
     validar_estado,
 )
 from economia.registro import listar_meses, obtener_mes, obtener_ultima_semana
@@ -158,6 +159,17 @@ def token_csrf() -> str:
     if "csrf" not in session:
         session["csrf"] = secrets.token_urlsafe(32)
     return session["csrf"]
+
+
+@app.template_filter("fecha_es")
+def _fecha_es(valor: str) -> str:
+    """2026-07-22 -> 22/07/2026, que es como se lee una fecha en España.
+    Si el dato no tiene la forma esperada se devuelve tal cual, sin
+    romper la página."""
+    try:
+        return datetime.strptime(str(valor), "%Y-%m-%d").strftime("%d/%m/%Y")
+    except (ValueError, TypeError):
+        return str(valor)
 
 
 @app.context_processor
@@ -384,17 +396,23 @@ def perfil_cliente(nombre):
     filas = _con_sesiones_restantes({nombre: clientes[nombre]})
     cliente = filas[0]
     cliente["token"] = clientes[nombre].get("token")
+
+    # El historial ya viene agrupado dentro de cada bono, así que no hace
+    # falta pedirlo otra vez suelto.
+    firmado = request.args.get("firmado")
     return render_template(
         "perfil_cliente.html",
         puede_firmar=cliente["estado"] == "activo",
         nombre=nombre,
         cliente=cliente,
         clave_idempotencia=uuid.uuid4().hex,
-        entradas=obtener_historial(nombre),
-        firmado=request.args.get("firmado"),
+        firmado=firmado,
         borrado=request.args.get("borrado"),
-        hay_sesion_pendiente=hay_sesion_pendiente_de_confirmar(nombre),
+        # El QR solo sale justo después de firmar; el resto de las veces ni
+        # se pregunta, que es una consulta menos en cada visita.
+        hay_sesion_pendiente=bool(firmado) and hay_sesion_pendiente_de_confirmar(nombre),
         confirmaciones_hoy=confirmaciones_de_hoy(nombre),
+        bonos=obtener_programas_cliente(nombre),
     )
 
 
@@ -483,6 +501,56 @@ def eliminar_cliente_ruta(nombre):
     return redirect(url_for("inicio", eliminado=mensaje))
 
 
+@app.route("/cliente/<nombre>/pago", methods=["POST"])
+def cambiar_pago(nombre):
+    """Marca el bono en curso como pagado o pendiente, desde la propia ficha.
+
+    Solo toca `pendiente_pago`: no cambia sesiones, ni programa, ni
+    historial, ni economía. La confirmación («¿seguro?») la pide el
+    navegador antes de enviar."""
+    clientes = leer_clientes()
+    if nombre not in clientes:
+        return render_template("error.html", mensaje=f"No existe el cliente '{nombre}'"), 404
+
+    actual = clientes[nombre]
+    pagado = request.form.get("pagado") == "si"
+    try:
+        actualizar_cliente(
+            nombre=nombre,
+            nuevo_nombre=nombre,
+            tipo_programa=actual["tipo_programa"],
+            sesiones_completadas=int(actual["sesiones_completadas"]),
+            pendiente_pago=not pagado,
+        )
+    except sqlite3.OperationalError:
+        return render_template(
+            "error.html", mensaje="No se pudo guardar: la base de datos está ocupada. Reintenta."
+        ), 409
+    except ValueError as error:
+        return render_template("error.html", mensaje=str(error)), 400
+
+    return redirect(url_for("perfil_cliente", nombre=nombre))
+
+
+@app.route("/cliente/<nombre>/editar-datos")
+def editar_datos(nombre):
+    """Datos del propio cliente: nombre y estado. La eliminación vive aquí
+    dentro, en una zona aparte — fuera de la ficha principal, que es una
+    pantalla de uso diario (2026-08-02)."""
+    clientes = leer_clientes()
+    if nombre not in clientes:
+        return f"No existe el cliente '{nombre}'", 404
+    cliente = clientes[nombre]
+    return render_template(
+        "editar_datos.html",
+        nombre=nombre,
+        cliente=cliente,
+        estado=cliente.get("estado") or ESTADO_POR_DEFECTO,
+        estados=ESTADOS_VALIDOS,
+        tiene_historial=bool(obtener_historial(nombre)),
+    )
+
+
 @app.route("/cliente/<nombre>/editar")
 def editar(nombre):
     clientes = leer_clientes()
@@ -552,7 +620,9 @@ def guardar(nombre):
     except ValueError as error:
         return render_template("error.html", mensaje=str(error)), 400
 
-    return redirect(url_for("inicio", guardado=request.form["nombre"]))
+    # Se vuelve a la ficha del cliente, no a la lista general: casi siempre
+    # se sigue trabajando sobre el mismo cliente.
+    return redirect(url_for("perfil_cliente", nombre=request.form["nombre"]))
 
 
 @app.route("/mi/<token>")

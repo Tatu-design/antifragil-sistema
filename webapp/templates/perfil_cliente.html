@@ -11,11 +11,20 @@
   <script defer src="{{ url_for('static', filename='carga.js', v=version_estaticos) }}"></script>
 </head>
 <body>
+  {% include '_iconos.html' %}
   <div class="page sin-barra">
-    <a class="volver" href="{{ url_for('inicio') }}">← Clientes</a>
+    <a class="volver" href="{{ url_for('inicio') }}">
+      <svg class="icono icono-sm" aria-hidden="true"><use href="#i-arrow-left"></use></svg>Clientes
+    </a>
 
-    <h1>{{ nombre }}</h1>
-    <p class="subtitulo" style="margin:0 0 1.25rem;">Perfil, sesiones y pagos</p>
+    {# Nombre y estado en la misma línea: el estado se ve de un vistazo, sin
+       subtítulo que ocupe espacio. #}
+    <div class="ficha-titulo">
+      <h1>{{ nombre }}</h1>
+      <a class="pill estado-{{ cliente.estado }}" href="{{ url_for('editar_datos', nombre=nombre) }}">
+        {{ cliente.estado|capitalize }}
+      </a>
+    </div>
 
     {% if firmado %}
     <div class="aviso-guardado">✔ Sesión firmada — {{ firmado }}</div>
@@ -25,6 +34,18 @@
     <div class="aviso-guardado">✔ Sesión borrada — {{ borrado }}</div>
     {% endif %}
 
+    {% if not puede_firmar %}
+    <div class="aviso-texto">
+      {% if cliente.estado == 'pausado' %}
+      Este cliente está <strong>pausado</strong>: no se pueden firmar sesiones mientras lo esté.
+      {% else %}
+      Este cliente está <strong>cancelado</strong>: no se pueden firmar sesiones.
+      {% endif %}
+      Su bono y su historial se conservan intactos. Puedes reactivarlo en «Editar datos».
+    </div>
+    {% endif %}
+
+    {# ---- Bono en curso ---- #}
     <div class="perfil-hero">
       <div class="programa-nombre">{{ cliente.tipo_programa or "sin programa asignado" }}</div>
 
@@ -41,39 +62,42 @@
       </div>
       {% endif %}
 
-      <div class="estado">
-        {% if cliente.pendiente_pago %}
-        <span class="pill pendiente">Pendiente de pago</span>
-        {% else %}
-        <span class="pill aldia">Al día</span>
-        {% endif %}
-      </div>
+      {# El pago se cambia desde aquí mismo, con una confirmación previa. Solo
+         toca el estado de pago: no altera sesiones ni economía. #}
+      <form method="post" action="{{ url_for('cambiar_pago', nombre=nombre) }}" class="estado"
+            onsubmit="return confirm({{ ('¿Volver a marcar este programa como pendiente?' if not cliente.pendiente_pago else '¿Marcar este programa como pagado?')|tojson }});">
+        <input type="hidden" name="csrf" value="{{ token_csrf() }}">
+        <input type="hidden" name="pagado" value="{{ 'no' if not cliente.pendiente_pago else 'si' }}">
+        <button type="submit" class="pill {{ 'pendiente' if cliente.pendiente_pago else 'aldia' }} pill-boton">
+          {{ 'Pago pendiente' if cliente.pendiente_pago else 'Programa pagado' }}
+          <svg class="icono icono-sm" aria-hidden="true"><use href="#i-chevron-right"></use></svg>
+        </button>
+      </form>
     </div>
 
-    {% if not puede_firmar %}
-    {# El estado se ve nada más entrar, para que no haya dudas de por qué no
-       aparece el botón de firmar. El servidor lo comprueba igualmente. #}
-    <div class="aviso-texto">
-      {% if cliente.estado == 'pausado' %}
-      Este cliente está <strong>pausado</strong>. No se pueden firmar sesiones mientras lo esté.
-      {% else %}
-      Este cliente está <strong>cancelado</strong>. No se pueden firmar sesiones.
-      {% endif %}
-      Su ficha, su bono y su historial se conservan intactos. Puedes reactivarlo en «Editar programa».
-    </div>
+    {# ---- Acción principal ---- #}
+    {% if cliente.sesiones_totales and puede_firmar %}
+    <form method="post" action="{{ url_for('firmar_sesion', nombre=nombre) }}" class="accion-principal"
+          onsubmit="this.querySelector('button').disabled = true; this.querySelector('button').textContent = 'Guardando…';">
+      <input type="hidden" name="csrf" value="{{ token_csrf() }}">
+      <input type="hidden" name="clave_idempotencia" value="{{ clave_idempotencia }}">
+      <button type="submit" class="boton-firmar">✓ Firmar sesión</button>
+    </form>
     {% endif %}
 
+    {# ---- Acciones secundarias, del mismo tamaño ---- #}
     <div class="acciones-perfil">
-      {% if cliente.sesiones_totales and puede_firmar %}
-      <form method="post" action="{{ url_for('firmar_sesion', nombre=nombre) }}"
-            onsubmit="this.querySelector('button').disabled = true; this.querySelector('button').textContent = 'Guardando…';">
-        <input type="hidden" name="csrf" value="{{ token_csrf() }}">
-        <input type="hidden" name="clave_idempotencia" value="{{ clave_idempotencia }}">
-        <button type="submit" class="boton-firmar">✓ Firmar sesión de hoy</button>
-      </form>
-      {% endif %}
+      <a class="boton-secundario" href="{{ url_for('editar_datos', nombre=nombre) }}">Editar datos</a>
       <a class="boton-secundario" href="{{ url_for('editar', nombre=nombre) }}">Editar programa</a>
     </div>
+
+    {% if cliente.token %}
+    <button type="button" class="boton-secundario boton-copiar" id="copiar-enlace"
+            data-enlace="{{ url_for('mi_perfil', token=cliente.token, _external=True) }}">
+      <svg class="icono icono-sm" aria-hidden="true"><use href="#i-link"></use></svg>
+      <span>Copiar enlace del cliente</span>
+    </button>
+    {% endif %}
 
     {% if cliente.token and firmado and hay_sesion_pendiente %}
     <div class="qr-fondo" id="qr-fondo" role="dialog" aria-modal="true" aria-labelledby="qr-titulo">
@@ -88,24 +112,14 @@
     <script>
       new QRCode(document.getElementById("qr-confirmar"), {
         text: "{{ url_for('mi_confirmar', token=cliente.token, _external=True) }}",
-        width: 190,
-        height: 190,
-        colorDark: "#0f172a",
-        colorLight: "#ffffff",
+        width: 190, height: 190, colorDark: "#0f172a", colorLight: "#ffffff",
       });
-
       (function () {
         var fondo = document.getElementById("qr-fondo");
         function cerrar() { fondo.remove(); }
         document.getElementById("qr-cerrar").addEventListener("click", cerrar);
-        // Tocar fuera del recuadro también cierra, como en cualquier
-        // ventana emergente — pero no si se toca el QR en sí.
-        fondo.addEventListener("click", function (evento) {
-          if (evento.target === fondo) { cerrar(); }
-        });
-        document.addEventListener("keydown", function (evento) {
-          if (evento.key === "Escape") { cerrar(); }
-        });
+        fondo.addEventListener("click", function (e) { if (e.target === fondo) cerrar(); });
+        document.addEventListener("keydown", function (e) { if (e.key === "Escape") cerrar(); });
       })();
     </script>
     {% elif cliente.token and confirmaciones_hoy %}
@@ -118,38 +132,109 @@
     </div>
     {% endif %}
 
-    {% if cliente.token %}
-    <p class="meta" style="margin-bottom: 1.5rem; word-break: break-all;">
-      Enlace personal del cliente: {{ url_for('mi_perfil', token=cliente.token, _external=True) }}
-    </p>
-    {% endif %}
+    {# ---- Historial plegado, agrupado por bono ---- #}
+    <div class="lista historial">
+      <button type="button" class="cabecera-seccion plegable" aria-expanded="false" aria-controls="lista-bonos">
+        <span>Historial de programas · {{ bonos|length }}</span>
+        <svg class="icono icono-sm flecha-plegable" aria-hidden="true"><use href="#i-chevron-right"></use></svg>
+      </button>
 
-    <p class="meta" style="margin-bottom: 1.5rem;">
-      <a class="editar" href="{{ url_for('eliminar_cliente_confirmar', nombre=nombre) }}">Borrar este cliente →</a>
-    </p>
+      <div id="lista-bonos" hidden>
+        {% for bono in bonos %}
+        <div class="fila">
+          <button type="button" class="bono-cabecera plegable" aria-expanded="false"
+                  aria-controls="bono-{{ bono.ciclo_bono }}">
+            <span class="bono-info">
+              <span class="nombre">
+                {% if bono.es_actual %}Programa actual{% else %}{{ bono.tipo_programa }}{% endif %}
+              </span>
+              <span class="programa">
+                {% if bono.es_actual %}{{ bono.tipo_programa }} · {% endif %}
+                {% if bono.fecha_inicio %}Desde {{ bono.fecha_inicio|fecha_es }}{% else %}Sin sesiones todavía{% endif %}
+                {%- if bono.fecha_fin %} — {{ bono.fecha_fin|fecha_es }} · Completado{% endif %}
+              </span>
+            </span>
+            <svg class="icono icono-sm flecha-plegable" aria-hidden="true"><use href="#i-chevron-right"></use></svg>
+          </button>
 
-    <div class="lista">
-      <div class="cabecera-seccion">
-        <span>Historial de sesiones</span>
-      </div>
-
-      {% if entradas %}
-      {% for entrada in entradas %}
-      <div class="fila">
-        <div class="sesion-fila">
-          <div class="sesion-badge">{{ entrada.numero_sesion }}</div>
-          <div class="sesion-info" style="flex:1;">
-            <div class="fecha">{{ entrada.fecha }}</div>
-            <div class="tipo">{{ entrada.tipo_programa }} · sesión {{ entrada.numero_sesion }} de {{ entrada.sesiones_totales }}</div>
+          <div id="bono-{{ bono.ciclo_bono }}" class="bono-sesiones" hidden>
+            {% for sesion in bono.sesiones %}
+            <div class="sesion-fila">
+              <div class="sesion-badge">{{ sesion.numero_sesion }}</div>
+              <div class="sesion-info" style="flex:1;">
+                <div class="fecha">Sesión {{ sesion.numero_sesion }}</div>
+                <div class="tipo">
+                  {{ sesion.fecha|fecha_es }}{% if sesion.hora %} · {{ sesion.hora }}{% endif %}
+                </div>
+              </div>
+              <a class="editar" href="{{ url_for('editar_historial_ruta', nombre=nombre, entrada_id=sesion.id) }}">Editar</a>
+            </div>
+            {% else %}
+            <p class="empty">Este programa todavía no tiene sesiones firmadas.</p>
+            {% endfor %}
           </div>
-          <a class="editar" href="{{ url_for('editar_historial_ruta', nombre=nombre, entrada_id=entrada.id) }}">Editar →</a>
         </div>
+        {% else %}
+        <p class="empty">Todavía no hay ningún programa registrado.</p>
+        {% endfor %}
       </div>
-      {% endfor %}
-      {% else %}
-      <p class="empty">Todavía no hay sesiones registradas con fecha.</p>
-      {% endif %}
     </div>
   </div>
+
+  <script>
+    /* Plegar y desplegar. Sin librerías: un botón que enseña u oculta el
+       bloque que indica `aria-controls`. */
+    (function () {
+      document.querySelectorAll(".plegable").forEach(function (boton) {
+        boton.addEventListener("click", function () {
+          var destino = document.getElementById(boton.getAttribute("aria-controls"));
+          if (!destino) return;
+          var abierto = boton.getAttribute("aria-expanded") === "true";
+          boton.setAttribute("aria-expanded", abierto ? "false" : "true");
+          destino.hidden = abierto;
+        });
+      });
+
+      /* Copiar el enlace del cliente. `navigator.clipboard` no existe en
+         contextos sin HTTPS ni en navegadores antiguos, así que hay un plan
+         B con un campo de texto temporal — funciona también en Safari de
+         iPhone. */
+      var boton = document.getElementById("copiar-enlace");
+      if (!boton) return;
+
+      function avisar() {
+        var texto = boton.querySelector("span");
+        var original = texto.textContent;
+        texto.textContent = "✓ Enlace copiado";
+        boton.classList.add("copiado");
+        setTimeout(function () {
+          texto.textContent = original;
+          boton.classList.remove("copiado");
+        }, 2000);
+      }
+
+      boton.addEventListener("click", function () {
+        var enlace = boton.getAttribute("data-enlace");
+        if (navigator.clipboard && window.isSecureContext) {
+          navigator.clipboard.writeText(enlace).then(avisar, copiarAlaAntigua);
+        } else {
+          copiarAlaAntigua();
+        }
+
+        function copiarAlaAntigua() {
+          var campo = document.createElement("textarea");
+          campo.value = enlace;
+          campo.setAttribute("readonly", "");
+          campo.style.position = "fixed";
+          campo.style.top = "-1000px";
+          document.body.appendChild(campo);
+          campo.select();
+          campo.setSelectionRange(0, campo.value.length); // iOS lo necesita
+          try { document.execCommand("copy"); avisar(); } catch (e) { /* nada que hacer */ }
+          document.body.removeChild(campo);
+        }
+      });
+    })();
+  </script>
 </body>
 </html>

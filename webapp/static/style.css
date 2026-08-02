@@ -1020,3 +1020,96 @@ h1 {
   white-space: nowrap;
   border: 0;
 }
+
+
+/* ----- Ficha del cliente (2026-08-02) ----- */
+
+/* Nombre y estado en la misma línea: el estado se lee de un vistazo y no
+   hace falta subtítulo. */
+.ficha-titulo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.ficha-titulo h1 { margin: 0; }
+
+.pill.estado-activo { background: var(--bien-velo); color: var(--bien); border: 1px solid rgba(16, 185, 129, 0.25); }
+.pill.estado-pausado { background: var(--alerta-velo); color: var(--alerta); border: 1px solid rgba(245, 158, 11, 0.28); }
+.pill.estado-cancelado { background: rgba(110, 117, 114, 0.12); color: var(--tinta-suave); border: 1px solid rgba(110, 117, 114, 0.28); }
+
+a.pill { text-decoration: none; }
+
+/* El estado de pago del bono se cambia desde la propia ficha. */
+.pill-boton {
+  font: inherit;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.accion-principal { margin-bottom: 0.65rem; }
+
+.boton-copiar { width: 100%; margin-bottom: 1.25rem; }
+.boton-copiar.copiado { color: var(--bien); border-color: rgba(16, 185, 129, 0.45); }
+
+/* ----- Historial plegable ----- */
+
+.historial .cabecera-seccion.plegable,
+.bono-cabecera {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+  font: inherit;
+  text-align: left;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  color: inherit;
+}
+
+.historial .cabecera-seccion.plegable {
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--tinta-suave);
+  padding: 0.9rem 1.1rem;
+}
+
+.bono-cabecera { padding: 0.15rem 0; }
+.bono-info { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
+
+.flecha-plegable { transition: transform 0.15s ease; color: var(--tinta-suave); }
+[aria-expanded="true"] .flecha-plegable { transform: rotate(90deg); }
+
+.bono-sesiones { margin-top: 0.75rem; display: flex; flex-direction: column; gap: 0.75rem; }
+.bono-sesiones .sesion-fila { padding-left: 0.25rem; }
+
+/* ----- Zona peligrosa ----- */
+
+.zona-peligrosa {
+  margin-top: 2rem;
+  padding: 1.1rem;
+  border-radius: var(--radio);
+  border: 1px solid rgba(192, 40, 59, 0.25);
+  background: var(--peligro-velo);
+}
+
+.zona-peligrosa-titulo {
+  margin: 0 0 0.5rem;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--peligro);
+}
+
+.zona-peligrosa .meta { margin-bottom: 0.85rem; }
+.zona-peligrosa .boton-secundario { width: 100%; }

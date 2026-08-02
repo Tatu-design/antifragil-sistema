@@ -36,16 +36,7 @@
         <input type="number" name="sesiones_completadas" value="{{ cliente.sesiones_completadas }}" min="0" required />
       </label>
 
-      <label class="campo">
-        <span>Estado del cliente</span>
-        <select name="estado">
-          {% for opcion in estados %}
-          <option value="{{ opcion }}" {% if estado == opcion %}selected{% endif %}>{{ opcion|capitalize }}</option>
-          {% endfor %}
-        </select>
-        <span class="meta">Pausado o cancelado archiva al cliente sin perder nada: conserva programa,
-        sesiones, historial, deuda y su enlace personal. Puede volver a activo cuando quieras.</span>
-      </label>
+      <input type="hidden" name="estado" value="{{ estado }}" />
 
       <label class="campo-check">
         <input type="checkbox" name="pendiente_pago" {% if pendiente_pago %}checked{% endif %} />

@@ -162,8 +162,8 @@ def revisar_consultas(problemas) -> None:
         pantallas = {
             "Clientes": lambda: (fp.avisar_confirmaciones_pendientes(ruta), cr.leer_clientes(ruta),
                                  avisos.contar_no_leidos(ruta)),
-            "Perfil": lambda: (cr.leer_clientes(ruta), cr.obtener_historial("Cliente A", ruta=ruta),
-                               fp.hay_sesion_pendiente_de_confirmar("Cliente A", ruta=ruta),
+            "Perfil": lambda: (cr.leer_clientes(ruta),
+                               cr.obtener_programas_cliente("Cliente A", ruta=ruta),
                                fp.confirmaciones_de_hoy("Cliente A", ruta=ruta),
                                avisos.contar_no_leidos(ruta)),
             "Economía": lambda: (er.obtener_ultima_semana(ruta), er.listar_meses(ruta),

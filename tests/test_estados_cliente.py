@@ -346,16 +346,16 @@ class TestPantallaYBloqueo(BaseEstados):
 
     def test_el_perfil_de_un_activo_deja_firmar(self):
         html = self.cliente.get("/cliente/Cliente A").get_data(as_text=True)
-        self.assertIn("Firmar sesión de hoy", html)
+        self.assertIn("/firmar", html)
 
     def test_el_perfil_de_un_pausado_no_ofrece_firmar(self):
         html = self.cliente.get("/cliente/Cliente C").get_data(as_text=True)
-        self.assertNotIn("Firmar sesión de hoy", html)
+        self.assertNotIn("/firmar", html)
         self.assertIn("pausado", html)
 
     def test_el_perfil_de_un_cancelado_no_ofrece_firmar(self):
         html = self.cliente.get("/cliente/Cliente D").get_data(as_text=True)
-        self.assertNotIn("Firmar sesión de hoy", html)
+        self.assertNotIn("/firmar", html)
         self.assertIn("cancelado", html)
 
     def _intentar_firmar(self, nombre: str):
@@ -387,12 +387,17 @@ class TestPantallaYBloqueo(BaseEstados):
         self.assertEqual(respuesta.status_code, 302)
         self.assertEqual(len(cr.obtener_historial("Cliente A", ruta=self.ruta)), 1)
 
-    def test_editar_ofrece_los_tres_estados(self):
-        html = self.cliente.get("/cliente/Cliente A/editar").get_data(as_text=True)
+    def test_editar_datos_ofrece_los_tres_estados(self):
+        html = self.cliente.get("/cliente/Cliente A/editar-datos").get_data(as_text=True)
         self.assertIn("Estado del cliente", html)
         for opcion in ("activo", "pausado", "cancelado"):
             self.assertIn(f'value="{opcion}"', html)
         self.assertIn('value="activo" selected', html.replace(" selected", " selected"))
+
+    def test_editar_programa_conserva_el_estado_sin_tocarlo(self):
+        html = self.cliente.get("/cliente/Cliente C/editar").get_data(as_text=True)
+        self.assertNotIn("Estado del cliente", html)
+        self.assertIn('name="estado" value="pausado"', html)
 
     def test_confirmar_muestra_el_cambio_de_estado(self):
         respuesta = self.cliente.post(

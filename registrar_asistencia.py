@@ -24,12 +24,14 @@ from basedatos import RUTA_POR_DEFECTO, transaccion
 from calendar_integration.semana import get_week_range
 from clientes.repositorio import (
     aplicar_actualizaciones,
+    cerrar_programa_cliente,
     editar_historial,
     eliminar_cliente,
     eliminar_historial,
     marcar_pendiente_pago,
     obtener_historial,
     registrar_historial,
+    registrar_programa_cliente,
 )
 from economia.calculo import TARIFA_CROSSFIT_LIDOMARE
 from economia.registro import (
@@ -39,7 +41,7 @@ from economia.registro import (
     verificar_sincronizacion_semana,
 )
 from programas.procesar import procesar_una_sesion
-from zona_horaria import hoy_negocio
+from zona_horaria import ahora_negocio, hoy_negocio
 
 
 def _sumar_a_semana(fecha: date, tarifa: float | None, sesiones_extra: int, kids_extra: int, conexion) -> None:
@@ -185,11 +187,19 @@ def registrar_sesion_pt(
             )
 
         aplicar_actualizaciones({nombre: paso}, conexion=conexion)
+        # El bono en curso debe existir como ficha antes de colgarle
+        # sesiones (un cliente recién dado de alta aún no la tiene).
+        registrar_programa_cliente(
+            nombre, ciclo_bono, programa["tipo_programa"], tarifa,
+            programa["sesiones_totales"], fecha.isoformat(), conexion=conexion,
+        )
+
         registrar_historial(
             {
                 nombre: [
                     {
                         "fecha": fecha.isoformat(),
+                        "hora": ahora_negocio().strftime("%H:%M"),
                         "numero_sesion": numero_sesion,
                         "sesiones_totales": programa["sesiones_totales"],
                         "tipo_programa": programa["tipo_programa"],
@@ -201,6 +211,19 @@ def registrar_sesion_pt(
             conexion=conexion,
         )
         _sumar_a_semana(fecha, tarifa, sesiones_extra=1, kids_extra=0, conexion=conexion)
+
+        if paso.renovado:
+            # Esta sesión ha cerrado el bono: se anota cuándo terminó y si
+            # quedó pagado (es el único momento en que se sabe), y se abre la
+            # ficha del bono nuevo, que nace pendiente de pago.
+            cerrar_programa_cliente(
+                nombre, ciclo_bono, fecha.isoformat(),
+                pagado=not programa["pendiente_pago"], conexion=conexion,
+            )
+            registrar_programa_cliente(
+                nombre, ciclo_bono + 1, programa["tipo_programa"], tarifa,
+                programa["sesiones_totales"], None, conexion=conexion,
+            )
 
         # Avisos para que Fernando se entere sin tener que estar mirando la
         # lista de clientes — decisión del 2026-07-22.

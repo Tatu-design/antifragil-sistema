@@ -22,6 +22,70 @@
   cuenta en sesiones pero su importe se reparte hacia atrás sobre las
   semanas del mes en cuanto Fernando indica la facturación mensual total.
 
+### La ficha del cliente y los bonos concretos (2026-08-02)
+
+Fernando pidió reorganizar la pantalla del cliente: tenía la información
+repartida y repetida, y faltaba lo más importante — poder ver **qué bonos
+concretos** ha tenido y qué sesiones fueron de cada uno.
+
+**El problema de fondo.** El historial sabía "esta sesión fue de un Bono 4
+a 45 €", pero no *de cuál* Bono 4. Si un cliente contrata el mismo bono
+tres veces seguidas, agrupar por nombre de programa lo mezclaba todo en un
+solo bloque de 12 sesiones. Cada contratación necesita su propia ficha.
+
+**Tabla nueva `programas_cliente`** (`basedatos.py`): una fila por bono
+contratado, con clave primaria `(cliente, ciclo_bono)`. Guarda el tipo de
+programa, la **tarifa histórica** (la del momento de contratarlo, no la
+actual), las sesiones que incluía, la fecha de inicio, la de fin cuando se
+completa, y si se pagó. El corte entre bonos lo marca `ciclo_bono`, que ya
+existía desde el sprint de integridad del 2026-07-28.
+
+**Qué pasa en cada momento:**
+
+- Al **dar de alta** un cliente se registra ya su bono en curso, sin fechas
+  (todavía no ha entrenado). Antes la ficha salía vacía hasta la primera
+  firma.
+- Al **firmar** una sesión se anota también la **hora** (columna nueva
+  `hora` en `historial_sesiones`, opcional: las sesiones antiguas se quedan
+  sin hora, no se inventa ninguna).
+- Al **renovar**, el bono que se agota se cierra con su fecha de fin y su
+  estado de pago, y se abre el siguiente. Los dos quedan separados aunque
+  sean el mismo programa.
+- Al **renombrar** un cliente, sus bonos le siguen; al **borrarlo**, se van
+  con él (no quedan huérfanos).
+
+**Migración `migrar_programas_cliente.py`.** Reconstruye los bonos pasados
+desde el historial existente. No inventa nada: las fechas salen de la
+primera y la última sesión de cada bono, la tarifa de las propias sesiones,
+y el estado de pago de los bonos antiguos queda **desconocido** (nunca se
+guardó, y no se supone). Es idempotente. Verificada sobre una copia de los
+datos reales: facturación, horas, precio medio, bonos, sesiones y deudas
+**idénticos** antes y después, en los 8 clientes y los 2 meses con datos;
+`integrity_check` correcto y 0 claves rotas, también tras 3 ejecuciones.
+
+**La pantalla.** El nombre y el estado van en la misma línea (el estado es
+un enlace a editarlo, así que no hace falta subtítulo). Debajo, el bono en
+curso con su progreso y un botón que cambia el estado de pago en el sitio,
+con confirmación previa — solo toca el pago, nunca sesiones ni economía.
+Luego la acción principal (firmar), dos botones iguales que separan
+**editar datos** (quién es y en qué estado está) de **editar programa** (el
+bono), y un botón para copiar el enlace del cliente. El historial va
+plegado y agrupado por bono: cada bono se despliega para ver sus sesiones
+con fecha y hora. «Editar datos» tiene una zona peligrosa que solo ofrece
+borrar si el cliente no tiene ninguna sesión — si ya ha entrenado, lo
+correcto es cancelarlo y conservar su historial.
+
+**Rendimiento.** La ficha pasó a hacer **4 consultas en vez de 5** (10,4 ms
+frente a 18,4): el historial ya viene dentro de los bonos, y el QR solo se
+consulta justo después de firmar, que es la única vez que puede aparecer.
+`comprobar_rendimiento.py` se actualizó para medir la pantalla real — antes
+seguía simulando la versión antigua, así que el número no decía la verdad.
+
+**Regresión cero.** 122 pruebas en verde, 16 de ellas nuevas
+(`tests/test_perfil_programas.py`), incluidas las que comprueban que dos
+bonos iguales seguidos no se mezclan, que leer la ficha no escribe nada, y
+que cambiar el pago no mueve ni un euro.
+
 ### Estados del cliente: activo, pausado y cancelado (2026-08-01)
 
 Hasta ahora un cliente que dejaba de entrenar solo se podía borrar. Fernando
