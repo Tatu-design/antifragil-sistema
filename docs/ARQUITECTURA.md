@@ -63,6 +63,12 @@ datos reales: facturación, horas, precio medio, bonos, sesiones y deudas
 **idénticos** antes y después, en los 8 clientes y los 2 meses con datos;
 `integrity_check` correcto y 0 claves rotas, también tras 3 ejecuciones.
 
+El servidor se migra **solo**: `rellenar_si_falta()` corre al arrancar la
+web (igual que `asegurar_tokens`) y reconstruye los bonos la primera vez,
+solo si no hay ninguno. No hay que entrar al servidor a ejecutar nada, y no
+se sube la base de datos local por encima de la suya — la del servidor
+tiene lo que Fernando mete desde el móvil.
+
 **La pantalla.** El nombre y el estado van en la misma línea (el estado es
 un enlace a editarlo, así que no hace falta subtítulo). Debajo, el bono en
 curso con su progreso y un botón que cambia el estado de pago en el sitio,

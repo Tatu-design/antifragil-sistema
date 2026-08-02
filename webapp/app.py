@@ -39,6 +39,7 @@ from avisos import (
     resolver_avisos_por_tipo,
 )
 from basedatos import RUTA_POR_DEFECTO, crear_esquema
+from migrar_programas_cliente import rellenar_si_falta
 from clientes.repositorio import (
     ESTADO_POR_DEFECTO,
     ESTADOS_VALIDOS,
@@ -79,6 +80,7 @@ from webapp.auth import (
 
 crear_esquema()  # crea las tablas si es la primera vez que arranca en esta máquina (ej. un servidor nuevo)
 asegurar_tokens()  # da un enlace personal a clientes dados de alta antes del milestone 4
+rellenar_si_falta()  # reconstruye los bonos pasados la primera vez que arranca esta versión (2026-08-02)
 
 app = Flask(__name__)
 app.secret_key = obtener_secret_key()

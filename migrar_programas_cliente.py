@@ -149,6 +149,28 @@ def aplicar(ruta: Path = RUTA_POR_DEFECTO) -> dict:
     return {"bonos": bonos, "avisos": avisos}
 
 
+def rellenar_si_falta(ruta: Path = RUTA_POR_DEFECTO) -> int:
+    """Reconstruye los bonos SOLO si todavía no hay ninguno registrado.
+
+    Pensada para llamarse al arrancar la web (igual que `asegurar_tokens`):
+    un servidor que se actualiza a esta versión se migra él solo la primera
+    vez que recarga, sin que nadie tenga que entrar a ejecutar nada a mano.
+    A partir de ahí no vuelve a hacer nada — los bonos ya los mantiene al
+    día el propio flujo de firmar y renovar.
+
+    Devuelve cuántos bonos ha registrado (0 si no había nada que hacer)."""
+    if not ruta.exists():
+        return 0
+
+    with conectar(ruta) as conexion:
+        ya_hay = conexion.execute("SELECT EXISTS(SELECT 1 FROM programas_cliente) AS hay").fetchone()["hay"]
+        hay_clientes = conexion.execute("SELECT EXISTS(SELECT 1 FROM clientes) AS hay").fetchone()["hay"]
+    if ya_hay or not hay_clientes:
+        return 0
+
+    return len(aplicar(ruta)["bonos"])
+
+
 def main() -> None:
     sys.stdout.reconfigure(encoding="utf-8")
     argumentos = [a for a in sys.argv[1:] if not a.startswith("--")]
