@@ -329,3 +329,44 @@ límites. **Se ejecuta antes de dar por terminado cualquier cambio que toque
 plantillas, CSS, JavaScript o consultas**, igual que se ejecutan las
 pruebas. Si un cambio empeora una cifra, o se corrige antes de entregar o se
 dice explícitamente por qué compensa — pero nunca se entrega sin saberlo.
+
+---
+
+## 2026-08-02 — Una medición que ya no medía lo que decía medir
+
+**Qué pasó:** al reorganizar la ficha del cliente,
+`comprobar_rendimiento.py` seguía dando el visto bueno al perfil… pero
+estaba simulando la versión **antigua** de la pantalla: llamaba a consultas
+que la ruta real ya no hacía. El número era verde y no significaba nada.
+
+**Por qué pasó:** la puerta de rendimiento se escribió imitando a mano lo
+que hacía cada pantalla, en vez de ejecutar la pantalla de verdad. Esa
+imitación envejece en cuanto se toca la ruta, y no hay nada que avise —
+ninguna prueba falla porque una simulación se quede desfasada.
+
+**Qué se hace distinto a partir de ahora:** cuando se cambien las consultas
+de una ruta, se actualiza en el mismo cambio lo que
+`comprobar_rendimiento.py` simula de esa ruta. Y en general: una medición
+que no se revisa junto al código que mide es peor que no tener medición,
+porque da falsa tranquilidad.
+
+---
+
+## 2026-08-02 — Sintaxis de PowerShell dentro de la herramienta Bash
+
+**Qué pasó:** dos commits quedaron con un `@` colgando al principio del
+título (`@ feat(perfil): …`). Escribí el mensaje con `-m @'…'@`, que es un
+*here-string* de PowerShell, dentro de la herramienta Bash — donde ese `@`
+es simplemente el primer carácter del mensaje.
+
+**Por qué pasó:** en este proyecto conviven dos intérpretes (PowerShell y
+Bash) y mezclé la sintaxis de uno con la herramienta del otro. Además no
+comprobé el resultado: `git commit` no falla por esto, así que pasó
+inadvertido hasta mirar `git log`.
+
+**Qué se hace distinto a partir de ahora:** mensajes de varias líneas en
+Bash con `-F -` y un heredoc `<<'FIN'`, nunca con `@'…'@`. Y **mirar
+`git log --oneline` después de commitear**, que es un segundo y evita
+arrastrar el error a algo que ya no se puede corregir sin `push --force`
+(prohibido). Los dos commits se quedan como están: reescribir historia ya
+publicada por un carácter cosmético sale mucho más caro que el defecto.
