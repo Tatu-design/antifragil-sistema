@@ -51,6 +51,7 @@ from clientes.repositorio import (
     crear_cliente,
     leer_clientes,
     listar_tipos_programa,
+    deuda_pendiente,
     marcar_pago_del_ciclo,
     obtener_ciclo_actual,
     obtener_cliente_por_token,
@@ -353,6 +354,8 @@ def _con_sesiones_restantes(clientes: dict) -> list[dict]:
                 "sesiones_restantes": restantes,
                 "pendiente_pago": str(datos.get("pendiente_pago", "")).strip().lower() in ("sí", "si"),
                 "estado": datos.get("estado") or ESTADO_POR_DEFECTO,
+                # Servicios anteriores ya cerrados que siguen sin cobrarse.
+                "ciclos_pendientes": datos.get("ciclos_pendientes") or 0,
                 # Condiciones del servicio en curso (2026-08-03). Esta función
                 # copia claves una a una, así que lo que no se nombre aquí NO
                 # llega a la pantalla — el precio del bono y el periodo de una
@@ -366,6 +369,13 @@ def _con_sesiones_restantes(clientes: dict) -> list[dict]:
                 "mes": datos.get("mes"),
             }
         )
+    # «Debe algo» junta las dos deudas posibles: la del servicio en curso y
+    # la de cualquier servicio anterior que quedara sin cobrar. Antes la lista
+    # solo miraba el primero, así que un cliente con la cuenta del mes pasado
+    # a deber pero la de este mes al día NO salía como pendiente (lo detectó
+    # Fernando con Samanta, 2026-08-04).
+    for fila in filas:
+        fila["debe_algo"] = fila["pendiente_pago"] or fila["ciclos_pendientes"] > 0
     return filas
 
 
@@ -411,7 +421,7 @@ def inicio():
     # cancelado — la deuda no desaparece por dejar de entrenar.
     conteos = {
         "activos": sum(1 for f in filas if f["estado"] == "activo"),
-        "pendientes": sum(1 for f in filas if f["pendiente_pago"]),
+        "pendientes": sum(1 for f in filas if f["debe_algo"]),
         "pausados": sum(1 for f in filas if f["estado"] == "pausado"),
         "cancelados": sum(1 for f in filas if f["estado"] == "cancelado"),
     }
@@ -539,6 +549,7 @@ def perfil_cliente(nombre):
         clave_idempotencia=uuid.uuid4().hex,
         firmado=firmado,
         borrado=request.args.get("borrado"),
+        cobro=request.args.get("cobro"),
         # El QR solo sale justo después de firmar; el resto de las veces ni
         # se pregunta, que es una consulta menos en cada visita.
         hay_sesion_pendiente=bool(firmado) and hay_sesion_pendiente_de_confirmar(nombre),
@@ -657,6 +668,34 @@ def cambiar_pago(nombre):
         return render_template("error.html", mensaje=str(error)), 400
 
     return redirect(url_for("perfil_cliente", nombre=nombre))
+
+
+@app.route("/cliente/<nombre>/ciclo/<int:ciclo>/pago", methods=["POST"])
+def cambiar_pago_ciclo(nombre, ciclo):
+    """Marca como cobrado o pendiente CUALQUIER servicio del historial, no
+    solo el que está en curso (2026-08-04).
+
+    Hacía falta porque en el negocio real se paga después: una cuenta de
+    cliente se cobra al terminar el mes, y un bono puede quedar a deber una
+    vez agotado. Antes, al cerrarse el ciclo su estado quedaba congelado y
+    esa deuda no había forma de saldarla.
+
+    Solo cambia el estado de COBRO. No toca sesiones, horas, historial,
+    facturación ni precio medio."""
+    if nombre not in leer_clientes():
+        return render_template("error.html", mensaje=f"No existe el cliente '{nombre}'"), 404
+
+    pagado = request.form.get("pagado") == "si"
+    try:
+        marcar_pago_del_ciclo(nombre, pagado, ciclo=ciclo)
+    except sqlite3.OperationalError:
+        return render_template(
+            "error.html", mensaje="No se pudo guardar: la base de datos está ocupada. Reintenta."
+        ), 409
+    except ValueError as error:
+        return render_template("error.html", mensaje=str(error)), 400
+
+    return redirect(url_for("perfil_cliente", nombre=nombre, cobro=ciclo))
 
 
 @app.route("/cliente/<nombre>/editar-datos")

@@ -73,7 +73,7 @@
       <a class="tarjeta-cliente"
          href="{{ url_for('perfil_cliente', nombre=cliente.nombre) }}"
          data-estado="{{ cliente.estado }}"
-         data-pendiente="{{ 'si' if cliente.pendiente_pago else 'no' }}">
+         data-pendiente="{{ 'si' if cliente.debe_algo else 'no' }}">
         <div class="cabecera">
           <span class="nombre">{{ cliente.nombre }}</span>
           <span class="etiquetas">
@@ -82,8 +82,16 @@
             {% elif cliente.estado == 'cancelado' %}
               <span class="pill cancelado">Cancelado</span>
             {% endif %}
-            {% if cliente.pendiente_pago %}
-              <span class="pill pendiente">{{ 'Pendiente de pago' if cliente.estado != 'activo' else 'Pendiente' }}</span>
+            {% if cliente.debe_algo %}
+              <span class="pill pendiente">
+                {%- if cliente.ciclos_pendientes and not cliente.pendiente_pago -%}
+                  {{ cliente.ciclos_pendientes }} sin cobrar
+                {%- elif cliente.ciclos_pendientes -%}
+                  Pendiente +{{ cliente.ciclos_pendientes }}
+                {%- else -%}
+                  {{ 'Pendiente de pago' if cliente.estado != 'activo' else 'Pendiente' }}
+                {%- endif -%}
+              </span>
             {% elif cliente.estado == 'activo' %}
               <span class="pill aldia">Al día</span>
             {% endif %}

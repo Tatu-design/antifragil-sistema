@@ -22,6 +22,46 @@
   cuenta en sesiones pero su importe se reparte hacia atrás sobre las
   semanas del mes en cuanto Fernando indica la facturación mensual total.
 
+### Cobrar servicios ya cerrados y deudas en la lista (2026-08-04)
+
+Dos huecos que encontró Fernando con el caso real de Samanta, que tenía una
+cuenta de cliente del mes anterior a deber.
+
+**1. El estado de cobro quedaba congelado al cerrar el ciclo.** Solo se
+podía marcar el pago del servicio EN CURSO. Pero en el negocio real se paga
+DESPUÉS: una cuenta de cliente se cobra al terminar el mes, y un bono puede
+quedar a deber una vez agotado. Sin poder marcarlos, esas deudas no había
+forma de saldarlas.
+
+`marcar_pago_del_ciclo(cliente, pagado, ciclo=None)` acepta ahora cualquier
+ciclo. Escribe en una sola transacción en todos los sitios donde vive ese
+estado: el ciclo, el cargo del mes si es una mensualidad, y
+`clientes.pendiente_pago` **solo si el ciclo es el que está en curso** — la
+ficha del cliente habla del servicio de ahora, así que marcar un periodo
+antiguo no la toca. En la pantalla, cada servicio del historial tiene su
+propio control al desplegarlo (no en su cabecera: esa cabecera ya es un
+botón y no puede contener otro).
+
+**2. La lista de clientes no veía las deudas antiguas.** Contaba solo
+`clientes.pendiente_pago`, que describe el ciclo en curso. Samanta, con
+julio a deber y agosto al día, **no aparecía como pendiente de pago**.
+
+`leer_clientes` devuelve ahora `ciclos_pendientes`: cuántos servicios YA
+CERRADOS siguen sin cobrarse. La lista marca a un cliente como pendiente si
+debe el actual **o** alguno anterior, y la tarjeta dice cuál es el caso
+(«Pendiente», «2 sin cobrar», «Pendiente +1»). Se cuentan solo los ciclos
+distintos del actual, porque el actual ya lo describe `pendiente_pago`: así
+las dos fuentes no pueden contradecirse.
+
+Un ciclo con `pagado` **nulo** no cuenta como deuda: de los servicios
+anteriores a esta versión nunca se registró el pago y no se va a suponer. En
+pantalla salen como «Sin marcar», y se pueden marcar cuando Fernando lo
+sepa.
+
+Nada de esto mueve la economía. `tests/test_cobro_historial.py` (19 pruebas)
+comprueba que marcar y desmarcar el cobro tres veces seguidas deja
+facturación, horas e historial exactamente iguales, en las tres modalidades.
+
 ### Corrección de la ficha: una sola fuente para la pantalla (2026-08-04)
 
 Fernando probó las tres modalidades y encontró un fallo que ninguna de las

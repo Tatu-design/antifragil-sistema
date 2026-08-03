@@ -34,6 +34,10 @@
     <div class="aviso-guardado">✔ Sesión borrada — {{ borrado }}</div>
     {% endif %}
 
+    {% if cobro %}
+    <div class="aviso-guardado">✔ Estado de cobro actualizado — no se ha tocado ninguna sesión ni la economía</div>
+    {% endif %}
+
     {% if ficha.estado != 'activo' %}
     <div class="aviso-texto">
       {% if ficha.estado == 'pausado' %}
@@ -214,7 +218,12 @@
             <span class="bono-info">
               <span class="nombre">
                 {% if bono.es_actual %}Servicio actual{% else %}{{ bono.tipo_programa }}{% endif %}
-                {% if bono.pagado == 0 %}<span class="pill pendiente">Pendiente</span>{% endif %}
+                {# Indicador de un vistazo. El botón para cambiarlo va dentro,
+                   al desplegar: aquí no cabe (esta cabecera ya es un botón y
+                   no se puede meter otro dentro). #}
+                {% if bono.pagado == 0 %}<span class="pill pendiente">Pendiente de cobro</span>
+                {% elif bono.pagado == 1 %}<span class="pill aldia">Cobrado</span>
+                {% else %}<span class="pill">Sin marcar</span>{% endif %}
               </span>
               <span class="programa">
                 {% if bono.es_actual %}{{ bono.tipo_programa }} · {% endif %}
@@ -248,6 +257,28 @@
           </button>
 
           <div id="bono-{{ bono.ciclo_bono }}" class="bono-sesiones" hidden>
+            {# Estado de cobro de ESTE servicio, se pueda o no seguir usando.
+               Vale para las tres modalidades y también para los ya cerrados:
+               un bono agotado o un mes terminado se cobran después, y hasta
+               ahora no había forma de marcarlos (2026-08-04). #}
+            <form method="post" class="cobro-ciclo"
+                  action="{{ url_for('cambiar_pago_ciclo', nombre=nombre, ciclo=bono.ciclo_bono) }}"
+                  onsubmit="return confirm({{ (
+                    ('¿Marcar como cobrado este servicio de %s?' % nombre) if bono.pagado != 1
+                    else ('¿Volver a dejar este servicio de %s como pendiente de cobro?' % nombre)
+                  )|tojson }});">
+              <input type="hidden" name="csrf" value="{{ token_csrf() }}">
+              <input type="hidden" name="pagado" value="{{ 'no' if bono.pagado == 1 else 'si' }}">
+              <span class="cobro-etiqueta">
+                {% if bono.pagado == 1 %}Cobrado
+                {% elif bono.pagado == 0 %}Pendiente de cobro
+                {% else %}Sin marcar{% endif %}
+              </span>
+              <button type="submit" class="boton-secundario boton-cobro">
+                {% if bono.pagado == 1 %}Marcar pendiente{% else %}Marcar cobrado{% endif %}
+              </button>
+            </form>
+
             {% for sesion in bono.sesiones %}
             <div class="sesion-fila">
               <div class="sesion-badge">{{ sesion.numero_sesion }}</div>

@@ -90,7 +90,17 @@ def leer_clientes(ruta: Path = RUTA_POR_DEFECTO) -> dict[str, dict]:
                    -- mensualidad o una cuenta es la única cuenta que existe,
                    -- porque ahí no se consume nada.
                    (SELECT COUNT(*) FROM historial_sesiones h
-                     WHERE h.cliente = c.nombre AND h.ciclo_bono = c.ciclo_bono) AS sesiones_ciclo
+                     WHERE h.cliente = c.nombre AND h.ciclo_bono = c.ciclo_bono) AS sesiones_ciclo,
+                   -- Servicios YA CERRADOS que siguen sin cobrarse (2026-08-04).
+                   -- Una deuda no desaparece porque el periodo termine: una
+                   -- cuenta de cliente se cobra al acabar el mes, y un bono
+                   -- puede quedar a deber después de agotarse. Se cuentan solo
+                   -- los distintos del ciclo en curso, porque el de ahora lo
+                   -- describe `clientes.pendiente_pago` — así las dos fuentes
+                   -- no pueden contradecirse.
+                   (SELECT COUNT(*) FROM programas_cliente pc2
+                     WHERE pc2.cliente = c.nombre AND pc2.ciclo_bono <> c.ciclo_bono
+                       AND pc2.pagado = 0) AS ciclos_pendientes
             FROM clientes c
             LEFT JOIN programas p ON p.nombre = c.tipo_programa
             LEFT JOIN programas_cliente pc
@@ -111,6 +121,7 @@ def leer_clientes(ruta: Path = RUTA_POR_DEFECTO) -> dict[str, dict]:
             "modalidad": fila["modalidad"] or MODALIDAD_POR_DEFECTO,
             "ciclo_bono": fila["ciclo_bono"],
             "sesiones_ciclo": fila["sesiones_ciclo"],
+            "ciclos_pendientes": fila["ciclos_pendientes"],
             "precio_total": fila["precio_total"],
             "cuota_mensual": fila["cuota_mensual"],
             "sesiones_referencia": fila["sesiones_referencia"],
@@ -998,18 +1009,29 @@ def registrar_programa_cliente(
 
 
 def marcar_pago_del_ciclo(
-    cliente: str, pagado: bool, ruta: Path = RUTA_POR_DEFECTO
-) -> None:
-    """Cambia el estado de COBRO del servicio en curso, y nada más.
+    cliente: str, pagado: bool, ciclo: int | None = None, ruta: Path = RUTA_POR_DEFECTO
+) -> dict:
+    """Cambia el estado de COBRO de un servicio, y nada más.
 
-    No toca sesiones, ni historial, ni economía, ni el precio medio: cobrar
-    o no cobrar no cambia lo que ya se ha producido ni las horas que ya se
-    han trabajado.
+    `ciclo`: cuál. Si no se indica, el que esté en curso. **Se puede marcar
+    cualquier ciclo, también uno ya cerrado** (2026-08-04): en el negocio
+    real la gente paga DESPUÉS de terminar el periodo — una cuenta de
+    cliente se cobra al acabar el mes, y un bono puede quedar a deber
+    después de agotarse. Congelar el estado de cobro al cerrar el ciclo
+    dejaba esas deudas sin forma de saldarse.
 
-    Escribe en los DOS sitios a la vez —la ficha del cliente y su ciclo en
-    curso— dentro de una misma transacción, para que no puedan contradecirse
-    (2026-08-04). Si solo se actualizara uno, la pantalla podría enseñar
-    "pagado" mientras el ciclo guardado dice lo contrario."""
+    Lo que NO toca, en ningún caso: sesiones, horas, historial,
+    facturación ni precio medio. Cobrar más tarde no hace que el trabajo
+    se haya hecho más tarde, ni cambia lo que costó.
+
+    Escribe a la vez, en una sola transacción, en todos los sitios donde
+    vive ese estado —el ciclo, el cargo del mes si es una mensualidad, y la
+    ficha del cliente si el ciclo es el que está en curso— para que no
+    puedan contradecirse. La ficha del cliente NO se toca al marcar un ciclo
+    antiguo: su "pendiente de pago" habla del servicio de ahora.
+
+    Devuelve {"ciclo": n, "es_actual": bool, "pagado": bool}.
+    """
     with conectar(ruta) as conexion:
         conexion.execute("BEGIN")
         try:
@@ -1019,24 +1041,55 @@ def marcar_pago_del_ciclo(
             if fila is None:
                 raise ValueError(f"No existe el cliente '{cliente}'")
 
-            conexion.execute(
-                "UPDATE clientes SET pendiente_pago = ? WHERE nombre = ?",
-                (int(not pagado), cliente),
-            )
+            ciclo_actual = fila["ciclo_bono"]
+            objetivo = ciclo_actual if ciclo is None else int(ciclo)
+
+            existe = conexion.execute(
+                "SELECT 1 FROM programas_cliente WHERE cliente = ? AND ciclo_bono = ?",
+                (cliente, objetivo),
+            ).fetchone()
+            if not existe and objetivo != ciclo_actual:
+                raise ValueError(f"'{cliente}' no tiene ningún servicio con el número {objetivo}")
+
             conexion.execute(
                 "UPDATE programas_cliente SET pagado = ? WHERE cliente = ? AND ciclo_bono = ?",
-                (int(pagado), cliente, fila["ciclo_bono"]),
+                (int(pagado), cliente, objetivo),
             )
-            # Si es una mensualidad, su cuota del mes también queda marcada:
-            # es el cargo concreto que se cobra o se debe.
+            # Si ese ciclo era una mensualidad, su cuota del mes queda
+            # marcada igual: es el cargo concreto que se cobra o se debe.
             conexion.execute(
                 "UPDATE cargos_mensuales SET pagado = ? WHERE cliente = ? AND ciclo = ?",
-                (int(pagado), cliente, fila["ciclo_bono"]),
+                (int(pagado), cliente, objetivo),
             )
+            # `clientes.pendiente_pago` describe el servicio EN CURSO, así que
+            # solo se mueve cuando se está marcando ese.
+            if objetivo == ciclo_actual:
+                conexion.execute(
+                    "UPDATE clientes SET pendiente_pago = ? WHERE nombre = ?",
+                    (int(not pagado), cliente),
+                )
+
             conexion.commit()
+            return {"ciclo": objetivo, "es_actual": objetivo == ciclo_actual, "pagado": bool(pagado)}
         except Exception:
             conexion.rollback()
             raise
+
+
+def deuda_pendiente(cliente: str, ruta: Path = RUTA_POR_DEFECTO) -> list[dict]:
+    """Los ciclos de un cliente que están marcados como NO cobrados, del más
+    reciente al más antiguo. Un ciclo sin marcar (`pagado` nulo) no cuenta
+    como deuda: de los servicios anteriores a esta versión nunca se registró
+    el pago y no se va a suponer."""
+    with conectar(ruta) as conexion:
+        filas = conexion.execute(
+            "SELECT ciclo_bono, tipo_programa, COALESCE(modalidad, 'bono') AS modalidad, "
+            "       anio, mes, fecha_inicio, fecha_fin "
+            "FROM programas_cliente WHERE cliente = ? AND pagado = 0 "
+            "ORDER BY ciclo_bono DESC",
+            (cliente,),
+        ).fetchall()
+    return [dict(fila) for fila in filas]
 
 
 def configurar_servicio(
