@@ -1,0 +1,8 @@
+node_modules/
+.next/
+.env
+.env.local
+# Datos de staging: ficticios, pero se regeneran solos y no aportan al repo.
+.data/
+*.tsbuildinfo
+next-env.d.ts
