@@ -38,6 +38,17 @@ export const esquemaAlta = z.object({
   sesionesReferencia: numeroOpcional,
 });
 
+export const esquemaServicio = z.object({
+  clienteId: z.string().min(1),
+  modalidad: z.enum(MODALIDADES),
+  servicio: z.string().trim().max(80).default(""),
+  sesionesTotales: numeroOpcional,
+  precioTotal: numeroOpcional,
+  cuotaMensual: numeroOpcional,
+  tarifa: numeroOpcional,
+  sesionesReferencia: numeroOpcional,
+});
+
 export const esquemaEstado = z.object({
   clienteId: z.string().min(1),
   estado: z.enum(ESTADOS),

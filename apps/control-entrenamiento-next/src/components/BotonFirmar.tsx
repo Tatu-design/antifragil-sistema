@@ -1,7 +1,6 @@
 "use client";
 
 import { Check } from "lucide-react";
-import Link from "next/link";
 import { useActionState, useId } from "react";
 import { useFormStatus } from "react-dom";
 
@@ -41,9 +40,9 @@ export function BotonFirmar({ clienteId, ficha }: { clienteId: string; ficha: Fi
             <p className="text-sm text-tinta-suave">
               No se puede firmar todavía: falta <strong>{ficha.faltan.join(" y ")}</strong>.
             </p>
-            <Link href="#" className="boton-suave">
-              Editar programa
-            </Link>
+            <p className="text-xs text-tinta-suave">
+              Rellénalo en «Editar programa», justo debajo.
+            </p>
           </>
         )}
       </section>

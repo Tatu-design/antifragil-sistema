@@ -28,8 +28,15 @@ import {
   esquemaFirma,
   esquemaLogin,
   esquemaRenombrar,
+  esquemaServicio,
 } from "@/schemas/formularios";
-import { cambiarEstado, crearCliente, marcarCobro, renombrarCliente } from "@/services/clientes";
+import {
+  cambiarEstado,
+  configurarServicio,
+  crearCliente,
+  marcarCobro,
+  renombrarCliente,
+} from "@/services/clientes";
 import { eliminarSesion, firmarSesion } from "@/services/sesiones";
 
 export interface Resultado {
@@ -131,6 +138,41 @@ export async function accionCrearCliente(_previo: Resultado | null, datos: FormD
   }
   revalidatePath("/clientes");
   redirect(`/clientes/${id}`);
+}
+
+export async function accionConfigurarServicio(
+  _previo: Resultado | null,
+  datos: FormData,
+): Promise<Resultado> {
+  await exigirSesion();
+  const validado = esquemaServicio.safeParse(desdeFormulario(datos));
+  if (!validado.success) {
+    return { ok: false, mensaje: validado.error.issues[0]?.message ?? "Revisa los datos.", tono: "error" };
+  }
+
+  try {
+    const resultado = await configurarServicio(validado.data.clienteId, {
+      modalidad: validado.data.modalidad,
+      servicio: validado.data.servicio,
+      sesionesTotales: validado.data.sesionesTotales,
+      precioTotal: validado.data.precioTotal,
+      cuotaMensual: validado.data.cuotaMensual,
+      tarifa: validado.data.tarifa,
+      sesionesReferencia: validado.data.sesionesReferencia,
+    });
+    revalidatePath(`/clientes/${validado.data.clienteId}`);
+    revalidatePath("/clientes");
+
+    return {
+      ok: true,
+      tono: "exito",
+      mensaje: resultado.cerroCiclo
+        ? "Servicio anterior cerrado y servicio nuevo abierto. Las sesiones ya hechas no se han tocado."
+        : "Condiciones actualizadas. Las sesiones ya firmadas conservan su precio.",
+    };
+  } catch (error) {
+    return comoMensaje(error);
+  }
 }
 
 export async function accionCambiarEstado(_previo: Resultado | null, datos: FormData): Promise<Resultado> {

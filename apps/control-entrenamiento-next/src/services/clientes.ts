@@ -156,6 +156,147 @@ export async function crearCliente(datos: DatosAlta): Promise<Cliente> {
   return cliente;
 }
 
+export interface CambioDeServicio {
+  modalidad: Modalidad;
+  servicio: string;
+  sesionesTotales?: number | null;
+  precioTotal?: number | null;
+  cuotaMensual?: number | null;
+  tarifa?: number | null;
+  sesionesReferencia?: number | null;
+}
+
+export interface ResultadoCambio {
+  cerroCiclo: boolean;
+  ciclo: number;
+}
+
+/**
+ * Configura el servicio de un cliente. Dos comportamientos muy distintos:
+ *
+ * **Si la modalidad NO cambia**, se corrigen las condiciones del ciclo en curso
+ * ahí mismo. Es una corrección, no un servicio nuevo.
+ *
+ * **Si la modalidad SÍ cambia**, el ciclo actual se CIERRA y se abre uno nuevo.
+ * Nunca se transforma un ciclo empezado: las sesiones ya hechas se quedan donde
+ * están, con las condiciones con las que se hicieron, y su economía no se
+ * recalcula. Un bono a medias no se convierte en una mensualidad — se cierra
+ * como bono y empieza una mensualidad limpia.
+ *
+ * En los dos casos, las sesiones ya firmadas conservan su tarifa histórica:
+ * cambiar el precio hoy no reescribe lo que se cobró ayer.
+ */
+export async function configurarServicio(
+  clienteId: string,
+  cambio: CambioDeServicio,
+): Promise<ResultadoCambio> {
+  const repo = repositorio();
+  const condiciones = validarCondiciones(cambio.modalidad, cambio);
+  const hoy = new Date();
+
+  return repo.transaccion(async () => {
+    const cliente = await repo.obtenerCliente(clienteId);
+    if (!cliente) throw new ErrorDeNegocio("Ese cliente ya no existe");
+
+    const actual = await repo.cicloActual(clienteId);
+    if (!actual) throw new ErrorDeNegocio("Ese cliente no tiene servicio en curso");
+
+    const etiqueta = cambio.servicio.trim() || ETIQUETAS_SERVICIO[condiciones.modalidad];
+    const esMensualNueva = condiciones.modalidad !== "bono";
+    const anio = esMensualNueva ? hoy.getFullYear() : null;
+    const mes = esMensualNueva ? hoy.getMonth() + 1 : null;
+
+    const camposEconomicos = {
+      servicio: etiqueta,
+      modalidad: condiciones.modalidad,
+      tarifa: condiciones.tarifa,
+      sesionesTotales: condiciones.sesionesTotales ?? 0,
+      precioTotal: condiciones.precioTotal,
+      cuotaMensual: condiciones.cuotaMensual,
+      sesionesReferencia: condiciones.sesionesReferencia,
+    };
+
+    if (actual.modalidad === condiciones.modalidad) {
+      // Misma modalidad: se corrigen las condiciones del ciclo en curso.
+      await repo.guardarCiclo({ ...actual, ...camposEconomicos });
+      await cobrarMesSiProcede(clienteId, actual.ciclo, actual.anio, actual.mes, condiciones.cuotaMensual);
+      return { cerroCiclo: false, ciclo: actual.ciclo };
+    }
+
+    // Cambia la modalidad: se cierra el ciclo y se abre otro.
+    const sesiones = await repo.listarSesiones(clienteId);
+    const ultima = sesiones.filter((s) => s.ciclo === actual.ciclo)[0]?.fecha ?? null;
+    await repo.guardarCiclo({
+      ...actual,
+      fechaFin: actual.fechaFin ?? ultima ?? hoy.toISOString().slice(0, 10),
+    });
+
+    const nuevo = actual.ciclo + 1;
+    await repo.guardarCiclo({
+      clienteId,
+      ciclo: nuevo,
+      ...camposEconomicos,
+      anio,
+      mes,
+      fechaInicio: null,
+      fechaFin: null,
+      pagado: condiciones.modalidad === MENSUALIDAD ? false : true,
+    });
+
+    // El contador vuelve a cero: el servicio nuevo empieza limpio. Las sesiones
+    // anteriores NO se mueven ni se renumeran.
+    await repo.actualizarCliente({
+      ...cliente,
+      cicloActual: nuevo,
+      sesionesCompletadas: 0,
+      pendientePago: condiciones.modalidad === MENSUALIDAD,
+    });
+    await cobrarMesSiProcede(clienteId, nuevo, anio, mes, condiciones.cuotaMensual);
+
+    return { cerroCiclo: true, ciclo: nuevo };
+  });
+}
+
+const ETIQUETAS_SERVICIO: Record<Modalidad, string> = {
+  bono: "Bono",
+  mensualidad: "Mensualidad",
+  cuenta: "Cuenta de cliente",
+};
+
+/**
+ * Registra la cuota del mes de una mensualidad — una sola vez.
+ *
+ * Solo las mensualidades generan cargo: una cuenta de cliente factura por las
+ * sesiones que se firmen, no por adelantado. Y un cliente pausado o cancelado
+ * no genera cuota: cobrar automáticamente a quien ha dejado de entrenar sería
+ * inventar ingresos.
+ */
+async function cobrarMesSiProcede(
+  clienteId: string,
+  ciclo: number,
+  anio: number | null,
+  mes: number | null,
+  cuota: number | null,
+): Promise<void> {
+  if (!cuota || anio === null || mes === null) return;
+  const repo = repositorio();
+  const cliente = await repo.obtenerCliente(clienteId);
+  if (!cliente || cliente.estado !== "activo") return;
+
+  const existente = await repo.cargoDelMes(clienteId, anio, mes);
+  if (existente) return; // La clave (cliente, año, mes) impide cobrar dos veces.
+
+  await repo.guardarCargo({
+    clienteId,
+    anio,
+    mes,
+    concepto: "mensualidad",
+    ciclo,
+    importe: cuota,
+    pagado: false,
+  });
+}
+
 export async function cambiarEstado(clienteId: string, estado: Estado): Promise<void> {
   const repo = repositorio();
   await repo.transaccion(async () => {

@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { BotonFirmar } from "@/components/BotonFirmar";
 import { CambiarEstado } from "@/components/CambiarEstado";
+import { EditarServicio } from "@/components/EditarServicio";
 import { HistorialServicios } from "@/components/HistorialServicios";
 import { TarjetaServicio } from "@/components/TarjetaServicio";
 import { haySesion } from "@/lib/auth";
@@ -47,6 +48,8 @@ export default async function PaginaPerfil({ params }: { params: Promise<{ id: s
       <BotonFirmar clienteId={cliente.id} ficha={ficha} />
 
       <CambiarEstado clienteId={cliente.id} estado={cliente.estado} nombre={cliente.nombre} />
+
+      <EditarServicio clienteId={cliente.id} ficha={ficha} />
 
       <HistorialServicios clienteId={cliente.id} servicios={servicios} />
     </main>
