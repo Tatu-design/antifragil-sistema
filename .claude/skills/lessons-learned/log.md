@@ -370,3 +370,31 @@ Bash con `-F -` y un heredoc `<<'FIN'`, nunca con `@'…'@`. Y **mirar
 arrastrar el error a algo que ya no se puede corregir sin `push --force`
 (prohibido). Los dos commits se quedan como están: reescribir historia ya
 publicada por un carácter cosmético sale mucho más caro que el defecto.
+
+---
+
+## 2026-08-03 — Las pruebas de lógica no ven lo que ve la pantalla
+
+**Qué pasó:** el motor de las tres modalidades pasó 144 pruebas en verde y
+la economía cuadraba al céntimo. Al dibujar la ficha por primera vez
+aparecieron **tres fallos de golpe** que ninguna prueba había tocado:
+`configurar_servicio` hacía un `UPDATE` sobre una fila que podía no existir
+(se guardaba en silencio nada), las sesiones completadas se calculaban con
+el total de la lista global en vez del ciclo (contadores negativos, «-9 de 8
+sesiones»), y la función que prepara los datos para la plantilla copia
+claves una a una y descartaba las nuevas, así que el precio del bono
+desaparecía sin error.
+
+**Por qué pasó:** las pruebas comprobaban las funciones por separado —
+guardar, firmar, calcular— pero ninguna recorría el camino entero *hasta el
+HTML*. Los tres fallos viven justo en las costuras: entre guardar y leer,
+entre el ciclo y la lista global, entre el diccionario del repositorio y el
+de la plantilla. Ninguno lanza excepción; los tres fallan callados.
+
+**Qué se hace distinto a partir de ahora:** cuando una funcionalidad tenga
+pantalla, **una de las pruebas pide la página y comprueba el texto que sale**
+(ver `TestPantallaPorModalidad` en `tests/test_tres_modalidades.py`), no solo
+que las funciones devuelvan lo correcto. Y en general: desconfiar de
+`UPDATE ... WHERE` cuando la fila puede no existir todavía — casi siempre
+lo que se quiere es `INSERT ... ON CONFLICT DO UPDATE`, que funciona en los
+dos casos.
