@@ -404,11 +404,33 @@ def _calcular_mes_desde_historial(anio: int, mes: int, ruta: Path, conexion: sql
     corregido en el sprint de integridad, 2026-07-28)."""
     patron_mes = f"{anio:04d}-{mes:02d}-%"
 
+    # Facturación y horas de PT se cuentan por separado a propósito
+    # (2026-08-03): son dos cosas distintas y desde que existen las
+    # mensualidades ya no coinciden.
+    #
+    #   - El dinero sale solo de las sesiones que llevan importe.
+    #   - Las HORAS salen de TODAS las sesiones firmadas, lleven importe o
+    #     no. Una sesión de una mensualidad se ha trabajado igual: su dinero
+    #     está en la cuota del mes, no en la sesión.
+    #
+    # Antes las horas también filtraban por `tarifa IS NOT NULL`. El cambio
+    # no altera ningún mes ya cerrado: se comprobó que las 47 sesiones
+    # reales existentes llevan todas su tarifa.
     fila_pt = conexion.execute(
-        "SELECT COALESCE(SUM(tarifa), 0) AS facturacion, COUNT(*) AS horas "
-        "FROM historial_sesiones WHERE fecha LIKE ? AND tarifa IS NOT NULL",
+        "SELECT COALESCE(SUM(tarifa), 0) AS facturacion, "
+        "       COUNT(*) AS horas "
+        "FROM historial_sesiones WHERE fecha LIKE ?",
         (patron_mes,),
     ).fetchone()
+
+    # Cuotas fijas del mes (mensualidades). No salen de contar sesiones: se
+    # facturan enteras por tener las plazas reservadas.
+    fila_cuotas = conexion.execute(
+        "SELECT COALESCE(SUM(importe), 0) AS importe, COUNT(*) AS n "
+        "FROM cargos_mensuales WHERE anio = ? AND mes = ?",
+        (anio, mes),
+    ).fetchone()
+    facturacion_cuotas = fila_cuotas["importe"]
 
     fila_lidomare = conexion.execute(
         "SELECT COUNT(*) AS n FROM clases_grupo WHERE tipo = 'lidomare' AND fecha LIKE ?", (patron_mes,)
@@ -447,7 +469,33 @@ def _calcular_mes_desde_historial(anio: int, mes: int, ruta: Path, conexion: sql
     horas_totales = (
         fila_pt["horas"] + horas_lidomare + (sesiones_kids if facturacion_kids is not None else 0) + ajuste_horas
     )
-    facturacion_total = fila_pt["facturacion"] + facturacion_lidomare + (facturacion_kids or 0) + ajuste_importe
+    facturacion_total = (
+        fila_pt["facturacion"] + facturacion_cuotas + facturacion_lidomare
+        + (facturacion_kids or 0) + ajuste_importe
+    )
+
+    # Desglose por modalidad, para que se vea de dónde sale el dinero del
+    # mes. Se calcula al vuelo desde el ciclo al que pertenece cada sesión:
+    # no se guarda nada nuevo ni hay un segundo sitio que pueda
+    # desincronizarse.
+    filas_modalidad = conexion.execute(
+        "SELECT COALESCE(pc.modalidad, 'bono') AS modalidad, "
+        "       COUNT(*) AS horas, COALESCE(SUM(h.tarifa), 0) AS facturacion "
+        "FROM historial_sesiones h "
+        "LEFT JOIN programas_cliente pc "
+        "       ON pc.cliente = h.cliente AND pc.ciclo_bono = h.ciclo_bono "
+        "WHERE h.fecha LIKE ? GROUP BY 1",
+        (patron_mes,),
+    ).fetchall()
+    por_modalidad = {
+        fila["modalidad"]: {"horas": fila["horas"], "facturacion": fila["facturacion"]}
+        for fila in filas_modalidad
+    }
+    # La facturación de una mensualidad no está en sus sesiones, sino en su
+    # cuota: se le suma aquí para que la línea del desglose diga la verdad.
+    if facturacion_cuotas:
+        entrada = por_modalidad.setdefault("mensualidad", {"horas": 0, "facturacion": 0.0})
+        entrada["facturacion"] += facturacion_cuotas
 
     return {
         "anio": anio,
@@ -455,6 +503,9 @@ def _calcular_mes_desde_historial(anio: int, mes: int, ruta: Path, conexion: sql
         "facturacion_total": facturacion_total,
         "horas_totales": horas_totales,
         "precio_medio_hora": facturacion_total / horas_totales if horas_totales else 0.0,
+        "facturacion_cuotas": facturacion_cuotas,
+        "cuotas": fila_cuotas["n"],
+        "por_modalidad": por_modalidad,
         "sesiones_kids": sesiones_kids,
         "facturacion_kids": facturacion_kids,
         "provisional": provisional,
@@ -483,10 +534,14 @@ def listar_meses(ruta: Path = RUTA_POR_DEFECTO) -> list[dict]:
         # de antes del registro de fechas, sin ninguna fila de historial que
         # la respalde. No incluirlo aquí lo haría desaparecer del histórico.
         meses_ajuste = conexion.execute("SELECT DISTINCT anio, mes FROM ajustes_mensuales").fetchall()
+        # Un mes puede existir solo por la cuota de una mensualidad, sin
+        # ninguna sesión firmada todavía (el cliente paga por adelantado).
+        meses_cuota = conexion.execute("SELECT DISTINCT anio, mes FROM cargos_mensuales").fetchall()
         claves = (
             {(int(f["anio"]), int(f["mes"])) for f in meses_pt}
             | {(int(f["anio"]), int(f["mes"])) for f in meses_grupo}
             | {(f["anio"], f["mes"]) for f in meses_ajuste}
+            | {(f["anio"], f["mes"]) for f in meses_cuota}
         )
 
         return [
@@ -507,7 +562,8 @@ def obtener_mes(anio: int, mes: int, ruta: Path = RUTA_POR_DEFECTO) -> dict | No
         hay_datos = conexion.execute(
             "SELECT EXISTS(SELECT 1 FROM historial_sesiones WHERE substr(fecha,1,4)=? AND substr(fecha,6,2)=?) "
             "OR EXISTS(SELECT 1 FROM clases_grupo WHERE substr(fecha,1,4)=? AND substr(fecha,6,2)=?) "
-            "OR EXISTS(SELECT 1 FROM ajustes_mensuales WHERE anio=? AND mes=?) AS hay",
-            (f"{anio:04d}", f"{mes:02d}", f"{anio:04d}", f"{mes:02d}", anio, mes),
+            "OR EXISTS(SELECT 1 FROM ajustes_mensuales WHERE anio=? AND mes=?) "
+            "OR EXISTS(SELECT 1 FROM cargos_mensuales WHERE anio=? AND mes=?) AS hay",
+            (f"{anio:04d}", f"{mes:02d}", f"{anio:04d}", f"{mes:02d}", anio, mes, anio, mes),
         ).fetchone()["hay"]
     return resultado if hay_datos else None

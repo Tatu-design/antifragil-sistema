@@ -24,11 +24,13 @@ from basedatos import RUTA_POR_DEFECTO, transaccion
 from calendar_integration.semana import get_week_range
 from clientes.repositorio import (
     aplicar_actualizaciones,
+    asegurar_ciclo_mensual,
     cerrar_programa_cliente,
     editar_historial,
     eliminar_cliente,
     eliminar_historial,
     marcar_pendiente_pago,
+    obtener_ciclo_actual,
     obtener_historial,
     registrar_historial,
     registrar_programa_cliente,
@@ -40,7 +42,15 @@ from economia.registro import (
     registrar_semana,
     verificar_sincronizacion_semana,
 )
+from programas.logica import ActualizacionPrograma
 from programas.procesar import procesar_una_sesion
+from servicios.modalidades import (
+    BONO,
+    CUENTA,
+    MENSUALIDAD,
+    consume_sesiones,
+    tarifa_de_la_sesion,
+)
 from zona_horaria import ahora_negocio, hoy_negocio
 
 
@@ -137,31 +147,69 @@ def registrar_sesion_pt(
     inicio_semana, fin_semana = get_week_range(datetime.combine(fecha, datetime.min.time()))
 
     with transaccion(ruta, inmediata=True) as conexion:
-        # Estado del cliente leído DENTRO de la transacción bloqueante: es
-        # la base del cálculo de la siguiente sesión, así que no puede
-        # leerse antes de coger el bloqueo.
-        fila_cliente = conexion.execute(
-            "SELECT c.tipo_programa, c.sesiones_completadas, c.pendiente_pago, c.ciclo_bono, "
-            "       p.tarifa, p.sesiones_totales "
-            "FROM clientes c LEFT JOIN programas p ON p.nombre = c.tipo_programa "
-            "WHERE c.nombre = ?",
-            (nombre,),
-        ).fetchone()
-        if fila_cliente is None:
-            raise ValueError(f"'{nombre}' no tiene un programa asignado")
-        if fila_cliente["sesiones_totales"] is None or fila_cliente["tarifa"] is None:
-            raise ValueError(f"A '{nombre}' le faltan datos de programa por rellenar — revísalo en Editar cliente")
+        # Si es un cliente mensual y ha cambiado el mes, primero se abre su
+        # ciclo nuevo — DENTRO de la misma transacción que la firma, para que
+        # no pueda quedarse a medias (ciclo abierto pero sesión sin guardar,
+        # o al revés).
+        asegurar_ciclo_mensual(nombre, fecha.year, fecha.month, conexion=conexion)
 
-        programa = {
-            "sesiones_restantes": fila_cliente["sesiones_totales"] - fila_cliente["sesiones_completadas"],
-            "sesiones_totales": fila_cliente["sesiones_totales"],
-            "pendiente_pago": bool(fila_cliente["pendiente_pago"]),
-            "tipo_programa": fila_cliente["tipo_programa"],
-        }
-        tarifa = fila_cliente["tarifa"]
-        ciclo_bono = fila_cliente["ciclo_bono"]
+        # Condiciones del ciclo en curso leídas DENTRO de la transacción
+        # bloqueante: son la base del cálculo de la siguiente sesión, así que
+        # no pueden leerse antes de coger el bloqueo.
+        ciclo = obtener_ciclo_actual(nombre, conexion=conexion)
+        if ciclo is None:
+            raise ValueError(f"'{nombre}' no tiene un servicio asignado")
 
-        paso, numero_sesion = procesar_una_sesion(programa)
+        modalidad = ciclo["modalidad"]
+        ciclo_bono = ciclo["ciclo_bono"]
+        etiqueta_servicio = ciclo["tipo_programa"]
+
+        if modalidad == BONO:
+            if ciclo["sesiones_totales"] is None or ciclo["tarifa"] is None:
+                raise ValueError(
+                    f"A '{nombre}' le faltan datos del bono por rellenar — revísalo en Editar programa"
+                )
+        elif modalidad == CUENTA and ciclo["tarifa"] is None:
+            raise ValueError(
+                f"A '{nombre}' le falta el precio por sesión — revísalo en Editar programa"
+            )
+        elif modalidad == MENSUALIDAD and not ciclo["cuota_mensual"]:
+            raise ValueError(
+                f"A '{nombre}' le falta la cuota mensual — revísalo en Editar programa"
+            )
+
+        # Lo que esta sesión aporta a la economía. En una mensualidad es
+        # `None`: la cuota del mes ya está registrada aparte, así que sumar
+        # también cada sesión sería cobrar dos veces. La sesión se guarda
+        # igual y sigue contando como hora trabajada.
+        tarifa = tarifa_de_la_sesion(modalidad, ciclo["tarifa"])
+
+        if consume_sesiones(modalidad):
+            programa = {
+                "sesiones_restantes": ciclo["sesiones_totales"] - ciclo["sesiones_completadas"],
+                "sesiones_totales": ciclo["sesiones_totales"],
+                "pendiente_pago": bool(ciclo["pendiente_pago"]),
+                "tipo_programa": etiqueta_servicio,
+            }
+            paso, numero_sesion = procesar_una_sesion(programa)
+        else:
+            # Mensualidad y cuenta de cliente: no hay saldo que gastar ni
+            # renovación que disparar. La sesión simplemente es la siguiente
+            # de este mes.
+            hechas = conexion.execute(
+                "SELECT COUNT(*) AS n FROM historial_sesiones WHERE cliente = ? AND ciclo_bono = ?",
+                (nombre, ciclo_bono),
+            ).fetchone()["n"]
+            numero_sesion = hechas + 1
+            programa = {
+                "sesiones_totales": 0,  # 0 = sin tope
+                "pendiente_pago": bool(ciclo["pendiente_pago"]),
+                "tipo_programa": etiqueta_servicio,
+            }
+            paso = ActualizacionPrograma(
+                sesiones_restantes=0, renovado=False,
+                pendiente_pago=bool(ciclo["pendiente_pago"]), aviso_ultima_sesion=False,
+            )
 
         if clave_idempotencia is not None:
             ya_procesada = conexion.execute(
@@ -186,13 +234,25 @@ def registrar_sesion_pt(
                 (clave_idempotencia, hoy_negocio().isoformat()),
             )
 
-        aplicar_actualizaciones({nombre: paso}, conexion=conexion)
-        # El bono en curso debe existir como ficha antes de colgarle
-        # sesiones (un cliente recién dado de alta aún no la tiene).
-        registrar_programa_cliente(
-            nombre, ciclo_bono, programa["tipo_programa"], tarifa,
-            programa["sesiones_totales"], fecha.isoformat(), conexion=conexion,
-        )
+        if consume_sesiones(modalidad):
+            # Solo un bono descuenta saldo y puede renovar. Una mensualidad
+            # o una cuenta no tienen nada que gastar.
+            aplicar_actualizaciones({nombre: paso}, conexion=conexion)
+            # El bono en curso debe existir como ficha antes de colgarle
+            # sesiones (un cliente recién dado de alta aún no la tiene).
+            registrar_programa_cliente(
+                nombre, ciclo_bono, programa["tipo_programa"], ciclo["tarifa"],
+                programa["sesiones_totales"], fecha.isoformat(), conexion=conexion,
+            )
+        else:
+            # La ficha del ciclo mensual ya existe (la creó
+            # `asegurar_ciclo_mensual` o la configuración del servicio);
+            # solo estrena su fecha de inicio con la primera sesión.
+            conexion.execute(
+                "UPDATE programas_cliente SET fecha_inicio = COALESCE(fecha_inicio, ?) "
+                "WHERE cliente = ? AND ciclo_bono = ?",
+                (fecha.isoformat(), nombre, ciclo_bono),
+            )
 
         registrar_historial(
             {
@@ -215,14 +275,20 @@ def registrar_sesion_pt(
         if paso.renovado:
             # Esta sesión ha cerrado el bono: se anota cuándo terminó y si
             # quedó pagado (es el único momento en que se sabe), y se abre la
-            # ficha del bono nuevo, que nace pendiente de pago.
+            # ficha del bono nuevo, que nace pendiente de pago. Con las mismas
+            # condiciones económicas, que quedan congeladas en cada ciclo.
             cerrar_programa_cliente(
                 nombre, ciclo_bono, fecha.isoformat(),
                 pagado=not programa["pendiente_pago"], conexion=conexion,
             )
             registrar_programa_cliente(
-                nombre, ciclo_bono + 1, programa["tipo_programa"], tarifa,
+                nombre, ciclo_bono + 1, programa["tipo_programa"], ciclo["tarifa"],
                 programa["sesiones_totales"], None, conexion=conexion,
+            )
+            conexion.execute(
+                "UPDATE programas_cliente SET modalidad = ?, precio_total = ? "
+                "WHERE cliente = ? AND ciclo_bono = ?",
+                (modalidad, ciclo["precio_total"], nombre, ciclo_bono + 1),
             )
 
         # Avisos para que Fernando se entere sin tener que estar mirando la

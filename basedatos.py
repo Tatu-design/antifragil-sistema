@@ -305,6 +305,76 @@ def crear_esquema(ruta: Path = RUTA_POR_DEFECTO) -> None:
             )
             """
         )
+        # Las tres modalidades de servicio (2026-08-03).
+        #
+        # Hasta ahora todo cliente funcionaba como un bono de sesiones. Ahora
+        # cada ciclo dice de qué clase es:
+        #
+        #   'bono'        se paga por adelantado un paquete de N sesiones;
+        #                 cada sesión descuenta y al agotarse se renueva.
+        #   'mensualidad' se paga una cuota fija al mes por tener las plazas
+        #                 reservadas; las sesiones NO se consumen ni cambian
+        #                 lo facturado, solo suman horas reales.
+        #   'cuenta'      se paga al final por lo realmente hecho; cada
+        #                 sesión suma su precio y no hay tope ni renovación.
+        #
+        # Todas las columnas son opcionales y se añaden con ALTER TABLE: no
+        # se reescribe ni una fila existente, y `modalidad` nace en 'bono',
+        # que es lo que TODOS los clientes actuales son.
+        #
+        # `ciclo_bono` se conserva como número de ciclo genérico aunque la
+        # palabra "bono" se quede corta: es la columna con la que razonan la
+        # renovación, el borrado seguro y el historial. Renombrarla obligaría
+        # a tocar el código más delicado del proyecto para ganar solo un
+        # nombre mejor.
+        columnas_ciclo = {fila["name"] for fila in conexion.execute("PRAGMA table_info(programas_cliente)")}
+        nuevas_columnas_ciclo = {
+            # Qué clase de servicio es este ciclo.
+            "modalidad": "TEXT NOT NULL DEFAULT 'bono'",
+            # Bono: lo que costó el paquete entero (tarifa × sesiones).
+            "precio_total": "REAL",
+            # Mensualidad: la cuota fija del mes.
+            "cuota_mensual": "REAL",
+            # Mensualidad: sesiones previstas al mes. Informativo — no es un
+            # límite, no se consume y no provoca renovación.
+            "sesiones_referencia": "INTEGER",
+            # Mensualidad y cuenta: a qué mes natural corresponde el ciclo.
+            "anio": "INTEGER",
+            "mes": "INTEGER",
+        }
+        for columna, tipo in nuevas_columnas_ciclo.items():
+            if columna not in columnas_ciclo:
+                conexion.execute(f"ALTER TABLE programas_cliente ADD COLUMN {columna} {tipo}")
+
+        # Cargos fijos de un mes que NO salen de contar sesiones (2026-08-03).
+        #
+        # Una mensualidad se factura entera al empezar el mes, independiente
+        # de cuántas sesiones se hagan después. Guardarla aquí, y no como
+        # sesiones inventadas en el historial, mantiene separadas las dos
+        # cosas que nunca deben mezclarse: el dinero producido y las horas
+        # realmente trabajadas.
+        #
+        # La clave primaria (cliente, año, mes, concepto) es lo que impide
+        # cobrar dos veces el mismo mes. No lo impide el código que llama:
+        # lo impide la base de datos, aunque lleguen diez peticiones a la vez.
+        conexion.execute(
+            """
+            CREATE TABLE IF NOT EXISTS cargos_mensuales (
+                cliente TEXT NOT NULL REFERENCES clientes(nombre),
+                anio INTEGER NOT NULL,
+                mes INTEGER NOT NULL,
+                concepto TEXT NOT NULL DEFAULT 'mensualidad',
+                ciclo INTEGER NOT NULL,
+                importe REAL NOT NULL,
+                creado TEXT,
+                pagado INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (cliente, anio, mes, concepto)
+            )
+            """
+        )
+        conexion.execute(
+            "CREATE INDEX IF NOT EXISTS idx_cargos_mes ON cargos_mensuales(anio, mes)"
+        )
         conexion.execute(
             """
             CREATE TABLE IF NOT EXISTS clases_grupo (

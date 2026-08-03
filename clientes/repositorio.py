@@ -20,6 +20,14 @@ from pathlib import Path
 
 from basedatos import RUTA_POR_DEFECTO, conectar
 from programas.logica import ActualizacionPrograma
+from servicios.modalidades import (
+    BONO,
+    ETIQUETAS as ETIQUETAS_MODALIDAD,
+    MODALIDAD_POR_DEFECTO,
+    es_mensual,
+    validar_condiciones,
+    validar_modalidad,
+)
 
 
 ESTADOS_VALIDOS = ("activo", "pausado", "cancelado")
@@ -47,14 +55,46 @@ def leer_clientes(ruta: Path = RUTA_POR_DEFECTO) -> dict[str, dict]:
     Fernando anota las sesiones "completadas" (consumidas del bono actual),
     no las que le quedan. `a_programa` hace la conversión a "restantes"
     para la lógica de `programas`.
+
+    Desde el 2026-08-03 las condiciones económicas (tarifa, sesiones, cuota)
+    se leen del CICLO EN CURSO del cliente (`programas_cliente`), no de la
+    lista global `programas`. La lista global queda como atajo para dar de
+    alta un bono rápido, pero ya no manda: cada cliente puede tener sus
+    propias condiciones sin que exista un programa predefinido con ese
+    nombre.
+
+    El `JOIN` con `programas` pasa a ser `LEFT JOIN` — y esto es lo más
+    importante de todo el cambio. Con el `JOIN` normal, un cliente cuyo
+    `tipo_programa` no estuviera en la lista global DESAPARECÍA de la
+    aplicación entera: de la lista, de su ficha y de la economía. Con
+    condiciones propias por cliente eso pasaría constantemente.
     """
     with conectar(ruta) as conexion:
         filas = conexion.execute(
             """
-            SELECT c.nombre, c.tipo_programa, p.tarifa, p.sesiones_totales,
-                   c.sesiones_completadas, c.pendiente_pago, c.token, c.estado
+            SELECT c.nombre, c.sesiones_completadas, c.pendiente_pago, c.token,
+                   c.estado, c.ciclo_bono,
+                   -- Si el cliente tiene ficha de su ciclo en curso, manda ella
+                   -- por completo. Nada de mezclar a medias con la lista
+                   -- global: una mensualidad no tiene tarifa por sesión, y
+                   -- rellenarla desde `programas` le pondría un precio que no
+                   -- le corresponde y la cobraría dos veces.
+                   CASE WHEN pc.cliente IS NULL THEN c.tipo_programa ELSE pc.tipo_programa END AS tipo_programa,
+                   CASE WHEN pc.cliente IS NULL THEN p.tarifa ELSE pc.tarifa END AS tarifa,
+                   CASE WHEN pc.cliente IS NULL THEN p.sesiones_totales ELSE pc.sesiones_totales END AS sesiones_totales,
+                   COALESCE(pc.modalidad, 'bono') AS modalidad,
+                   pc.precio_total, pc.cuota_mensual, pc.sesiones_referencia,
+                   pc.anio, pc.mes,
+                   -- Sesiones realmente firmadas en el ciclo en curso. Para un
+                   -- bono coincide con `sesiones_completadas`; para una
+                   -- mensualidad o una cuenta es la única cuenta que existe,
+                   -- porque ahí no se consume nada.
+                   (SELECT COUNT(*) FROM historial_sesiones h
+                     WHERE h.cliente = c.nombre AND h.ciclo_bono = c.ciclo_bono) AS sesiones_ciclo
             FROM clientes c
-            JOIN programas p ON p.nombre = c.tipo_programa
+            LEFT JOIN programas p ON p.nombre = c.tipo_programa
+            LEFT JOIN programas_cliente pc
+                   ON pc.cliente = c.nombre AND pc.ciclo_bono = c.ciclo_bono
             ORDER BY c.nombre
             """
         ).fetchall()
@@ -68,6 +108,14 @@ def leer_clientes(ruta: Path = RUTA_POR_DEFECTO) -> dict[str, dict]:
             "pendiente_pago": "Sí" if fila["pendiente_pago"] else "No",
             "token": fila["token"],
             "estado": fila["estado"] or ESTADO_POR_DEFECTO,
+            "modalidad": fila["modalidad"] or MODALIDAD_POR_DEFECTO,
+            "ciclo_bono": fila["ciclo_bono"],
+            "sesiones_ciclo": fila["sesiones_ciclo"],
+            "precio_total": fila["precio_total"],
+            "cuota_mensual": fila["cuota_mensual"],
+            "sesiones_referencia": fila["sesiones_referencia"],
+            "anio": fila["anio"],
+            "mes": fila["mes"],
         }
         for fila in filas
     }
@@ -167,6 +215,26 @@ def _validar_sesiones_completadas(sesiones_completadas: int, tipo_programa: str,
             f"Las sesiones completadas ({sesiones_completadas}) no pueden superar las del "
             f"programa '{tipo_programa}' ({programa['sesiones_totales']})"
         )
+
+
+def _puntero_de_programa_valido(tipo_programa: str, conexion: sqlite3.Connection) -> str | None:
+    """Devuelve `tipo_programa` solo si existe en la lista global.
+
+    `clientes.tipo_programa` tiene una clave foránea contra `programas`, así
+    que ahí no se puede escribir un nombre libre. Desde el 2026-08-03 la
+    etiqueta de verdad del servicio vive en el ciclo
+    (`programas_cliente.tipo_programa`), que sí es libre, y es la que se
+    muestra en pantalla; esta columna se queda como puntero heredado y se
+    deja intacta cuando el nombre nuevo no está en la lista.
+
+    Se resolvió así, y no quitando la clave foránea, porque quitarla obliga a
+    reconstruir la tabla `clientes` — de la que cuelgan las claves foráneas
+    de historial, bonos y confirmaciones. Cambio pequeño y reversible frente
+    a uno grande y arriesgado, que es la regla del proyecto."""
+    if not tipo_programa:
+        return None
+    existe = conexion.execute("SELECT 1 FROM programas WHERE nombre = ?", (tipo_programa,)).fetchone()
+    return tipo_programa if existe else None
 
 
 def crear_cliente(
@@ -270,20 +338,34 @@ def actualizar_cliente(
                 colision = conexion.execute("SELECT 1 FROM clientes WHERE nombre = ?", (nuevo_nombre,)).fetchone()
                 if colision:
                     raise ValueError(f"Ya existe un cliente llamado '{nuevo_nombre}'")
-            _validar_sesiones_completadas(sesiones_completadas, tipo_programa, conexion)
+            # El puntero solo se cambia si el nombre existe en la lista
+            # global; si es una etiqueta libre del cliente, se conserva el
+            # que ya tenía (ver `_puntero_de_programa_valido`).
+            puntero = _puntero_de_programa_valido(tipo_programa, conexion)
+            if puntero is not None:
+                _validar_sesiones_completadas(sesiones_completadas, tipo_programa, conexion)
+            elif sesiones_completadas < 0:
+                raise ValueError("Las sesiones completadas no pueden ser negativas")
 
             if estado is None:
                 conexion.execute(
-                    "UPDATE clientes SET nombre = ?, tipo_programa = ?, sesiones_completadas = ?, "
-                    "pendiente_pago = ? WHERE nombre = ?",
-                    (nuevo_nombre, tipo_programa, sesiones_completadas, int(pendiente_pago), nombre),
+                    "UPDATE clientes SET nombre = ?, tipo_programa = COALESCE(?, tipo_programa), "
+                    "sesiones_completadas = ?, pendiente_pago = ? WHERE nombre = ?",
+                    (nuevo_nombre, puntero, sesiones_completadas, int(pendiente_pago), nombre),
                 )
             else:
                 validar_estado(estado)
                 conexion.execute(
-                    "UPDATE clientes SET nombre = ?, tipo_programa = ?, sesiones_completadas = ?, "
-                    "pendiente_pago = ?, estado = ? WHERE nombre = ?",
-                    (nuevo_nombre, tipo_programa, sesiones_completadas, int(pendiente_pago), estado, nombre),
+                    "UPDATE clientes SET nombre = ?, tipo_programa = COALESCE(?, tipo_programa), "
+                    "sesiones_completadas = ?, pendiente_pago = ?, estado = ? WHERE nombre = ?",
+                    (nuevo_nombre, puntero, sesiones_completadas, int(pendiente_pago), estado, nombre),
+                )
+            # La etiqueta que se ve en pantalla vive en el ciclo en curso.
+            if tipo_programa:
+                conexion.execute(
+                    "UPDATE programas_cliente SET tipo_programa = ? "
+                    "WHERE cliente = ? AND ciclo_bono = (SELECT ciclo_bono FROM clientes WHERE nombre = ?)",
+                    (tipo_programa, nombre, nuevo_nombre),
                 )
             if nuevo_nombre != nombre:
                 conexion.execute(
@@ -610,7 +692,9 @@ def obtener_programas_cliente(nombre: str, ruta: Path = RUTA_POR_DEFECTO) -> lis
         ciclo_actual = ficha["ciclo_bono"]
 
         bonos = conexion.execute(
-            "SELECT ciclo_bono, tipo_programa, tarifa, sesiones_totales, fecha_inicio, fecha_fin, pagado "
+            "SELECT ciclo_bono, tipo_programa, tarifa, sesiones_totales, fecha_inicio, fecha_fin, pagado, "
+            "       COALESCE(modalidad, 'bono') AS modalidad, precio_total, cuota_mensual, "
+            "       sesiones_referencia, anio, mes "
             "FROM programas_cliente WHERE cliente = ? ORDER BY ciclo_bono DESC",
             (nombre,),
         ).fetchall()
@@ -642,10 +726,228 @@ def obtener_programas_cliente(nombre: str, ruta: Path = RUTA_POR_DEFECTO) -> lis
             "fecha_inicio": sesiones_actuales[-1]["fecha"] if sesiones_actuales else None,
             "fecha_fin": None,
             "pagado": int(not ficha["pendiente_pago"]),
+            "modalidad": MODALIDAD_POR_DEFECTO,
+            "precio_total": None,
+            "cuota_mensual": None,
+            "sesiones_referencia": None,
+            "anio": None,
+            "mes": None,
             "es_actual": True,
             "sesiones": sesiones_actuales,
         })
     return resultado
+
+
+def obtener_ciclo_actual(
+    cliente: str, conexion: sqlite3.Connection | None = None, ruta: Path = RUTA_POR_DEFECTO
+) -> dict | None:
+    """El ciclo en curso de un cliente, con sus condiciones económicas.
+
+    Es la respuesta a "¿qué tiene contratado ahora mismo y en qué
+    condiciones?", y la fuente de verdad para firmar una sesión: la
+    modalidad decide si se consume saldo, si la sesión lleva importe y si
+    hay que renovar."""
+
+    def _hacer(conexion: sqlite3.Connection) -> dict | None:
+        fila = conexion.execute(
+            "SELECT pc.*, c.pendiente_pago, c.estado, c.sesiones_completadas, "
+            "       c.ciclo_bono AS ciclo_del_cliente, c.tipo_programa AS programa_del_cliente, "
+            "       p.tarifa AS tarifa_global, p.sesiones_totales AS totales_global "
+            "FROM clientes c "
+            "LEFT JOIN programas_cliente pc ON pc.cliente = c.nombre AND pc.ciclo_bono = c.ciclo_bono "
+            "LEFT JOIN programas p ON p.nombre = c.tipo_programa "
+            "WHERE c.nombre = ?",
+            (cliente,),
+        ).fetchone()
+        if fila is None:
+            return None
+
+        datos = dict(fila)
+        if datos.get("cliente") is None:
+            # El cliente existe pero le falta la ficha de su ciclo en curso
+            # (dado de alta antes de que existieran, o creado a mano). Se
+            # compone al vuelo desde la lista global para que pueda seguir
+            # firmando con normalidad — leer nunca escribe.
+            datos.update({
+                "cliente": cliente,
+                "ciclo_bono": datos["ciclo_del_cliente"],
+                "tipo_programa": datos["programa_del_cliente"],
+                "modalidad": MODALIDAD_POR_DEFECTO,
+                "tarifa": datos["tarifa_global"],
+                "sesiones_totales": datos["totales_global"],
+                "precio_total": None,
+                "cuota_mensual": None,
+                "sesiones_referencia": None,
+                "anio": None,
+                "mes": None,
+                "fecha_inicio": None,
+                "fecha_fin": None,
+                "pagado": int(not datos["pendiente_pago"]),
+            })
+
+        datos["modalidad"] = datos.get("modalidad") or MODALIDAD_POR_DEFECTO
+        return datos
+
+    if conexion is not None:
+        return _hacer(conexion)
+    with conectar(ruta) as conexion:
+        return _hacer(conexion)
+
+
+def asegurar_ciclo_mensual(
+    cliente: str,
+    anio: int,
+    mes: int,
+    conexion: sqlite3.Connection | None = None,
+    ruta: Path = RUTA_POR_DEFECTO,
+) -> dict:
+    """Se asegura de que un cliente mensual (mensualidad o cuenta) tiene
+    abierto el ciclo del mes que se le indica. Si ya lo tiene, no hace nada.
+
+    Es la pieza que hace que la mensualidad se renueve por CALENDARIO y no
+    por número de sesiones: al llegar agosto se cierra el ciclo de julio
+    (con sus sesiones, su cuota y su estado de pago congelados) y se abre el
+    de agosto, en cero y pendiente de pago.
+
+    **Segura de llamar tantas veces como haga falta.** No lo garantiza este
+    código, sino la base de datos: la clave primaria de `cargos_mensuales`
+    es (cliente, año, mes, concepto), así que aunque diez peticiones a la
+    vez intenten cobrar agosto, solo cabe una fila. Por eso se puede llamar
+    al abrir la ficha, al firmar y al arrancar la app sin miedo a duplicar
+    la cuota.
+
+    Devuelve {"creado": bool, "ciclo": int} — `creado` dice si ha abierto
+    uno nuevo, para poder contarlo o enseñarlo.
+    """
+
+    def _hacer(conexion: sqlite3.Connection) -> dict:
+        actual = obtener_ciclo_actual(cliente, conexion=conexion)
+        if actual is None or not es_mensual(actual["modalidad"]):
+            # Un bono no se renueva por calendario: se renueva al agotarse.
+            return {"creado": False, "ciclo": actual["ciclo_bono"] if actual else None}
+
+        if actual["anio"] == anio and actual["mes"] == mes:
+            return {"creado": False, "ciclo": actual["ciclo_bono"]}
+
+        if (actual["anio"], actual["mes"]) > (anio, mes):
+            # Nunca se retrocede: si el ciclo en curso es de un mes
+            # posterior, alguien está consultando el pasado. No se toca.
+            return {"creado": False, "ciclo": actual["ciclo_bono"]}
+
+        ciclo_anterior = actual["ciclo_bono"]
+        ciclo_nuevo = ciclo_anterior + 1
+
+        # El mes que se va queda congelado tal cual quedó: su cuota, sus
+        # sesiones, su precio efectivo y su estado de pago. No se recalcula
+        # nada de lo anterior.
+        ultima = conexion.execute(
+            "SELECT MAX(fecha) AS f FROM historial_sesiones WHERE cliente = ? AND ciclo_bono = ?",
+            (cliente, ciclo_anterior),
+        ).fetchone()["f"]
+        conexion.execute(
+            "UPDATE programas_cliente SET fecha_fin = COALESCE(fecha_fin, ?), pagado = ? "
+            "WHERE cliente = ? AND ciclo_bono = ?",
+            (ultima, int(not actual["pendiente_pago"]), cliente, ciclo_anterior),
+        )
+
+        conexion.execute(
+            "INSERT INTO programas_cliente "
+            "(cliente, ciclo_bono, tipo_programa, modalidad, tarifa, sesiones_totales, "
+            " precio_total, cuota_mensual, sesiones_referencia, anio, mes, fecha_inicio, fecha_fin, pagado) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, 0) "
+            "ON CONFLICT(cliente, ciclo_bono) DO NOTHING",
+            (
+                cliente, ciclo_nuevo, actual["tipo_programa"], actual["modalidad"],
+                actual["tarifa"], actual["sesiones_totales"] or 0, actual["precio_total"],
+                actual["cuota_mensual"], actual["sesiones_referencia"], anio, mes,
+            ),
+        )
+        conexion.execute("UPDATE clientes SET ciclo_bono = ? WHERE nombre = ?", (ciclo_nuevo, cliente))
+        # El mes nuevo empieza a deberse: todavía no se ha cobrado.
+        conexion.execute("UPDATE clientes SET pendiente_pago = 1 WHERE nombre = ?", (cliente,))
+
+        _cobrar_mes_si_procede(cliente, ciclo_nuevo, anio, mes, conexion)
+        return {"creado": True, "ciclo": ciclo_nuevo}
+
+    if conexion is not None:
+        return _hacer(conexion)
+    with conectar(ruta) as conexion:
+        resultado = _hacer(conexion)
+        conexion.commit()
+        return resultado
+
+
+def _cobrar_mes_si_procede(
+    cliente: str, ciclo: int, anio: int, mes: int, conexion: sqlite3.Connection
+) -> None:
+    """Registra la cuota del mes de una mensualidad — una sola vez.
+
+    Solo las mensualidades generan cargo: una cuenta de cliente factura por
+    las sesiones que se firmen, no por adelantado.
+
+    Un cliente pausado o cancelado NO genera cuota: cobrar automáticamente a
+    quien ha dejado de entrenar sería inventar ingresos. (Decisión prudente
+    de Claude, 2026-08-03, pendiente de que Fernando la confirme.)"""
+    fila = conexion.execute(
+        "SELECT pc.modalidad, pc.cuota_mensual, c.estado FROM programas_cliente pc "
+        "JOIN clientes c ON c.nombre = pc.cliente "
+        "WHERE pc.cliente = ? AND pc.ciclo_bono = ?",
+        (cliente, ciclo),
+    ).fetchone()
+    if fila is None:
+        return
+    if (fila["modalidad"] or MODALIDAD_POR_DEFECTO) != "mensualidad":
+        return
+    if not fila["cuota_mensual"]:
+        return
+    if (fila["estado"] or ESTADO_POR_DEFECTO) != "activo":
+        return
+
+    # `DO NOTHING` sobre la clave (cliente, año, mes, concepto): es la base
+    # de datos la que impide cobrar dos veces el mismo mes.
+    conexion.execute(
+        "INSERT INTO cargos_mensuales (cliente, anio, mes, concepto, ciclo, importe, creado, pagado) "
+        "VALUES (?, ?, ?, 'mensualidad', ?, ?, ?, 0) "
+        "ON CONFLICT(cliente, anio, mes, concepto) DO NOTHING",
+        (cliente, anio, mes, ciclo, fila["cuota_mensual"], date.today().isoformat()),
+    )
+
+
+def asegurar_ciclos_mensuales(
+    anio: int, mes: int, ruta: Path = RUTA_POR_DEFECTO
+) -> int:
+    """Pone al día a todos los clientes mensuales de golpe. Se llama al
+    arrancar la web y al abrir la lista de clientes, que es la pantalla que
+    Fernando abre siempre.
+
+    Deliberadamente NO se llama desde Economía: consultar una pantalla no
+    debe escribir en la base de datos. Así una consulta nunca puede crear ni
+    duplicar nada, que es la garantía más fácil de mantener.
+
+    Devuelve cuántos ciclos nuevos se han abierto."""
+    if not ruta.exists():
+        return 0
+
+    creados = 0
+    with conectar(ruta) as conexion:
+        mensuales = conexion.execute(
+            "SELECT c.nombre FROM clientes c "
+            "JOIN programas_cliente pc ON pc.cliente = c.nombre AND pc.ciclo_bono = c.ciclo_bono "
+            "WHERE pc.modalidad IN ('mensualidad', 'cuenta')"
+        ).fetchall()
+        for fila in mensuales:
+            if asegurar_ciclo_mensual(fila["nombre"], anio, mes, conexion=conexion)["creado"]:
+                creados += 1
+        # También hay que cobrar el mes en curso de quien ya lo tiene abierto
+        # pero todavía no tiene su cargo (p. ej. recién configurado a
+        # mensualidad a mitad de mes).
+        for fila in mensuales:
+            actual = obtener_ciclo_actual(fila["nombre"], conexion=conexion)
+            if actual and actual["anio"] == anio and actual["mes"] == mes:
+                _cobrar_mes_si_procede(fila["nombre"], actual["ciclo_bono"], anio, mes, conexion)
+        conexion.commit()
+
+    return creados
 
 
 def registrar_programa_cliente(
@@ -683,6 +985,126 @@ def registrar_programa_cliente(
     else:
         with conectar(ruta) as conexion:
             _hacer(conexion)
+
+
+def configurar_servicio(
+    cliente: str,
+    modalidad: str,
+    *,
+    nombre_servicio: str | None = None,
+    sesiones_totales=None,
+    precio_total=None,
+    cuota_mensual=None,
+    tarifa=None,
+    sesiones_referencia=None,
+    pendiente_pago: bool | None = None,
+    hoy: date | None = None,
+    ruta: Path = RUTA_POR_DEFECTO,
+) -> dict:
+    """Configura el servicio de un cliente: su modalidad y sus condiciones.
+
+    Es lo que hay detrás de «Editar programa». Dos comportamientos muy
+    distintos según lo que se cambie:
+
+    **Si la modalidad NO cambia**, se corrigen las condiciones del ciclo en
+    curso ahí mismo. Es una corrección, no un servicio nuevo.
+
+    **Si la modalidad SÍ cambia**, el ciclo actual se CIERRA y se abre uno
+    nuevo. Nunca se transforma un ciclo ya empezado: las sesiones ya hechas
+    se quedan donde están, con las condiciones con las que se hicieron, y la
+    economía pasada no se recalcula. Un bono a medias no se convierte en una
+    mensualidad — se cierra como bono y empieza una mensualidad limpia.
+
+    Todo ocurre dentro de una única transacción: o se guarda entero o no se
+    guarda nada.
+    """
+    validar_modalidad(modalidad)
+    condiciones = validar_condiciones(
+        modalidad,
+        sesiones_totales=sesiones_totales,
+        precio_total=precio_total,
+        cuota_mensual=cuota_mensual,
+        tarifa=tarifa,
+        sesiones_referencia=sesiones_referencia,
+    )
+    hoy = hoy or date.today()
+
+    with conectar(ruta) as conexion:
+        conexion.isolation_level = None
+        conexion.execute("BEGIN IMMEDIATE")
+        try:
+            actual = obtener_ciclo_actual(cliente, conexion=conexion)
+            if actual is None:
+                raise ValueError(f"No existe el cliente '{cliente}'")
+
+            etiqueta = (nombre_servicio or "").strip() or actual["tipo_programa"] or ETIQUETAS_MODALIDAD[modalidad]
+            cambia_modalidad = actual["modalidad"] != modalidad
+            debe = actual["pendiente_pago"] if pendiente_pago is None else pendiente_pago
+
+            if cambia_modalidad:
+                ciclo_nuevo = actual["ciclo_bono"] + 1
+                ultima = conexion.execute(
+                    "SELECT MAX(fecha) AS f FROM historial_sesiones WHERE cliente = ? AND ciclo_bono = ?",
+                    (cliente, actual["ciclo_bono"]),
+                ).fetchone()["f"]
+                # El ciclo que se va queda cerrado tal cual estaba. Ni sus
+                # sesiones ni su economía se tocan.
+                conexion.execute(
+                    "UPDATE programas_cliente SET fecha_fin = COALESCE(fecha_fin, ?), pagado = ? "
+                    "WHERE cliente = ? AND ciclo_bono = ?",
+                    (ultima or hoy.isoformat(), int(not actual["pendiente_pago"]),
+                     cliente, actual["ciclo_bono"]),
+                )
+                conexion.execute(
+                    "INSERT INTO programas_cliente "
+                    "(cliente, ciclo_bono, tipo_programa, modalidad, tarifa, sesiones_totales, "
+                    " precio_total, cuota_mensual, sesiones_referencia, anio, mes, fecha_inicio, fecha_fin, pagado) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?)",
+                    (
+                        cliente, ciclo_nuevo, etiqueta, modalidad,
+                        condiciones["tarifa"], condiciones["sesiones_totales"] or 0,
+                        condiciones["precio_total"], condiciones["cuota_mensual"],
+                        condiciones["sesiones_referencia"],
+                        hoy.year if es_mensual(modalidad) else None,
+                        hoy.month if es_mensual(modalidad) else None,
+                        int(not debe),
+                    ),
+                )
+                conexion.execute(
+                    "UPDATE clientes SET ciclo_bono = ?, tipo_programa = COALESCE(?, tipo_programa), "
+                    "sesiones_completadas = 0, pendiente_pago = ? WHERE nombre = ?",
+                    (ciclo_nuevo, _puntero_de_programa_valido(etiqueta, conexion), int(debe), cliente),
+                )
+                _cobrar_mes_si_procede(cliente, ciclo_nuevo, hoy.year, hoy.month, conexion)
+                resultado = {"ciclo_anterior": actual["ciclo_bono"], "ciclo": ciclo_nuevo, "cerrado": True}
+            else:
+                conexion.execute(
+                    "UPDATE programas_cliente SET tipo_programa = ?, modalidad = ?, tarifa = ?, "
+                    "  sesiones_totales = ?, precio_total = ?, cuota_mensual = ?, sesiones_referencia = ?, "
+                    "  anio = COALESCE(anio, ?), mes = COALESCE(mes, ?) "
+                    "WHERE cliente = ? AND ciclo_bono = ?",
+                    (
+                        etiqueta, modalidad, condiciones["tarifa"], condiciones["sesiones_totales"] or 0,
+                        condiciones["precio_total"], condiciones["cuota_mensual"],
+                        condiciones["sesiones_referencia"],
+                        hoy.year if es_mensual(modalidad) else None,
+                        hoy.month if es_mensual(modalidad) else None,
+                        cliente, actual["ciclo_bono"],
+                    ),
+                )
+                conexion.execute(
+                    "UPDATE clientes SET tipo_programa = COALESCE(?, tipo_programa), "
+                    "pendiente_pago = ? WHERE nombre = ?",
+                    (_puntero_de_programa_valido(etiqueta, conexion), int(debe), cliente),
+                )
+                _cobrar_mes_si_procede(cliente, actual["ciclo_bono"], hoy.year, hoy.month, conexion)
+                resultado = {"ciclo_anterior": None, "ciclo": actual["ciclo_bono"], "cerrado": False}
+
+            conexion.commit()
+            return resultado
+        except Exception:
+            conexion.rollback()
+            raise
 
 
 def cerrar_programa_cliente(
