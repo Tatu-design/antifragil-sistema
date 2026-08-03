@@ -58,7 +58,12 @@ def _sumar_a_semana(fecha: date, tarifa: float | None, sesiones_extra: int, kids
     """Suma (o resta) sesiones a la economía de la semana que contiene
     `fecha`, dentro de la conexión/transacción que le pasa quien llama —
     ya no abre sus propias conexiones sueltas (sprint de integridad,
-    2026-07-28)."""
+    2026-07-28).
+
+    Una sesión SIN tarifa (la de una mensualidad) no aporta dinero, pero sí
+    una hora trabajada: se cuenta en `horas_sin_importe` en vez de en el
+    desglose por tarifa (corrección H-01, 2026-08-03). Antes no se contaba en
+    ningún sitio y la semana perdía esas horas."""
     inicio, fin = get_week_range(datetime.combine(fecha, datetime.min.time()))
     clave = inicio.date().isoformat()
 
@@ -71,7 +76,16 @@ def _sumar_a_semana(fecha: date, tarifa: float | None, sesiones_extra: int, kids
     semana_actual = obtener_semana(clave, conexion=conexion)
     sesiones_kids = (semana_actual["sesiones_kids"] if semana_actual else 0) + kids_extra
 
-    registrar_semana(inicio.date(), fin.date(), desglose, sesiones_kids, conexion=conexion)
+    horas_sin_importe = semana_actual["horas_sin_importe"] if semana_actual else 0
+    if tarifa is None and sesiones_extra:
+        # Solo una sesión de PT sin importe. Una clase de grupo llega aquí
+        # con `sesiones_extra = 0` y su propio contador, así que no entra.
+        horas_sin_importe += sesiones_extra
+
+    registrar_semana(
+        inicio.date(), fin.date(), desglose, sesiones_kids,
+        conexion=conexion, horas_sin_importe=horas_sin_importe,
+    )
 
 
 def _bloquear_si_hay_ciclos_posteriores(conexion, entrada_id: int, accion: str) -> None:
@@ -349,8 +363,12 @@ def editar_sesion_pt(
 
         resultado = editar_historial(entrada_id, nueva_fecha, nuevo_numero_sesion, conexion=conexion)
 
+        # Antes esto solo corría `if resultado["tarifa"] is not None`, así que
+        # mover una sesión de mensualidad de semana no trasladaba su hora
+        # (corrección H-01, 2026-08-03). `_sumar_a_semana` ya sabe distinguir:
+        # con tarifa mueve dinero y horas, sin tarifa mueve solo horas.
         cambia_de_semana = False
-        if fecha_original != nueva_fecha and resultado["tarifa"] is not None:
+        if fecha_original != nueva_fecha:
             fecha_original_d = date.fromisoformat(fecha_original)
             nueva_fecha_d = date.fromisoformat(nueva_fecha)
             inicio_original, fin_original = get_week_range(datetime.combine(fecha_original_d, datetime.min.time()))
@@ -420,13 +438,14 @@ def eliminar_sesion_pt(entrada_id: int, ruta: Path = RUTA_POR_DEFECTO) -> dict:
 
         entrada = eliminar_historial(entrada_id, conexion=conexion)
 
+        # Sin el `if` que había aquí: una sesión de mensualidad (sin tarifa)
+        # también tiene que devolver su HORA a la semana, aunque no devuelva
+        # dinero (corrección H-01, 2026-08-03).
         fecha_d = date.fromisoformat(entrada["fecha"])
-        if entrada["tarifa"] is not None:
-            _sumar_a_semana(fecha_d, entrada["tarifa"], sesiones_extra=-1, kids_extra=0, conexion=conexion)
+        _sumar_a_semana(fecha_d, entrada["tarifa"], sesiones_extra=-1, kids_extra=0, conexion=conexion)
 
-    if entrada["tarifa"] is not None:
-        inicio, fin = get_week_range(datetime.combine(fecha_d, datetime.min.time()))
-        _comprobar_sincronizacion(inicio.date(), fin.date(), ruta)
+    inicio, fin = get_week_range(datetime.combine(fecha_d, datetime.min.time()))
+    _comprobar_sincronizacion(inicio.date(), fin.date(), ruta)
 
     entrada["deshizo_renovacion"] = deshizo_renovacion
     return entrada

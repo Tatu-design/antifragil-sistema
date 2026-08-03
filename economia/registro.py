@@ -41,6 +41,7 @@ def registrar_semana(
     sesiones_kids: int,
     ruta: Path = RUTA_POR_DEFECTO,
     conexion: sqlite3.Connection | None = None,
+    horas_sin_importe: int = 0,
 ) -> None:
     """Guarda (o actualiza, si ya existía) el resultado económico de una
     semana. `desglose`: {tarifa: {"sesiones": n, "facturacion": importe}}
@@ -49,7 +50,13 @@ def registrar_semana(
     `conexion`: si se pasa una conexión ya abierta (de una transacción más
     amplia, ver `registrar_asistencia.py`), se reutiliza en vez de abrir
     otra — así firmar una sesión es una única operación atómica (sprint de
-    integridad, 2026-07-28)."""
+    integridad, 2026-07-28).
+
+    `horas_sin_importe`: horas trabajadas que NO aportan dinero a esta
+    semana — hoy, las sesiones de una mensualidad, cuya cuota se factura
+    entera en el mes (corrección H-01, 2026-08-03). Se guardan aparte de
+    `desglose` porque ahí todo va por tarifa, y "sin importe" no es una
+    tarifa de 0 €."""
     resumen = resumir(desglose)
     anio, mes = fecha_inicio.year, fecha_inicio.month
     clave = fecha_inicio.isoformat()
@@ -58,15 +65,21 @@ def registrar_semana(
         conexion.execute(
             """
             INSERT INTO semanas
-                (fecha_inicio, fecha_fin, anio, mes, facturacion_pt_lidomare, horas_pt_lidomare, sesiones_kids)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+                (fecha_inicio, fecha_fin, anio, mes, facturacion_pt_lidomare, horas_pt_lidomare,
+                 sesiones_kids, horas_sin_importe)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(fecha_inicio) DO UPDATE SET
                 fecha_fin = excluded.fecha_fin,
                 facturacion_pt_lidomare = excluded.facturacion_pt_lidomare,
                 horas_pt_lidomare = excluded.horas_pt_lidomare,
-                sesiones_kids = excluded.sesiones_kids
+                sesiones_kids = excluded.sesiones_kids,
+                horas_sin_importe = excluded.horas_sin_importe
             """,
-            (clave, fecha_fin.isoformat(), anio, mes, resumen["facturacion_total"], resumen["horas_totales"], sesiones_kids),
+            (
+                clave, fecha_fin.isoformat(), anio, mes,
+                resumen["facturacion_total"], resumen["horas_totales"], sesiones_kids,
+                max(horas_sin_importe, 0),
+            ),
         )
         conexion.execute("DELETE FROM desglose WHERE fecha_inicio_semana = ?", (clave,))
         for tarifa, datos in desglose.items():
@@ -188,8 +201,26 @@ def verificar_sincronizacion_semana(
             f"la economía pero {lidomare_esperado} clases reales registradas"
         )
 
-    kids_esperado = clases_reales.get("kids", 0)
     semana_guardada = obtener_semana(clave, ruta)
+
+    # Horas trabajadas sin importe (mensualidades). Se vigilan igual que el
+    # resto: una cifra que no se comprueba acaba desincronizándose sin que
+    # nadie lo note (corrección H-01, 2026-08-03).
+    if ruta.exists():
+        with conectar(ruta) as conexion:
+            sin_importe_reales = conexion.execute(
+                "SELECT COUNT(*) AS n FROM historial_sesiones "
+                "WHERE fecha BETWEEN ? AND ? AND tarifa IS NULL",
+                (clave, clave_fin),
+            ).fetchone()["n"]
+        sin_importe_guardadas = semana_guardada["horas_sin_importe"] if semana_guardada else 0
+        if sin_importe_reales != sin_importe_guardadas:
+            discrepancias.append(
+                f"Semana del {clave}: hay {sin_importe_guardadas} horas sin importe guardadas en la "
+                f"economía pero {sin_importe_reales} sesiones sin importe reales en el historial"
+            )
+
+    kids_esperado = clases_reales.get("kids", 0)
     kids_guardado = semana_guardada["sesiones_kids"] if semana_guardada else 0
     if kids_esperado != kids_guardado:
         discrepancias.append(
@@ -355,11 +386,20 @@ def _fila_semana_a_dict(fila: sqlite3.Row) -> dict:
     sesiones_kids = fila["sesiones_kids"] or 0
     provisional = sesiones_kids > 0 and facturacion_kids is None
 
-    horas_totales = fila["horas_pt_lidomare"] + (sesiones_kids if facturacion_kids is not None else 0)
+    # Horas trabajadas que no aportan dinero a la semana (mensualidades).
+    # Cuentan como horas y solo como horas — corrección H-01, 2026-08-03: sin
+    # esto, un cliente de mensualidad dejaba la semana en 0 horas y el precio
+    # medio por hora salía inflado, mientras el mes sí las contaba.
+    horas_sin_importe = (fila["horas_sin_importe"] if "horas_sin_importe" in fila.keys() else 0) or 0
+
+    horas_totales = (
+        fila["horas_pt_lidomare"] + horas_sin_importe + (sesiones_kids if facturacion_kids is not None else 0)
+    )
     facturacion_total = fila["facturacion_pt_lidomare"] + (facturacion_kids or 0)
     return {
         "fecha_inicio": fila["fecha_inicio"],
         "fecha_fin": fila["fecha_fin"],
+        "horas_sin_importe": horas_sin_importe,
         "sesiones_kids": sesiones_kids,
         "facturacion_kids": facturacion_kids,
         "facturacion_total": facturacion_total,

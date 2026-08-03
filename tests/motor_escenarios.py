@@ -391,6 +391,9 @@ def _foto_semanas(ruta: Path, conexion) -> list[dict]:
                 "fin": semana["fecha_fin"],
                 "facturacion_total": _euros(semana["facturacion_total"]),
                 "horas_totales": semana["horas_totales"],
+                # Horas trabajadas que no aportan dinero a la semana
+                # (mensualidades). Corrección H-01, 2026-08-03.
+                "horas_sin_importe": semana["horas_sin_importe"],
                 "sesiones_kids": semana["sesiones_kids"],
                 "facturacion_kids": _euros(semana["facturacion_kids"]),
                 "provisional": semana["provisional"],

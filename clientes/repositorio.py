@@ -98,9 +98,36 @@ def leer_clientes(ruta: Path = RUTA_POR_DEFECTO) -> dict[str, dict]:
                    -- los distintos del ciclo en curso, porque el de ahora lo
                    -- describe `clientes.pendiente_pago` — así las dos fuentes
                    -- no pueden contradecirse.
+                   --
+                   -- En una MENSUALIDAD manda el cargo de su mes, no esta
+                   -- columna (corrección H-02, 2026-08-03). Si no hay cargo
+                   -- (mensualidad antigua migrada, o cliente pausado que no
+                   -- genera cuota) se conserva el valor guardado, nulo
+                   -- incluido: `NULL` sigue siendo «no se sabe».
                    (SELECT COUNT(*) FROM programas_cliente pc2
                      WHERE pc2.cliente = c.nombre AND pc2.ciclo_bono <> c.ciclo_bono
-                       AND pc2.pagado = 0) AS ciclos_pendientes
+                       AND (CASE
+                              WHEN COALESCE(pc2.modalidad, 'bono') = 'mensualidad'
+                                   AND pc2.anio IS NOT NULL AND pc2.mes IS NOT NULL
+                              THEN COALESCE(
+                                     (SELECT cm.pagado FROM cargos_mensuales cm
+                                       WHERE cm.cliente = pc2.cliente AND cm.anio = pc2.anio
+                                         AND cm.mes = pc2.mes AND cm.concepto = 'mensualidad'),
+                                     pc2.pagado)
+                              ELSE pc2.pagado
+                            END) = 0) AS ciclos_pendientes,
+                   -- El estado de cobro del ciclo EN CURSO, con la misma
+                   -- regla. Sustituye a `c.pendiente_pago` cuando se puede
+                   -- saber de verdad, para que la lista y la ficha no
+                   -- puedan decir cosas distintas.
+                   (CASE
+                      WHEN COALESCE(pc.modalidad, 'bono') = 'mensualidad'
+                           AND pc.anio IS NOT NULL AND pc.mes IS NOT NULL
+                      THEN (SELECT cm.pagado FROM cargos_mensuales cm
+                             WHERE cm.cliente = c.nombre AND cm.anio = pc.anio
+                               AND cm.mes = pc.mes AND cm.concepto = 'mensualidad')
+                      ELSE NULL
+                    END) AS pagado_del_cargo
             FROM clientes c
             LEFT JOIN programas p ON p.nombre = c.tipo_programa
             LEFT JOIN programas_cliente pc
@@ -115,7 +142,13 @@ def leer_clientes(ruta: Path = RUTA_POR_DEFECTO) -> dict[str, dict]:
             "tarifa": fila["tarifa"],
             "sesiones_totales": fila["sesiones_totales"],
             "sesiones_completadas": fila["sesiones_completadas"],
-            "pendiente_pago": "Sí" if fila["pendiente_pago"] else "No",
+            # Si hay cargo del mes, manda él (H-02). Si no, la ficha.
+            "pendiente_pago": (
+                "Sí"
+                if (not fila["pagado_del_cargo"] if fila["pagado_del_cargo"] is not None
+                    else fila["pendiente_pago"])
+                else "No"
+            ),
             "token": fila["token"],
             "estado": fila["estado"] or ESTADO_POR_DEFECTO,
             "modalidad": fila["modalidad"] or MODALIDAD_POR_DEFECTO,
@@ -557,10 +590,15 @@ def editar_historial(
             date.fromisoformat(nueva_fecha)
         except ValueError as error:
             raise ValueError(f"Fecha inválida: '{nueva_fecha}'") from error
-        if not (1 <= nuevo_numero_sesion <= sesiones_totales):
-            raise ValueError(
-                f"El número de sesión debe estar entre 1 y {sesiones_totales} (de este programa)"
-            )
+        # `sesiones_totales = 0` significa SIN LÍMITE (mensualidad y cuenta de
+        # cliente), no "cero sesiones". Tratarlo como tope máximo hacía
+        # imposible corregir cualquier sesión de esas dos modalidades: el
+        # rango salía "entre 1 y 0" y no lo cumple ningún número. Encontrado
+        # al probar la corrección H-01 (2026-08-03) — es el mismo malentendido
+        # que dejó a Fernando sin el botón de firmar el 2026-08-04.
+        if nuevo_numero_sesion < 1 or (sesiones_totales and nuevo_numero_sesion > sesiones_totales):
+            limite = f"1 y {sesiones_totales} (de este programa)" if sesiones_totales else "1 en adelante"
+            raise ValueError(f"El número de sesión debe estar entre {limite}")
 
         conexion.execute(
             "UPDATE historial_sesiones SET fecha = ?, numero_sesion = ? WHERE id = ?",
@@ -726,6 +764,18 @@ def obtener_programas_cliente(nombre: str, ruta: Path = RUTA_POR_DEFECTO) -> lis
             (nombre,),
         ).fetchall()
 
+        # Todos sus cargos de una vez, dentro de la misma conexión: resolver
+        # el cobro ciclo a ciclo abriría una consulta por servicio y una
+        # conexión de más en la ficha (H-02, 2026-08-03).
+        cargos = {
+            (fila["anio"], fila["mes"]): fila["pagado"]
+            for fila in conexion.execute(
+                "SELECT anio, mes, pagado FROM cargos_mensuales "
+                "WHERE cliente = ? AND concepto = 'mensualidad'",
+                (nombre,),
+            )
+        }
+
     por_ciclo: dict[int, list[dict]] = {}
     for sesion in sesiones:
         por_ciclo.setdefault(sesion["ciclo_bono"], []).append(dict(sesion))
@@ -735,6 +785,10 @@ def obtener_programas_cliente(nombre: str, ruta: Path = RUTA_POR_DEFECTO) -> lis
         datos = dict(bono)
         datos["es_actual"] = bono["ciclo_bono"] == ciclo_actual
         datos["sesiones"] = por_ciclo.get(bono["ciclo_bono"], [])
+        # En una mensualidad manda el cargo de su mes. Si no hay cargo se
+        # conserva lo guardado, nulo incluido: `NULL` es «no se sabe».
+        if datos["modalidad"] == "mensualidad" and datos["anio"] is not None:
+            datos["pagado"] = cargos.get((datos["anio"], datos["mes"]), datos["pagado"])
         resultado.append(datos)
 
     if not any(bono["es_actual"] for bono in resultado):
@@ -757,6 +811,32 @@ def obtener_programas_cliente(nombre: str, ruta: Path = RUTA_POR_DEFECTO) -> lis
             "sesiones": sesiones_actuales,
         })
     return resultado
+
+
+def _pago_segun_el_cargo(conexion: sqlite3.Connection, cliente: str, ciclo: dict) -> int | None:
+    """Estado de cobro de un ciclo, con el cargo del mes como fuente de
+    verdad cuando se trata de una MENSUALIDAD (corrección H-02, 2026-08-03).
+
+    Antes había dos indicadores del mismo cobro —`programas_cliente.pagado` y
+    `cargos_mensuales.pagado`— y podían contradecirse: la ficha decía
+    «Mensualidad pagada» de un mes que no estaba cobrado. Ahora manda el
+    cargo, que es el que representa el dinero de verdad.
+
+    **Si NO hay cargo, se conserva el valor guardado del ciclo, incluido el
+    nulo.** Esto es deliberado: una mensualidad antigua migrada, o la de un
+    cliente pausado (que no genera cuota), no tiene cargo — y `NULL` sigue
+    significando «no se sabe», nunca «no pagado». Leer nunca escribe."""
+    if (ciclo.get("modalidad") or MODALIDAD_POR_DEFECTO) != "mensualidad":
+        return ciclo.get("pagado")
+    if ciclo.get("anio") is None or ciclo.get("mes") is None:
+        return ciclo.get("pagado")
+
+    cargo = conexion.execute(
+        "SELECT pagado FROM cargos_mensuales "
+        "WHERE cliente = ? AND anio = ? AND mes = ? AND concepto = 'mensualidad'",
+        (cliente, ciclo["anio"], ciclo["mes"]),
+    ).fetchone()
+    return ciclo.get("pagado") if cargo is None else cargo["pagado"]
 
 
 def obtener_ciclo_actual(
@@ -807,6 +887,11 @@ def obtener_ciclo_actual(
             })
 
         datos["modalidad"] = datos.get("modalidad") or MODALIDAD_POR_DEFECTO
+        # En una mensualidad manda el cargo del mes (H-02). `pendiente_pago`
+        # se alinea con él para que la ficha y el ciclo no puedan discrepar.
+        datos["pagado"] = _pago_segun_el_cargo(conexion, cliente, datos)
+        if datos["pagado"] is not None:
+            datos["pendiente_pago"] = int(not datos["pagado"])
         return datos
 
     if conexion is not None:
@@ -931,6 +1016,26 @@ def _cobrar_mes_si_procede(
         "VALUES (?, ?, ?, 'mensualidad', ?, ?, ?, 0) "
         "ON CONFLICT(cliente, anio, mes, concepto) DO NOTHING",
         (cliente, anio, mes, ciclo, fila["cuota_mensual"], date.today().isoformat()),
+    )
+
+    # El cargo acaba de fijar cuál es el estado de cobro real de este mes.
+    # Se copia al ciclo y a la ficha del cliente para que el dato GUARDADO
+    # tampoco pueda contradecirlo — no basta con resolverlo al leer, porque
+    # la columna seguiría mintiendo a cualquiera que la consulte por su
+    # cuenta (por ejemplo, el script que migre estos datos a PostgreSQL).
+    # Corrección H-02, 2026-08-03.
+    cobrado = conexion.execute(
+        "SELECT pagado FROM cargos_mensuales "
+        "WHERE cliente = ? AND anio = ? AND mes = ? AND concepto = 'mensualidad'",
+        (cliente, anio, mes),
+    ).fetchone()["pagado"]
+    conexion.execute(
+        "UPDATE programas_cliente SET pagado = ? WHERE cliente = ? AND ciclo_bono = ?",
+        (cobrado, cliente, ciclo),
+    )
+    conexion.execute(
+        "UPDATE clientes SET pendiente_pago = ? WHERE nombre = ? AND ciclo_bono = ?",
+        (int(not cobrado), cliente, ciclo),
     )
 
 
@@ -1080,16 +1185,26 @@ def deuda_pendiente(cliente: str, ruta: Path = RUTA_POR_DEFECTO) -> list[dict]:
     """Los ciclos de un cliente que están marcados como NO cobrados, del más
     reciente al más antiguo. Un ciclo sin marcar (`pagado` nulo) no cuenta
     como deuda: de los servicios anteriores a esta versión nunca se registró
-    el pago y no se va a suponer."""
+    el pago y no se va a suponer.
+
+    En una MENSUALIDAD la deuda la decide su cargo del mes, no la columna del
+    ciclo (corrección H-02, 2026-08-03) — si no, se podría enseñar como
+    pagado un mes que en realidad se debe, o al revés."""
     with conectar(ruta) as conexion:
         filas = conexion.execute(
             "SELECT ciclo_bono, tipo_programa, COALESCE(modalidad, 'bono') AS modalidad, "
-            "       anio, mes, fecha_inicio, fecha_fin "
-            "FROM programas_cliente WHERE cliente = ? AND pagado = 0 "
+            "       anio, mes, fecha_inicio, fecha_fin, pagado "
+            "FROM programas_cliente WHERE cliente = ? "
             "ORDER BY ciclo_bono DESC",
             (cliente,),
         ).fetchall()
-    return [dict(fila) for fila in filas]
+        pendientes = []
+        for fila in filas:
+            datos = dict(fila)
+            if _pago_segun_el_cargo(conexion, cliente, datos) == 0:
+                datos.pop("pagado")
+                pendientes.append(datos)
+    return pendientes
 
 
 def configurar_servicio(

@@ -297,6 +297,11 @@ class TestTarjetaPorModalidad(BaseFichaWeb):
         self.bono("Ana")
         self.mensualidad("Pareja")
         self.cuenta("Sami")
+        # La mensualidad se marca cobrada explícitamente: desde la corrección
+        # H-02 (2026-08-03) una mensualidad recién configurada nace PENDIENTE,
+        # porque su cargo del mes aún no está cobrado. Antes salía como
+        # «pagada» sin estarlo, que era justamente el defecto.
+        cr.marcar_pago_del_ciclo("Pareja", True, ruta=self.ruta)
         self.assertIn("Bono pagado", self.texto("Ana"))
         self.assertIn("Mensualidad pagada", self.texto("Pareja"))
         self.assertIn("Cuenta pagada", self.texto("Sami"))

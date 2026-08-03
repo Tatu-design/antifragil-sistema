@@ -154,6 +154,22 @@ def crear_esquema(ruta: Path = RUTA_POR_DEFECTO) -> None:
             )
             """
         )
+        columnas_semanas = {fila["name"] for fila in conexion.execute("PRAGMA table_info(semanas)")}
+        if "horas_sin_importe" not in columnas_semanas:
+            # Corrección H-01 (2026-08-03, autorizada por Fernando): las
+            # sesiones de una MENSUALIDAD se guardan sin importe (su dinero
+            # está en la cuota del mes, no en la sesión), y `desglose` va por
+            # tarifa — así que no tenían dónde caer y la vista semanal
+            # perdía esas horas: 3 sesiones firmadas y la semana decía 0.
+            #
+            # Se cuentan aparte en vez de meterlas en `desglose` con tarifa 0,
+            # que las haría aparecer como una línea de "0 €" en Economía y
+            # confundiría "sin importe" con "gratis" — dos cosas distintas.
+            #
+            # Aditiva y con valor 0: las semanas ya cerradas no se mueven, y
+            # eso es lo correcto, porque todas sus sesiones llevan importe.
+            # No se está suponiendo nada sobre el pasado.
+            conexion.execute("ALTER TABLE semanas ADD COLUMN horas_sin_importe INTEGER NOT NULL DEFAULT 0")
         conexion.execute(
             """
             CREATE TABLE IF NOT EXISTS desglose (

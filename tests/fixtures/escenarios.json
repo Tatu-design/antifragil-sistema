@@ -702,8 +702,8 @@
     },
     {
       "id": "E33",
-      "nota": "HALLAZGO ABIERTO (2026-08-03). Fija el comportamiento ACTUAL, no el deseable. Las sesiones de una mensualidad NO aparecen en la vista semanal: ni su dinero (defendible, la cuota es mensual) ni sus HORAS (no defendible, son horas trabajadas de verdad). El mes si las cuenta. Documentado para que la migracion no lo cambie en silencio y para que Fernando decida.",
-      "regla": "Hoy, las sesiones de una mensualidad no suman horas en la vista SEMANAL, aunque si en la mensual",
+      "nota": "CORREGIDO el 2026-08-03 (defecto H-01, correccion autorizada por Fernando). Este escenario fijaba antes el comportamiento defectuoso: la semana daba 0 horas con 3 sesiones firmadas. El cambio de resultado NO es una desviacion de paridad, es el defecto arreglado. El dinero de la semana sigue siendo 0 y eso es correcto: la cuota de una mensualidad se factura entera en el mes, no por semana.",
+      "regla": "Las sesiones de una mensualidad suman horas en la vista semanal, aunque no sumen dinero",
       "pasos": [
         { "accion": "programa", "nombre": "Base", "tarifa": 45, "sesiones": 4 },
         { "accion": "alta", "cliente": "Cliente B", "programa": "Base" },
@@ -712,7 +712,7 @@
       ],
       "esperado": {
         "semanas": [
-          { "inicio": "2026-08-03", "facturacion_total": 0.0, "horas_totales": 0 }
+          { "inicio": "2026-08-03", "facturacion_total": 0.0, "horas_totales": 3, "horas_sin_importe": 3 }
         ],
         "meses": [
           { "anio": 2026, "mes": 8, "facturacion_total": 720.0, "horas_totales": 3 }
@@ -721,8 +721,8 @@
     },
     {
       "id": "E34",
-      "nota": "HALLAZGO ABIERTO (2026-08-03). Fija el comportamiento ACTUAL. El ciclo de una mensualidad puede decir 'pagada' mientras su cargo del mismo mes dice 'sin cobrar': el ciclo hereda el estado de la ficha del cliente y el cargo nace siempre sin cobrar. Marcar el pago a mano si los escribe juntos; el camino automatico no.",
-      "regla": "Hoy, el estado de cobro del ciclo y el del cargo del mes pueden contradecirse",
+      "nota": "CORREGIDO el 2026-08-03 (defecto H-02, correccion autorizada por Fernando). Este escenario fijaba antes el comportamiento defectuoso: el ciclo decia 'pagada' (True) mientras su cargo del mismo mes decia 'sin cobrar'. Ahora manda el cargo, en los tres sitios a la vez. El cambio de resultado NO es una desviacion de paridad, es el defecto arreglado.",
+      "regla": "En una mensualidad manda el cargo del mes: ciclo, cargo y ficha dicen lo mismo",
       "pasos": [
         { "accion": "programa", "nombre": "Base", "tarifa": 45, "sesiones": 4 },
         { "accion": "alta", "cliente": "Cliente B", "programa": "Base" },
@@ -731,13 +731,13 @@
       "esperado": {
         "ciclos": [
           { "cliente": "Cliente B", "ciclo": 1, "modalidad": "bono" },
-          { "cliente": "Cliente B", "ciclo": 2, "modalidad": "mensualidad", "pagado": true }
+          { "cliente": "Cliente B", "ciclo": 2, "modalidad": "mensualidad", "pagado": false }
         ],
         "cargos_mensuales": [
           { "cliente": "Cliente B", "anio": 2026, "mes": 8, "ciclo": 2, "pagado": false }
         ],
         "clientes": [
-          { "cliente": "Cliente B", "pendiente_pago": false }
+          { "cliente": "Cliente B", "pendiente_pago": true }
         ]
       }
     },
