@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Confirmar programa de {{ nombre }} — Antifrágil</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css', v=version_estaticos) }}" />
+  <link rel="icon" href="{{ url_for('static', filename='favicon.png') }}" />
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='favicon.png') }}" />
+  <meta name="theme-color" content="#1fa99a" />
+  <script defer src="{{ url_for('static', filename='carga.js', v=version_estaticos) }}"></script>
+</head>
+<body>
+  {% include '_iconos.html' %}
+  <div class="page sin-barra">
+    <a class="volver" href="{{ url_for('editar', nombre=nombre) }}">
+      <svg class="icono icono-sm" aria-hidden="true"><use href="#i-arrow-left"></use></svg>Volver a editar
+    </a>
+    <h1>Revisa antes de guardar</h1>
+
+    {% if cambia_modalidad %}
+    {# Cambiar de modalidad es la operación delicada: se dice exactamente
+       qué va a pasar, con los números concretos de este cliente. #}
+    <div class="zona-peligrosa">
+      <p class="zona-peligrosa-titulo">Vas a cambiar de modalidad</p>
+      <p class="meta">
+        Se <strong>cierra</strong> {{ antes.etiqueta|lower }} actual de {{ nombre }}
+        {%- if antes.sesiones_ciclo %} ({{ antes.sesiones_ciclo }}
+        {{ 'sesión' if antes.sesiones_ciclo == 1 else 'sesiones' }} ya
+        {{ 'hecha' if antes.sesiones_ciclo == 1 else 'hechas' }},
+        {{ 'pendiente de pago' if antes.pendiente_pago else 'al día' }}){% endif %}
+        y se abre {{ despues.etiqueta|lower }} nueva.
+      </p>
+      <p class="meta">
+        Las sesiones anteriores y su economía <strong>se conservan sin ningún cambio</strong>:
+        seguirán en el historial con las condiciones con las que se hicieron. No se recalcula
+        nada del pasado ni se traslada ninguna sesión al servicio nuevo.
+      </p>
+    </div>
+    {% endif %}
+
+    <div class="lista">
+      <div class="cabecera-seccion"><span>Antes</span></div>
+      <div class="fila">
+        <div class="sesion-info">
+          <div class="fecha">{{ antes.etiqueta }}{% if antes.nombre_servicio %} · {{ antes.nombre_servicio }}{% endif %}</div>
+          <div class="tipo">{{ antes.detalle }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="lista" style="margin-top: 1rem;">
+      <div class="cabecera-seccion"><span>Después</span></div>
+      <div class="fila">
+        <div class="sesion-info">
+          <div class="fecha">{{ despues.etiqueta }}{% if despues.nombre_servicio %} · {{ despues.nombre_servicio }}{% endif %}</div>
+          <div class="tipo">{{ despues.detalle }}</div>
+        </div>
+      </div>
+    </div>
+
+    {% if despues.modalidad == 'mensualidad' %}
+    <p class="aviso-texto">
+      La cuota de este mes se registrará entera en la Economía en cuanto guardes, aunque todavía
+      no se haya entrenado — es lo que el cliente paga por tener sus plazas reservadas. Quedará
+      pendiente de pago hasta que la marques como pagada.
+    </p>
+    {% endif %}
+
+    <form method="post" action="{{ url_for('guardar_servicio', nombre=nombre) }}" style="margin-top: 1.25rem;">
+      <input type="hidden" name="csrf" value="{{ token_csrf() }}">
+      <input type="hidden" name="modalidad" value="{{ formulario.modalidad }}">
+      <input type="hidden" name="nombre_servicio" value="{{ formulario.nombre_servicio }}">
+      <input type="hidden" name="sesiones_totales" value="{{ formulario.sesiones_totales }}">
+      <input type="hidden" name="precio_total" value="{{ formulario.precio_total }}">
+      <input type="hidden" name="cuota_mensual" value="{{ formulario.cuota_mensual }}">
+      <input type="hidden" name="sesiones_referencia" value="{{ formulario.sesiones_referencia }}">
+      <input type="hidden" name="tarifa" value="{{ formulario.tarifa }}">
+      <input type="hidden" name="sesiones_completadas" value="{{ formulario.sesiones_completadas }}">
+      <input type="hidden" name="pendiente_pago" value="{{ 'si' if formulario.pendiente_pago else 'no' }}">
+      <button type="submit" class="boton">
+        {% if cambia_modalidad %}Cerrar el actual y guardar{% else %}Guardar cambios{% endif %}
+      </button>
+    </form>
+
+    <a class="boton-secundario" href="{{ url_for('editar', nombre=nombre) }}"
+       style="width: 100%; margin-top: 0.65rem;">Cancelar</a>
+  </div>
+</body>
+</html>

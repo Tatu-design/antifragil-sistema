@@ -119,6 +119,35 @@
             <span class="valor">{{ "%.2f"|format(mes.precio_medio_hora) }} €</span>
           </div>
         </div>
+        {# De dónde sale el dinero del mes. Una mensualidad factura su cuota
+           entera aunque sus sesiones no lleven importe, así que sin este
+           desglose los números no se explican solos. #}
+        {% if mes.por_modalidad %}
+        <div class="fila">
+          <div class="desglose-modalidad">
+            {% for clave, etiqueta in [('bono','Bonos'), ('mensualidad','Mensualidades'), ('cuenta','Cuentas de cliente')] %}
+            {% if mes.por_modalidad.get(clave) %}
+            <div class="sesion-fila">
+              <div class="sesion-info" style="flex:1;">
+                <div class="fecha">{{ etiqueta }}</div>
+                <div class="tipo">{{ mes.por_modalidad[clave].horas }} h reales</div>
+              </div>
+              <span class="cifra">{{ "%.2f"|format(mes.por_modalidad[clave].facturacion) }} €</span>
+            </div>
+            {% endif %}
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+
+        {% if mes.facturacion_cuotas %}
+        <p class="meta" style="padding: 0 1.25rem 1rem;">
+          Incluye {{ "%.2f"|format(mes.facturacion_cuotas) }} € de
+          {{ mes.cuotas }} {{ 'cuota mensual' if mes.cuotas == 1 else 'cuotas mensuales' }}.
+          Las sesiones de una mensualidad suman horas, no dinero: su importe ya está en la cuota.
+        </p>
+        {% endif %}
+
         {% if mes.ajuste_importe %}
         <p class="aviso-texto">
           Incluye un ajuste de {{ "%.2f"|format(mes.ajuste_importe) }} € y {{ mes.ajuste_horas }} h de

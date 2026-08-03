@@ -649,12 +649,22 @@ def aplicar_actualizaciones(
 
     def _hacer(conexion: sqlite3.Connection) -> None:
         for nombre, actualizacion in resultados.items():
+            # Las sesiones del bono se toman de SU ciclo, no de la lista
+            # global (2026-08-03). Con condiciones propias por cliente, la
+            # lista global puede decir otra cosa: un bono de 8 sesiones
+            # calculado contra un programa global de 4 daba contadores
+            # negativos ("-9 de 8 sesiones", visto al dibujar la ficha).
             fila = conexion.execute(
-                "SELECT p.sesiones_totales, c.ciclo_bono FROM clientes c "
-                "JOIN programas p ON p.nombre = c.tipo_programa WHERE c.nombre = ?",
+                "SELECT c.ciclo_bono, "
+                "       CASE WHEN pc.cliente IS NULL THEN p.sesiones_totales ELSE pc.sesiones_totales END "
+                "         AS sesiones_totales "
+                "FROM clientes c "
+                "LEFT JOIN programas p ON p.nombre = c.tipo_programa "
+                "LEFT JOIN programas_cliente pc ON pc.cliente = c.nombre AND pc.ciclo_bono = c.ciclo_bono "
+                "WHERE c.nombre = ?",
                 (nombre,),
             ).fetchone()
-            sesiones_totales = int(fila["sesiones_totales"])
+            sesiones_totales = int(fila["sesiones_totales"] or 0)
             sesiones_completadas = sesiones_totales - actualizacion.sesiones_restantes
             nuevo_ciclo = fila["ciclo_bono"] + 1 if actualizacion.renovado else fila["ciclo_bono"]
             conexion.execute(
@@ -1078,18 +1088,30 @@ def configurar_servicio(
                 _cobrar_mes_si_procede(cliente, ciclo_nuevo, hoy.year, hoy.month, conexion)
                 resultado = {"ciclo_anterior": actual["ciclo_bono"], "ciclo": ciclo_nuevo, "cerrado": True}
             else:
+                # INSERT ... ON CONFLICT, no UPDATE a secas: un cliente dado
+                # de alta antes de que existieran las fichas de ciclo no
+                # tiene fila que actualizar, y un UPDATE se quedaría en nada
+                # sin avisar (encontrado al dibujar la ficha, 2026-08-03).
                 conexion.execute(
-                    "UPDATE programas_cliente SET tipo_programa = ?, modalidad = ?, tarifa = ?, "
-                    "  sesiones_totales = ?, precio_total = ?, cuota_mensual = ?, sesiones_referencia = ?, "
-                    "  anio = COALESCE(anio, ?), mes = COALESCE(mes, ?) "
-                    "WHERE cliente = ? AND ciclo_bono = ?",
+                    "INSERT INTO programas_cliente "
+                    "(cliente, ciclo_bono, tipo_programa, modalidad, tarifa, sesiones_totales, "
+                    " precio_total, cuota_mensual, sesiones_referencia, anio, mes, pagado) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+                    "ON CONFLICT(cliente, ciclo_bono) DO UPDATE SET "
+                    "  tipo_programa = excluded.tipo_programa, modalidad = excluded.modalidad, "
+                    "  tarifa = excluded.tarifa, sesiones_totales = excluded.sesiones_totales, "
+                    "  precio_total = excluded.precio_total, cuota_mensual = excluded.cuota_mensual, "
+                    "  sesiones_referencia = excluded.sesiones_referencia, "
+                    "  anio = COALESCE(programas_cliente.anio, excluded.anio), "
+                    "  mes = COALESCE(programas_cliente.mes, excluded.mes)",
                     (
-                        etiqueta, modalidad, condiciones["tarifa"], condiciones["sesiones_totales"] or 0,
+                        cliente, actual["ciclo_bono"], etiqueta, modalidad,
+                        condiciones["tarifa"], condiciones["sesiones_totales"] or 0,
                         condiciones["precio_total"], condiciones["cuota_mensual"],
                         condiciones["sesiones_referencia"],
                         hoy.year if es_mensual(modalidad) else None,
                         hoy.month if es_mensual(modalidad) else None,
-                        cliente, actual["ciclo_bono"],
+                        int(not debe),
                     ),
                 )
                 conexion.execute(

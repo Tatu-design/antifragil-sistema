@@ -22,6 +22,102 @@
   cuenta en sesiones pero su importe se reparte hacia atrás sobre las
   semanas del mes en cuanto Fernando indica la facturación mensual total.
 
+### Tres modalidades de servicio: bono, mensualidad y cuenta (2026-08-03)
+
+Hasta ahora todos los clientes funcionaban igual: un bono de N sesiones que
+se consume y se renueva. Fernando necesitaba dos formas más de cobrar que ya
+usa en la realidad.
+
+**Las tres, en lenguaje llano:**
+
+| | Cuándo se paga | Qué pasa al firmar | Cuándo se renueva |
+|---|---|---|---|
+| **Bono** | Por adelantado, un paquete | Descuenta una sesión y suma su parte | Al agotarse |
+| **Mensualidad** | Cuota fija a principio de mes | Suma **hora**, no dinero | Al cambiar de mes |
+| **Cuenta de cliente** | Al final, por lo hecho | Suma hora y su precio | Al cambiar de mes |
+
+**La idea que mantiene esto simple:** una *cuenta de cliente* es
+económicamente un bono sin tope — mismo camino de código, con
+`sesiones_totales = 0` significando "sin límite" y sin renovación por
+consumo. La única modalidad que estrena camino económico es la mensualidad.
+
+**Cómo se resuelve la mensualidad sin ensuciar las horas.** Su cuota se
+factura entera aunque se hagan 9, 12 o 13 sesiones. Se podría haber
+inventado sesiones económicas ficticias para cuadrar; no se ha hecho, porque
+mezclaría para siempre dos cosas que deben quedar separadas: el dinero
+producido y las horas realmente trabajadas. En su lugar:
+
+- Sus sesiones se guardan **sin importe** (`tarifa = NULL`): cuentan como
+  hora trabajada y no suman dinero.
+- La cuota vive en una tabla nueva, `cargos_mensuales`, con clave primaria
+  `(cliente, año, mes, concepto)`. **Esa clave es lo que impide cobrar dos
+  veces el mismo mes** — no lo impide el código que llama, lo impide la base
+  de datos, aunque lleguen diez peticiones a la vez.
+- El precio efectivo se calcula al vuelo: 720 € entre 12 son 60 €/h, entre 9
+  son 80 €/h y entre 13 son 55,38 €/h. Sin sesiones no se muestra nada, para
+  no enseñar una división por cero.
+
+**Las condiciones dejan de depender de una lista global.** `programas_cliente`
+gana `modalidad`, `precio_total`, `cuota_mensual`, `sesiones_referencia`,
+`anio` y `mes` — todas opcionales y añadidas con `ALTER TABLE`, sin
+reescribir una sola fila. El ciclo en curso pasa a ser la fuente de verdad de
+tarifa, sesiones y cuota; la lista `programas` queda como atajo para dar de
+alta un bono rápido.
+
+**Dos trampas que aparecieron al hacerlo, y cómo se cerraron:**
+
+1. `leer_clientes` hacía `JOIN programas`, no `LEFT JOIN`. Un cliente cuyo
+   programa no estuviera en la lista global **desaparecía de la aplicación
+   entera** — lista, ficha y economía. Con condiciones propias por cliente
+   habría pasado constantemente. Ahora es `LEFT JOIN` y las condiciones se
+   toman del ciclo.
+2. `clientes.tipo_programa` tiene una clave foránea contra `programas`, así
+   que ahí no cabe un nombre libre. La etiqueta del servicio pasa a vivir en
+   el ciclo (que sí es libre) y esa columna se queda como puntero heredado,
+   intacta cuando el nombre no está en la lista. Se eligió esto en vez de
+   quitar la clave foránea porque eso obliga a reconstruir `clientes`, de la
+   que cuelgan las claves de historial, ciclos y confirmaciones — cambio
+   pequeño frente a uno grande y arriesgado.
+
+**Cambio de modalidad.** Nunca transforma un ciclo empezado: cierra el actual
+y abre uno nuevo, en una única transacción y tras una pantalla que dice con
+números concretos qué va a pasar. Las sesiones anteriores no se mueven, no se
+renumeran y su economía no se recalcula.
+
+**Renovación mensual.** `asegurar_ciclo_mensual` es idempotente y corre
+dentro de la misma transacción que la firma. Se dispara al arrancar la web y
+al abrir la lista de clientes — **nunca desde Economía**: consultar una
+pantalla no debe escribir en la base de datos. Un recuerdo en memoria
+(`_abrir_mes_si_toca`) hace que se compruebe como mucho una vez por mes y
+proceso; sin él, la lista de clientes pasaba de 3 consultas y 5,8 ms a 4 y
+16,5 ms en cada carga.
+
+**Economía mensual.** Las horas pasan a contar TODAS las sesiones firmadas,
+no solo las que llevan importe (antes filtraba por `tarifa IS NOT NULL`, que
+dejaría fuera las de una mensualidad). Se comprobó que no altera nada ya
+cerrado: las 47 sesiones reales existentes llevan todas su tarifa. La
+facturación suma sesiones + cuotas + CrossFit + ajustes, y hay un desglose
+por modalidad calculado al vuelo, sin guardar nada nuevo que pueda
+desincronizarse.
+
+**Migración.** `migrar_modalidades.py` deja a todos los clientes actuales
+como **bono**, que es lo que son. No hay ningún `UPDATE` de modalidad: la
+columna nace con ese valor por defecto. Solo completa el precio total donde
+falta, calculándolo como tarifa × sesiones. Verificada sobre copia de los
+datos reales: julio 1.552,50 € / 37 h y junio 355,00 € / 10 h **idénticos**
+antes y después, comparando también sesión a sesión y ciclo a ciclo.
+Idempotente, `integrity_check` correcto y 0 claves rotas.
+
+**Pruebas:** 198 en verde, 75 nuevas (`tests/test_modalidades.py` para las
+reglas puras, `tests/test_tres_modalidades.py` de punta a punta).
+
+**Decisiones prudentes pendientes de confirmar por Fernando:**
+
+- Un cliente **pausado o cancelado no genera cuota mensual**. Cobrar
+  automáticamente a quien ha dejado de entrenar sería inventar ingresos.
+- Al cambiar de mes, la mensualidad nueva **nace pendiente de pago**, igual
+  que un bono renovado.
+
 ### La ficha del cliente y los bonos concretos (2026-08-02)
 
 Fernando pidió reorganizar la pantalla del cliente: tenía la información

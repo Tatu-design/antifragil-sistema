@@ -1113,3 +1113,59 @@ a.pill { text-decoration: none; }
 
 .zona-peligrosa .meta { margin-bottom: 0.85rem; }
 .zona-peligrosa .boton-secundario { width: 100%; }
+
+/* ----- Modalidades de servicio (2026-08-03) ----- */
+
+/* Una mensualidad o una cuenta se identifican de un vistazo; el bono no
+   lleva etiqueta porque es lo habitual. */
+.etiqueta-modalidad {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.5625rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  vertical-align: middle;
+  background: rgba(31, 169, 154, 0.14);
+  color: var(--acento);
+}
+
+/* Las condiciones del servicio: pares etiqueta/valor en columnas que se
+   adaptan al ancho, sin tabla. */
+.datos-servicio {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1.5rem;
+  margin: 0.9rem 0 0;
+}
+
+.datos-servicio > div { display: flex; flex-direction: column; gap: 0.1rem; }
+
+.datos-servicio dt {
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--tinta-suave);
+}
+
+.datos-servicio dd {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.datos-servicio dd.acumulado { color: var(--acento); }
+
+/* Los campos de una modalidad que no está elegida no se ven. `[hidden]` ya
+   gana a cualquier `display` propio (regla general de la hoja). */
+.campos-modalidad { display: flex; flex-direction: column; gap: 0.9rem; }
+
+.ayuda-modalidad { margin-top: -0.35rem; }
+
+/* Desglose del mes por modalidad, en Economía. */
+.desglose-modalidad { display: flex; flex-direction: column; gap: 0.1rem; }
+.desglose-modalidad .cifra { font-variant-numeric: tabular-nums; }

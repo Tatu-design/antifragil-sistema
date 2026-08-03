@@ -45,10 +45,17 @@
     </div>
     {% endif %}
 
-    {# ---- Bono en curso ---- #}
+    {# ---- Servicio en curso. Cambia de forma según la modalidad: un bono se
+       consume, una mensualidad y una cuenta no. ---- #}
     <div class="perfil-hero">
-      <div class="programa-nombre">{{ cliente.tipo_programa or "sin programa asignado" }}</div>
+      <div class="programa-nombre">
+        {{ cliente.tipo_programa or "sin programa asignado" }}
+        {% if resumen.modalidad != 'bono' %}
+        <span class="etiqueta-modalidad">{{ resumen.etiqueta }}</span>
+        {% endif %}
+      </div>
 
+      {% if resumen.modalidad == 'bono' %}
       {% if cliente.sesiones_totales %}
       <div class="perfil-progreso">
         <div class="perfil-progreso-numeros">
@@ -60,6 +67,44 @@
         </div>
         <div class="perfil-progreso-restantes">Quedan {{ cliente.sesiones_restantes }}</div>
       </div>
+      <dl class="datos-servicio">
+        {% if cliente.precio_total %}<div><dt>Precio del bono</dt><dd>{{ cliente.precio_total|euros }}</dd></div>{% endif %}
+        {% if cliente.tarifa %}<div><dt>Por sesión</dt><dd>{{ cliente.tarifa|euros }}</dd></div>{% endif %}
+      </dl>
+      {% endif %}
+
+      {% elif resumen.modalidad == 'mensualidad' %}
+      {# Sin barra ni sesiones restantes: no hay nada que agotar. #}
+      <div class="perfil-progreso">
+        <div class="perfil-progreso-numeros">
+          <span class="grande">{{ resumen.sesiones_reales }}</span>
+          <span class="de">
+            {{ 'sesión' if resumen.sesiones_reales == 1 else 'sesiones' }} este mes
+            {%- if resumen.sesiones_referencia %} · {{ resumen.sesiones_referencia }} de referencia{% endif %}
+          </span>
+        </div>
+      </div>
+      <dl class="datos-servicio">
+        <div><dt>Cuota del mes</dt><dd>{{ resumen.facturacion|euros }}</dd></div>
+        <div>
+          <dt>Sale a</dt>
+          <dd>{% if resumen.precio_efectivo %}{{ resumen.precio_efectivo|euros }}/h{% else %}—{% endif %}</dd>
+        </div>
+        {% if cliente.mes %}<div><dt>Periodo</dt><dd>{{ cliente.mes|mes_es }} {{ cliente.anio }}</dd></div>{% endif %}
+      </dl>
+
+      {% elif resumen.modalidad == 'cuenta' %}
+      <div class="perfil-progreso">
+        <div class="perfil-progreso-numeros">
+          <span class="grande">{{ resumen.sesiones_reales }}</span>
+          <span class="de">{{ 'sesión' if resumen.sesiones_reales == 1 else 'sesiones' }} este mes</span>
+        </div>
+      </div>
+      <dl class="datos-servicio">
+        <div><dt>Precio por hora</dt><dd>{{ cliente.tarifa|euros }}</dd></div>
+        <div><dt>Acumulado</dt><dd class="acumulado">{{ resumen.facturacion|euros }}</dd></div>
+        {% if cliente.mes %}<div><dt>Periodo</dt><dd>{{ cliente.mes|mes_es }} {{ cliente.anio }}</dd></div>{% endif %}
+      </dl>
       {% endif %}
 
       {# El pago se cambia desde aquí mismo, con una confirmación previa. Solo
@@ -146,12 +191,35 @@
                   aria-controls="bono-{{ bono.ciclo_bono }}">
             <span class="bono-info">
               <span class="nombre">
-                {% if bono.es_actual %}Programa actual{% else %}{{ bono.tipo_programa }}{% endif %}
+                {% if bono.es_actual %}Servicio actual{% else %}{{ bono.tipo_programa }}{% endif %}
+                {% if bono.pagado == 0 %}<span class="pill pendiente">Pendiente</span>{% endif %}
               </span>
               <span class="programa">
                 {% if bono.es_actual %}{{ bono.tipo_programa }} · {% endif %}
+                {{ bono.resumen.etiqueta }}
+                {%- if bono.mes %} · {{ bono.mes|mes_es }} {{ bono.anio }}{% endif %}
+              </span>
+              {# La fotografía de las condiciones con las que se hizo ese
+                 ciclo. Cambiar las condiciones de hoy no toca esto. #}
+              <span class="programa">
+                {% if bono.resumen.modalidad == 'mensualidad' %}
+                Cuota {{ bono.cuota_mensual|euros }} · {{ bono.sesiones|length }}
+                {{ 'sesión' if bono.sesiones|length == 1 else 'sesiones' }}
+                {%- if bono.resumen.precio_efectivo %} · {{ bono.resumen.precio_efectivo|euros }}/h{% endif %}
+                {%- if bono.sesiones_referencia %} · ref. {{ bono.sesiones_referencia }}{% endif %}
+                {% elif bono.resumen.modalidad == 'cuenta' %}
+                {{ bono.tarifa|euros }}/sesión · {{ bono.sesiones|length }}
+                {{ 'sesión' if bono.sesiones|length == 1 else 'sesiones' }}
+                · total {{ bono.resumen.facturacion|euros }}
+                {% else %}
+                {{ bono.sesiones|length }} de {{ bono.sesiones_totales }} sesiones
+                {%- if bono.precio_total %} · {{ bono.precio_total|euros }}{% endif %}
+                {%- if bono.tarifa %} · {{ bono.tarifa|euros }}/sesión{% endif %}
+                {% endif %}
+              </span>
+              <span class="programa">
                 {% if bono.fecha_inicio %}Desde {{ bono.fecha_inicio|fecha_es }}{% else %}Sin sesiones todavía{% endif %}
-                {%- if bono.fecha_fin %} — {{ bono.fecha_fin|fecha_es }} · Completado{% endif %}
+                {%- if bono.fecha_fin %} — {{ bono.fecha_fin|fecha_es }} · Cerrado{% endif %}
               </span>
             </span>
             <svg class="icono icono-sm flecha-plegable" aria-hidden="true"><use href="#i-chevron-right"></use></svg>

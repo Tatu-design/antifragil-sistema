@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Editar {{ nombre }} — Antifrágil</title>
+  <title>Programa de {{ nombre }} — Antifrágil</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css', v=version_estaticos) }}" />
   <link rel="icon" href="{{ url_for('static', filename='favicon.png') }}" />
   <link rel="apple-touch-icon" href="{{ url_for('static', filename='favicon.png') }}" />
@@ -11,32 +11,93 @@
   <script defer src="{{ url_for('static', filename='carga.js', v=version_estaticos) }}"></script>
 </head>
 <body>
+  {% include '_iconos.html' %}
   <div class="page sin-barra">
-    <a class="volver" href="{{ url_for('inicio') }}">← Volver</a>
-    <h1>Editar cliente</h1>
+    <a class="volver" href="{{ url_for('perfil_cliente', nombre=nombre) }}">
+      <svg class="icono icono-sm" aria-hidden="true"><use href="#i-arrow-left"></use></svg>{{ nombre }}
+    </a>
+    <h1>Editar programa</h1>
+    <p class="subtitulo">Qué tiene contratado y en qué condiciones. Los datos del cliente se editan aparte.</p>
 
-    <form class="formulario" method="post" action="{{ url_for('confirmar', nombre=nombre) }}">
+    <form class="formulario" method="post" action="{{ url_for('confirmar_servicio', nombre=nombre) }}">
       <input type="hidden" name="csrf" value="{{ token_csrf() }}">
-      <label class="campo">
-        <span>Nombre</span>
-        <input type="text" name="nombre" value="{{ nombre }}" required />
-      </label>
 
+      {# La modalidad va primero: de ella depende todo lo demás. #}
       <label class="campo">
-        <span>Tipo de programa</span>
-        <select name="tipo_programa" required>
-          {% for tipo in tipos_programa %}
-          <option value="{{ tipo }}" {% if tipo == cliente.tipo_programa %}selected{% endif %}>{{ tipo }}</option>
+        <span>Modalidad del servicio</span>
+        <select name="modalidad" id="modalidad" required>
+          {% for clave, etiqueta in modalidades %}
+          <option value="{{ clave }}" {% if clave == modalidad %}selected{% endif %}>{{ etiqueta }}</option>
           {% endfor %}
         </select>
       </label>
 
+      <p class="meta ayuda-modalidad" data-para="bono">
+        El cliente paga por adelantado un paquete de sesiones. Cada sesión firmada descuenta una;
+        al agotarse, se abre otro bono igual pendiente de pago.
+      </p>
+      <p class="meta ayuda-modalidad" data-para="mensualidad">
+        El cliente paga una cuota fija cada mes por tener sus plazas reservadas. Haga las sesiones
+        que haga, la factura del mes es la misma. Se renueva al cambiar de mes, nunca por sesiones.
+      </p>
+      <p class="meta ayuda-modalidad" data-para="cuenta">
+        El cliente paga al final por las sesiones que realmente haya hecho, a un precio por hora.
+        Sin tope de sesiones. El periodo se cierra al cambiar de mes.
+      </p>
+
       <label class="campo">
-        <span>Sesiones completadas (de {{ cliente.sesiones_totales }})</span>
-        <input type="number" name="sesiones_completadas" value="{{ cliente.sesiones_completadas }}" min="0" required />
+        <span>Nombre del servicio <span class="meta">(opcional)</span></span>
+        <input type="text" name="nombre_servicio" value="{{ ciclo.tipo_programa or '' }}"
+               placeholder="p. ej. Bono 8 mañanas" maxlength="60" />
       </label>
 
-      <input type="hidden" name="estado" value="{{ estado }}" />
+      {# ---- Solo bono ---- #}
+      <div class="campos-modalidad" data-para="bono">
+        <label class="campo">
+          <span>Número de sesiones</span>
+          <input type="number" name="sesiones_totales" id="sesiones_totales" min="1" step="1"
+                 value="{{ ciclo.sesiones_totales or '' }}" />
+        </label>
+        <label class="campo">
+          <span>Precio total del bono (€)</span>
+          <input type="number" name="precio_total" id="precio_total" min="0" step="0.01"
+                 value="{{ ciclo.precio_total or '' }}" />
+        </label>
+        <p class="meta" id="precio-calculado">El precio por sesión se calcula solo.</p>
+      </div>
+
+      {# ---- Solo mensualidad ---- #}
+      <div class="campos-modalidad" data-para="mensualidad">
+        <label class="campo">
+          <span>Cuota mensual (€)</span>
+          <input type="number" name="cuota_mensual" min="0" step="0.01"
+                 value="{{ ciclo.cuota_mensual or '' }}" />
+        </label>
+        <label class="campo">
+          <span>Sesiones al mes de referencia <span class="meta">(opcional)</span></span>
+          <input type="number" name="sesiones_referencia" min="0" step="1"
+                 value="{{ ciclo.sesiones_referencia or '' }}" />
+          <span class="meta">Solo informativo: no es un límite, no se consume y no provoca renovación.</span>
+        </label>
+      </div>
+
+      {# ---- Solo cuenta de cliente ---- #}
+      <div class="campos-modalidad" data-para="cuenta">
+        <label class="campo">
+          <span>Precio por sesión (€)</span>
+          <input type="number" name="tarifa" min="0" step="0.01"
+                 value="{{ ciclo.tarifa if modalidad == 'cuenta' else '' }}" />
+        </label>
+      </div>
+
+      {# Las sesiones ya consumidas solo tienen sentido en un bono. #}
+      <div class="campos-modalidad" data-para="bono">
+        <label class="campo">
+          <span>Sesiones ya completadas</span>
+          <input type="number" name="sesiones_completadas" min="0" step="1"
+                 value="{{ cliente.sesiones_completadas }}" />
+        </label>
+      </div>
 
       <label class="campo-check">
         <input type="checkbox" name="pendiente_pago" {% if pendiente_pago %}checked{% endif %} />
@@ -46,21 +107,55 @@
       <button type="submit" class="boton">Revisar cambios</button>
     </form>
 
-    <p class="aviso-texto">Si cambias el nombre, recuerda renombrar igual las sesiones en Google Calendar — si no, el sistema dejará de reconocerlas.</p>
-
-    {% if cliente.token %}
-    <div class="lista" style="margin-top: 1rem;">
-      <div class="cabecera-seccion">
-        <span>Enlace personal de {{ nombre }}</span>
-      </div>
-      <p class="meta" style="padding: 0 1.25rem 1rem;">
-        Compártelo con el cliente para que vea su propio bono e historial, sin necesitar tu contraseña.
-      </p>
-      <p class="meta" style="padding: 0 1.25rem 1.25rem; word-break: break-all;">
-        {{ url_for('mi_perfil', token=cliente.token, _external=True) }}
-      </p>
-    </div>
-    {% endif %}
+    <p class="aviso-texto">
+      Cambiar de modalidad cierra el servicio actual y abre uno nuevo. Las sesiones ya hechas y su
+      economía se conservan sin ningún cambio — te lo enseñaremos antes de guardar.
+    </p>
   </div>
+
+  <script>
+    /* Enseña solo los campos de la modalidad elegida. Sin librerías: se
+       marcan con `data-para` y se ocultan los que no tocan. */
+    (function () {
+      var selector = document.getElementById("modalidad");
+      var bloques = document.querySelectorAll("[data-para]");
+
+      function refrescar() {
+        var elegida = selector.value;
+        bloques.forEach(function (bloque) {
+          var suya = bloque.getAttribute("data-para") === elegida;
+          bloque.hidden = !suya;
+          /* Un campo oculto no debe seguir siendo obligatorio ni enviar
+             datos de otra modalidad. */
+          bloque.querySelectorAll("input").forEach(function (campo) {
+            campo.disabled = !suya;
+          });
+        });
+        calcular();
+      }
+
+      /* El precio por sesión de un bono no se pide: se calcula, para que no
+         pueda contradecir al precio total. */
+      var sesiones = document.getElementById("sesiones_totales");
+      var total = document.getElementById("precio_total");
+      var salida = document.getElementById("precio-calculado");
+
+      function calcular() {
+        if (selector.value !== "bono") return;
+        var n = parseFloat(sesiones.value);
+        var t = parseFloat(total.value);
+        if (n > 0 && t >= 0) {
+          salida.textContent = "Sale a " + (t / n).toFixed(2).replace(".", ",") + " € por sesión.";
+        } else {
+          salida.textContent = "El precio por sesión se calcula solo.";
+        }
+      }
+
+      selector.addEventListener("change", refrescar);
+      sesiones.addEventListener("input", calcular);
+      total.addEventListener("input", calcular);
+      refrescar();
+    })();
+  </script>
 </body>
 </html>

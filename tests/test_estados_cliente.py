@@ -248,7 +248,8 @@ class TestPantallaYBloqueo(BaseEstados):
             n: getattr(app_module, n)
             for n in ("leer_clientes", "obtener_historial", "avisar_confirmaciones_pendientes",
                       "contar_no_leidos", "hay_sesion_pendiente_de_confirmar", "confirmaciones_de_hoy",
-                      "registrar_sesion_pt", "listar_tipos_programa", "actualizar_cliente")
+                      "registrar_sesion_pt", "listar_tipos_programa", "actualizar_cliente",
+                      "obtener_ciclo_actual", "obtener_programas_cliente", "configurar_servicio")
         }
         app_module.leer_clientes = lambda ruta=self.ruta: cr.leer_clientes(self.ruta)
         app_module.obtener_historial = lambda n, ruta=self.ruta: cr.obtener_historial(n, ruta=self.ruta)
@@ -257,6 +258,15 @@ class TestPantallaYBloqueo(BaseEstados):
         app_module.hay_sesion_pendiente_de_confirmar = lambda n, ruta=self.ruta: False
         app_module.confirmaciones_de_hoy = lambda n, ruta=self.ruta: []
         app_module.listar_tipos_programa = lambda ruta=self.ruta: ["Bono 8"]
+        app_module.obtener_ciclo_actual = lambda n, conexion=None, ruta=self.ruta: (
+            cr.obtener_ciclo_actual(n, ruta=self.ruta)
+        )
+        app_module.obtener_programas_cliente = lambda n, ruta=self.ruta: (
+            cr.obtener_programas_cliente(n, ruta=self.ruta)
+        )
+        app_module.configurar_servicio = lambda cliente, modalidad, ruta=self.ruta, **kw: (
+            cr.configurar_servicio(cliente, modalidad, ruta=self.ruta, **kw)
+        )
         # Sin esto, la ruta de guardar escribiría en la base de datos REAL
         # en vez de en la temporal de la prueba.
         app_module.actualizar_cliente = (
@@ -394,10 +404,18 @@ class TestPantallaYBloqueo(BaseEstados):
             self.assertIn(f'value="{opcion}"', html)
         self.assertIn('value="activo" selected', html.replace(" selected", " selected"))
 
-    def test_editar_programa_conserva_el_estado_sin_tocarlo(self):
+    def test_editar_programa_no_ofrece_cambiar_el_estado(self):
         html = self.cliente.get("/cliente/Cliente C/editar").get_data(as_text=True)
         self.assertNotIn("Estado del cliente", html)
-        self.assertIn('name="estado" value="pausado"', html)
+        self.assertIn("Modalidad del servicio", html)
+
+    def test_cambiar_el_programa_de_un_pausado_lo_deja_pausado(self):
+        """Lo que de verdad importa: tocar el bono no reactiva a nadie."""
+        cr.configurar_servicio(
+            "Cliente C", "bono", nombre_servicio="Bono 8",
+            sesiones_totales=8, precio_total=280, ruta=self.ruta,
+        )
+        self.assertEqual(cr.leer_clientes(self.ruta)["Cliente C"]["estado"], "pausado")
 
     def test_confirmar_muestra_el_cambio_de_estado(self):
         respuesta = self.cliente.post(

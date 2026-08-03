@@ -40,18 +40,30 @@ from avisos import (
 )
 from basedatos import RUTA_POR_DEFECTO, crear_esquema
 from migrar_programas_cliente import rellenar_si_falta
+from migrar_modalidades import rellenar_si_falta as rellenar_modalidades
 from clientes.repositorio import (
     ESTADO_POR_DEFECTO,
     ESTADOS_VALIDOS,
     actualizar_cliente,
+    asegurar_ciclos_mensuales,
     asegurar_tokens,
+    configurar_servicio,
     crear_cliente,
     leer_clientes,
     listar_tipos_programa,
+    obtener_ciclo_actual,
     obtener_cliente_por_token,
     obtener_historial,
     obtener_programas_cliente,
     validar_estado,
+)
+from servicios.modalidades import (
+    BONO,
+    ETIQUETAS as ETIQUETAS_MODALIDAD,
+    MODALIDAD_POR_DEFECTO,
+    MODALIDADES,
+    resumen_ciclo,
+    validar_condiciones,
 )
 from economia.registro import listar_meses, obtener_mes, obtener_ultima_semana
 from firma_publica import (
@@ -81,6 +93,10 @@ from webapp.auth import (
 crear_esquema()  # crea las tablas si es la primera vez que arranca en esta máquina (ej. un servidor nuevo)
 asegurar_tokens()  # da un enlace personal a clientes dados de alta antes del milestone 4
 rellenar_si_falta()  # reconstruye los bonos pasados la primera vez que arranca esta versión (2026-08-02)
+rellenar_modalidades()  # completa el precio total de los bonos ya existentes (2026-08-03)
+# Abre el ciclo del mes en curso a los clientes de mensualidad y cuenta. Es
+# idempotente, así que arrancar la web mil veces no duplica ninguna cuota.
+# (se hace en `_abrir_mes_si_toca`, la primera vez que se abre la lista)
 
 app = Flask(__name__)
 app.secret_key = obtener_secret_key()
@@ -171,6 +187,33 @@ def _fecha_es(valor: str) -> str:
     try:
         return datetime.strptime(str(valor), "%Y-%m-%d").strftime("%d/%m/%Y")
     except (ValueError, TypeError):
+        return str(valor)
+
+
+MESES_ES = {
+    1: "Enero", 2: "Febrero", 3: "Marzo", 4: "Abril", 5: "Mayo", 6: "Junio",
+    7: "Julio", 8: "Agosto", 9: "Septiembre", 10: "Octubre", 11: "Noviembre", 12: "Diciembre",
+}
+
+
+def _euros(valor) -> str:
+    if valor is None:
+        return "—"
+    return f"{float(valor):,.2f} €".replace(",", "·").replace(".", ",").replace("·", ".")
+
+
+@app.template_filter("euros")
+def _filtro_euros(valor) -> str:
+    """1234.5 -> 1.234,50 €, que es como se escribe una cantidad en España."""
+    return _euros(valor)
+
+
+@app.template_filter("mes_es")
+def _filtro_mes(valor) -> str:
+    """8 -> agosto."""
+    try:
+        return MESES_ES[int(valor)]
+    except (TypeError, ValueError, KeyError):
         return str(valor)
 
 
@@ -306,6 +349,17 @@ def _con_sesiones_restantes(clientes: dict) -> list[dict]:
                 "sesiones_restantes": restantes,
                 "pendiente_pago": str(datos.get("pendiente_pago", "")).strip().lower() in ("sí", "si"),
                 "estado": datos.get("estado") or ESTADO_POR_DEFECTO,
+                # Condiciones del servicio en curso (2026-08-03). Esta función
+                # copia claves una a una, así que lo que no se nombre aquí NO
+                # llega a la pantalla — el precio del bono y el periodo de una
+                # mensualidad desaparecían en silencio.
+                "modalidad": datos.get("modalidad") or MODALIDAD_POR_DEFECTO,
+                "sesiones_ciclo": datos.get("sesiones_ciclo") or 0,
+                "precio_total": datos.get("precio_total"),
+                "cuota_mensual": datos.get("cuota_mensual"),
+                "sesiones_referencia": datos.get("sesiones_referencia"),
+                "anio": datos.get("anio"),
+                "mes": datos.get("mes"),
             }
         )
     return filas
@@ -315,8 +369,34 @@ def _es_si(valor) -> bool:
     return str(valor or "").strip().lower() in ("sí", "si")
 
 
+# Mes que ya se ha comprobado en este proceso. Ver `_abrir_mes_si_toca`.
+_MES_COMPROBADO: tuple[int, int] | None = None
+
+
+def _abrir_mes_si_toca() -> None:
+    """Abre el ciclo del mes a los clientes de mensualidad y cuenta, como
+    mucho una vez por mes y proceso.
+
+    Sin este recuerdo, la lista de clientes —la pantalla que más se abre—
+    hacía una consulta extra en CADA carga para descubrir que no había nada
+    que hacer: pasó de 3 consultas y 5,8 ms a 4 y 16,5 ms (medido con
+    `comprobar_rendimiento.py`, 2026-08-03).
+
+    Olvidarlo no rompe nada: la operación es idempotente, así que si el
+    servidor se reinicia simplemente se vuelve a comprobar una vez. Y un
+    cliente que se configure como mensualidad a mitad de mes cobra su cuota
+    en el propio `configurar_servicio`, no aquí."""
+    global _MES_COMPROBADO
+    hoy = hoy_negocio()
+    if _MES_COMPROBADO == (hoy.year, hoy.month):
+        return
+    asegurar_ciclos_mensuales(hoy.year, hoy.month)
+    _MES_COMPROBADO = (hoy.year, hoy.month)
+
+
 @app.route("/")
 def inicio():
+    _abrir_mes_si_toca()
     avisar_confirmaciones_pendientes()
     clientes = leer_clientes()
     filas = _con_sesiones_restantes(clientes)
@@ -402,11 +482,26 @@ def perfil_cliente(nombre):
     # El historial ya viene agrupado dentro de cada bono, así que no hace
     # falta pedirlo otra vez suelto.
     firmado = request.args.get("firmado")
+
+    # Cada ciclo se traduce a lo que hay que enseñar según su modalidad, para
+    # que la plantilla no tenga que decidir nada: un bono enseña sesiones
+    # restantes y barra, una mensualidad su cuota y su precio efectivo, y una
+    # cuenta lo acumulado.
+    ciclos = obtener_programas_cliente(nombre)
+    for ciclo in ciclos:
+        ciclo["resumen"] = resumen_ciclo(ciclo, len(ciclo["sesiones"]))
+
+    actual = next((c for c in ciclos if c.get("es_actual")), None)
+    resumen = actual["resumen"] if actual else resumen_ciclo(cliente, cliente.get("sesiones_ciclo") or 0)
+
     return render_template(
         "perfil_cliente.html",
         puede_firmar=cliente["estado"] == "activo",
         nombre=nombre,
         cliente=cliente,
+        ciclo_actual=actual,
+        resumen=resumen,
+        etiquetas_modalidad=ETIQUETAS_MODALIDAD,
         clave_idempotencia=uuid.uuid4().hex,
         firmado=firmado,
         borrado=request.args.get("borrado"),
@@ -414,7 +509,7 @@ def perfil_cliente(nombre):
         # se pregunta, que es una consulta menos en cada visita.
         hay_sesion_pendiente=bool(firmado) and hay_sesion_pendiente_de_confirmar(nombre),
         confirmaciones_hoy=confirmaciones_de_hoy(nombre),
-        bonos=obtener_programas_cliente(nombre),
+        bonos=ciclos,
     )
 
 
@@ -553,21 +648,158 @@ def editar_datos(nombre):
     )
 
 
+def _detalle_servicio(datos: dict) -> str:
+    """Una frase que resume las condiciones de un servicio, para las
+    pantallas de revisión. En lenguaje llano, no en columnas de tabla."""
+    modalidad = datos.get("modalidad") or MODALIDAD_POR_DEFECTO
+
+    if modalidad == "mensualidad":
+        texto = f"Cuota de {_euros(datos.get('cuota_mensual'))} al mes"
+        if datos.get("sesiones_referencia"):
+            texto += f" · {datos['sesiones_referencia']} sesiones de referencia"
+        return texto
+
+    if modalidad == "cuenta":
+        return f"{_euros(datos.get('tarifa'))} por sesión · sin tope de sesiones"
+
+    totales = datos.get("sesiones_totales") or 0
+    if not totales:
+        return "Sin condiciones rellenas todavía"
+    return (
+        f"{totales} sesiones por {_euros(datos.get('precio_total'))} "
+        f"· {_euros(datos.get('tarifa'))} por sesión"
+    )
+
+
+def _servicio_del_formulario(formulario) -> dict:
+    """Lee los campos del formulario de servicio. Los que no son de la
+    modalidad elegida van deshabilitados en el navegador y no llegan, así
+    que se leen con `get` y se quedan vacíos."""
+    return {
+        "modalidad": formulario.get("modalidad") or MODALIDAD_POR_DEFECTO,
+        "nombre_servicio": (formulario.get("nombre_servicio") or "").strip(),
+        "sesiones_totales": formulario.get("sesiones_totales") or "",
+        "precio_total": formulario.get("precio_total") or "",
+        "cuota_mensual": formulario.get("cuota_mensual") or "",
+        "sesiones_referencia": formulario.get("sesiones_referencia") or "",
+        "tarifa": formulario.get("tarifa") or "",
+        "sesiones_completadas": formulario.get("sesiones_completadas") or "",
+        "pendiente_pago": (
+            "pendiente_pago" in formulario
+            if formulario.get("pendiente_pago") is None
+            else formulario.get("pendiente_pago") == "si"
+        ),
+    }
+
+
 @app.route("/cliente/<nombre>/editar")
 def editar(nombre):
+    """«Editar programa»: la modalidad del servicio y sus condiciones.
+
+    Desde el 2026-08-03 las condiciones se guardan en el propio cliente, no
+    se eligen de una lista global — cada uno puede tener las suyas."""
     clientes = leer_clientes()
     if nombre not in clientes:
         return f"No existe el cliente '{nombre}'", 404
     cliente = clientes[nombre]
+    ciclo = obtener_ciclo_actual(nombre) or {}
     return render_template(
         "editar.html",
         nombre=nombre,
         cliente=cliente,
+        ciclo=ciclo,
+        modalidad=cliente.get("modalidad") or MODALIDAD_POR_DEFECTO,
+        modalidades=[(clave, ETIQUETAS_MODALIDAD[clave]) for clave in MODALIDADES],
         pendiente_pago=_es_si(cliente.get("pendiente_pago")),
         estado=cliente.get("estado") or ESTADO_POR_DEFECTO,
         estados=ESTADOS_VALIDOS,
-        tipos_programa=listar_tipos_programa(),
     )
+
+
+@app.route("/cliente/<nombre>/servicio/confirmar", methods=["POST"])
+def confirmar_servicio(nombre):
+    """Enseña qué va a pasar ANTES de tocar nada. Si cambia la modalidad,
+    lo dice con todas las letras: el ciclo actual se cierra."""
+    clientes = leer_clientes()
+    if nombre not in clientes:
+        return render_template("error.html", mensaje=f"No existe el cliente '{nombre}'"), 404
+
+    actual = clientes[nombre]
+    formulario = _servicio_del_formulario(request.form)
+
+    # Las condiciones se validan aquí, antes de enseñar nada: más vale
+    # decir "faltan las sesiones del bono" ahora que guardar un servicio
+    # incoherente y descubrirlo en la facturación.
+    try:
+        condiciones = validar_condiciones(
+            formulario["modalidad"],
+            sesiones_totales=formulario["sesiones_totales"] or None,
+            precio_total=formulario["precio_total"] or None,
+            cuota_mensual=formulario["cuota_mensual"] or None,
+            tarifa=formulario["tarifa"] or None,
+            sesiones_referencia=formulario["sesiones_referencia"] or None,
+        )
+    except ValueError as error:
+        return render_template("error.html", mensaje=str(error)), 400
+
+    modalidad_actual = actual.get("modalidad") or MODALIDAD_POR_DEFECTO
+    return render_template(
+        "confirmar_servicio.html",
+        nombre=nombre,
+        formulario=formulario,
+        cambia_modalidad=modalidad_actual != formulario["modalidad"],
+        antes={
+            "modalidad": modalidad_actual,
+            "etiqueta": ETIQUETAS_MODALIDAD[modalidad_actual],
+            "nombre_servicio": actual.get("tipo_programa"),
+            "detalle": _detalle_servicio(actual),
+            "sesiones_ciclo": actual.get("sesiones_ciclo") or 0,
+            "pendiente_pago": _es_si(actual.get("pendiente_pago")),
+        },
+        despues={
+            "modalidad": formulario["modalidad"],
+            "etiqueta": ETIQUETAS_MODALIDAD[formulario["modalidad"]],
+            "nombre_servicio": formulario["nombre_servicio"] or actual.get("tipo_programa"),
+            "detalle": _detalle_servicio(condiciones),
+        },
+    )
+
+
+@app.route("/cliente/<nombre>/servicio/guardar", methods=["POST"])
+def guardar_servicio(nombre):
+    formulario = _servicio_del_formulario(request.form)
+    try:
+        configurar_servicio(
+            nombre,
+            formulario["modalidad"],
+            nombre_servicio=formulario["nombre_servicio"] or None,
+            sesiones_totales=formulario["sesiones_totales"] or None,
+            precio_total=formulario["precio_total"] or None,
+            cuota_mensual=formulario["cuota_mensual"] or None,
+            tarifa=formulario["tarifa"] or None,
+            sesiones_referencia=formulario["sesiones_referencia"] or None,
+            pendiente_pago=formulario["pendiente_pago"],
+            hoy=hoy_negocio(),
+        )
+        # Las sesiones ya consumidas solo existen en un bono, y se corrigen
+        # aparte para no mezclarlas con el cambio de condiciones.
+        if formulario["modalidad"] == BONO and formulario["sesiones_completadas"] != "":
+            actual = leer_clientes()[nombre]
+            actualizar_cliente(
+                nombre=nombre,
+                nuevo_nombre=nombre,
+                tipo_programa=actual["tipo_programa"],
+                sesiones_completadas=int(formulario["sesiones_completadas"]),
+                pendiente_pago=formulario["pendiente_pago"],
+            )
+    except sqlite3.OperationalError:
+        return render_template(
+            "error.html", mensaje="No se pudo guardar: la base de datos está ocupada. Reintenta."
+        ), 409
+    except ValueError as error:
+        return render_template("error.html", mensaje=str(error)), 400
+
+    return redirect(url_for("perfil_cliente", nombre=nombre))
 
 
 @app.route("/cliente/<nombre>/confirmar", methods=["POST"])
@@ -640,11 +872,17 @@ def mi_perfil(token):
 
     nombre, cliente = encontrado
     filas = _con_sesiones_restantes({nombre: cliente})
+    datos = filas[0]
+    # El cliente ve lo suyo con la forma que le corresponde: un bono, lo que
+    # le queda; una mensualidad, su cuota y las sesiones del mes; una cuenta,
+    # lo que lleva acumulado.
+    resumen = resumen_ciclo(datos, datos.get("sesiones_ciclo") or 0)
     return render_template(
         "mi_perfil.html",
         token=token,
         nombre=nombre,
-        cliente=filas[0],
+        cliente=datos,
+        resumen=resumen,
         entradas=obtener_historial(nombre),
         confirmaciones_hoy=confirmaciones_de_hoy(nombre),
     )
@@ -734,12 +972,6 @@ def historial(nombre):
     """El historial ahora vive dentro del perfil del cliente — este enlace
     antiguo se queda por si alguien lo tenía guardado."""
     return redirect(url_for("perfil_cliente", nombre=nombre))
-
-
-MESES_ES = {
-    1: "Enero", 2: "Febrero", 3: "Marzo", 4: "Abril", 5: "Mayo", 6: "Junio",
-    7: "Julio", 8: "Agosto", 9: "Septiembre", 10: "Octubre", 11: "Noviembre", 12: "Diciembre",
-}
 
 
 def _etiqueta_mes(anio: int, mes: int) -> str:

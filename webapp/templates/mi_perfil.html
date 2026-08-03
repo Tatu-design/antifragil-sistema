@@ -17,12 +17,17 @@
     <div class="perfil-saludo">
       <img src="{{ url_for('static', filename='logo-marca.png') }}" alt="Antifrágil" class="logo-login" />
       <h1>Hola, {{ nombre }}</h1>
-      <p class="subtitulo" style="margin:0;">Así va tu bono ahora mismo</p>
+      <p class="subtitulo" style="margin:0;">
+        {% if resumen.modalidad == 'mensualidad' %}Así va tu mes
+        {% elif resumen.modalidad == 'cuenta' %}Así va tu cuenta
+        {% else %}Así va tu bono ahora mismo{% endif %}
+      </p>
     </div>
 
     <div class="perfil-hero">
       <div class="programa-nombre">{{ cliente.tipo_programa }}</div>
 
+      {% if resumen.modalidad == 'bono' %}
       {% if cliente.sesiones_totales %}
       <div class="perfil-progreso">
         <div class="perfil-progreso-numeros">
@@ -34,6 +39,40 @@
         </div>
         <div class="perfil-progreso-restantes">Te quedan {{ cliente.sesiones_restantes }}</div>
       </div>
+      {% endif %}
+
+      {% elif resumen.modalidad == 'mensualidad' %}
+      {# Sin barra ni "te quedan": no hay nada que agotar. #}
+      <div class="perfil-progreso">
+        <div class="perfil-progreso-numeros">
+          <span class="grande">{{ resumen.sesiones_reales }}</span>
+          <span class="de">
+            {{ 'sesión' if resumen.sesiones_reales == 1 else 'sesiones' }}
+            {%- if cliente.mes %} en {{ cliente.mes|mes_es|lower }}{% else %} este mes{% endif %}
+          </span>
+        </div>
+      </div>
+      <dl class="datos-servicio">
+        <div><dt>Cuota del mes</dt><dd>{{ resumen.facturacion|euros }}</dd></div>
+        {% if resumen.sesiones_referencia %}
+        <div><dt>Previstas</dt><dd>{{ resumen.sesiones_referencia }}</dd></div>
+        {% endif %}
+      </dl>
+
+      {% elif resumen.modalidad == 'cuenta' %}
+      <div class="perfil-progreso">
+        <div class="perfil-progreso-numeros">
+          <span class="grande">{{ resumen.sesiones_reales }}</span>
+          <span class="de">
+            {{ 'sesión' if resumen.sesiones_reales == 1 else 'sesiones' }}
+            {%- if cliente.mes %} en {{ cliente.mes|mes_es|lower }}{% else %} este mes{% endif %}
+          </span>
+        </div>
+      </div>
+      <dl class="datos-servicio">
+        <div><dt>Precio por sesión</dt><dd>{{ cliente.tarifa|euros }}</dd></div>
+        <div><dt>Total</dt><dd class="acumulado">{{ resumen.facturacion|euros }}</dd></div>
+      </dl>
       {% endif %}
 
       <div class="estado">
@@ -62,8 +101,12 @@
         <div class="sesion-fila">
           <div class="sesion-badge">{{ entrada.numero_sesion }}</div>
           <div class="sesion-info">
-            <div class="fecha">{{ entrada.fecha }}</div>
-            <div class="tipo">{{ entrada.tipo_programa }} · sesión {{ entrada.numero_sesion }} de {{ entrada.sesiones_totales }}</div>
+            <div class="fecha">{{ entrada.fecha|fecha_es }}</div>
+            <div class="tipo">
+              {{ entrada.tipo_programa }} · sesión {{ entrada.numero_sesion }}
+              {%- if entrada.sesiones_totales %} de {{ entrada.sesiones_totales }}{% endif %}
+              {%- if entrada.hora %} · {{ entrada.hora }}{% endif %}
+            </div>
           </div>
         </div>
       </div>
