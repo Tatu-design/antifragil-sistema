@@ -10,6 +10,8 @@
  * Server Actions.
  */
 
+import { randomUUID } from "node:crypto";
+
 import { ErrorDeNegocio, MENSUALIDAD, consumeSesiones, tarifaDeLaSesion } from "@/domain/modalidades";
 import { datosQueFaltan, puedeFirmarse } from "@/domain/ficha";
 import { procesarUnaSesion } from "@/domain/programas";
@@ -92,7 +94,10 @@ export async function firmarSesion(clienteId: string, opciones: OpcionesFirma = 
     }
 
     const sesion: Sesion = {
-      id: `ses-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      // UUID de verdad: la base de datos real tiene esa columna tipada como
+      // uuid y rechaza cualquier otra cosa. Encontrado al probar contra
+      // Supabase — el repositorio de staging admitía cualquier texto.
+      id: randomUUID(),
       clienteId,
       fecha,
       hora: horaNegocio(),

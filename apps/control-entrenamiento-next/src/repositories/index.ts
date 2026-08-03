@@ -1,13 +1,17 @@
 /**
  * De dónde salen los datos.
  *
- * Hoy: staging en archivo, con datos ficticios. Cuando existan credenciales de
- * Supabase, se sustituye aquí y **no hay que tocar nada más** — ni pantallas,
- * ni reglas de negocio, ni servicios.
+ * Si hay base de datos configurada (`DATABASE_URL`), se usa la real. Si no, el
+ * repositorio de staging con datos ficticios en archivo — así el proyecto se
+ * puede abrir y probar sin credenciales.
+ *
+ * Ni las pantallas, ni los servicios, ni las reglas de negocio saben cuál de
+ * los dos está detrás.
  */
 
 import "server-only";
 
+import { RepositorioPostgres } from "./postgres";
 import { RepositorioStaging } from "./staging";
 import type { Repositorio } from "./tipos";
 
@@ -15,13 +19,14 @@ let instancia: Repositorio | null = null;
 
 export function repositorio(): Repositorio {
   if (!instancia) {
-    // Cuando haya Supabase:
-    //   instancia = process.env.NEXT_PUBLIC_SUPABASE_URL
-    //     ? new RepositorioSupabase()
-    //     : new RepositorioStaging();
-    instancia = new RepositorioStaging();
+    instancia = process.env.DATABASE_URL ? new RepositorioPostgres() : new RepositorioStaging();
   }
   return instancia;
+}
+
+/** Qué está usando ahora mismo, para poder decirlo en pantalla. */
+export function origenDeDatos(): "supabase" | "staging" {
+  return process.env.DATABASE_URL ? "supabase" : "staging";
 }
 
 export type { Repositorio, SemanaEconomica } from "./tipos";
