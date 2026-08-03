@@ -1,0 +1,771 @@
+{
+  "version": 1,
+  "descripcion": "Escenarios de equivalencia entre el sistema Python actual y la futura version Next.js/Supabase. Datos ficticios. Los resultados esperados estan calculados a mano desde las reglas de negocio, no capturados de la salida del sistema.",
+  "escenarios": [
+    {
+      "id": "E01",
+      "regla": "Firmar una sesion descuenta exactamente una unidad",
+      "pasos": [
+        { "accion": "programa", "nombre": "Bono 8", "tarifa": 45, "sesiones": 8 },
+        { "accion": "alta", "cliente": "Cliente A", "programa": "Bono 8" },
+        { "accion": "firmar", "cliente": "Cliente A", "fecha": "2026-08-03", "veces": 3 }
+      ],
+      "esperado": {
+        "clientes": [
+          { "cliente": "Cliente A", "estado": "activo", "pendiente_pago": false, "sesiones_completadas": 3, "ciclo": 1 }
+        ],
+        "historial": [
+          { "cliente": "Cliente A", "fecha": "2026-08-03", "numero_sesion": 1, "sesiones_totales": 8, "tarifa": 45.0, "ciclo": 1 },
+          { "cliente": "Cliente A", "fecha": "2026-08-03", "numero_sesion": 2, "sesiones_totales": 8, "tarifa": 45.0, "ciclo": 1 },
+          { "cliente": "Cliente A", "fecha": "2026-08-03", "numero_sesion": 3, "sesiones_totales": 8, "tarifa": 45.0, "ciclo": 1 }
+        ],
+        "meses": [
+          { "anio": 2026, "mes": 8, "facturacion_total": 135.0, "horas_totales": 3, "precio_medio_hora": 45.0 }
+        ]
+      }
+    },
+    {
+      "id": "E02",
+      "regla": "Firmar la ultima sesion activa la renovacion correcta",
+      "pasos": [
+        { "accion": "programa", "nombre": "Bono 4", "tarifa": 40, "sesiones": 4 },
+        { "accion": "alta", "cliente": "Cliente A", "programa": "Bono 4" },
+        { "accion": "firmar", "cliente": "Cliente A", "fecha": "2026-08-03", "veces": 4 }
+      ],
+      "esperado": {
+        "clientes": [
+          { "cliente": "Cliente A", "sesiones_completadas": 0, "ciclo": 2, "pendiente_pago": true }
+        ],
+        "ciclos": [
+          { "cliente": "Cliente A", "ciclo": 1, "modalidad": "bono", "tarifa": 40.0, "sesiones_totales": 4, "fecha_inicio": "2026-08-03", "fecha_fin": "2026-08-03", "pagado": true },
+          { "cliente": "Cliente A", "ciclo": 2, "modalidad": "bono", "tarifa": 40.0, "sesiones_totales": 4, "fecha_inicio": null, "fecha_fin": null, "pagado": false }
+        ],
+        "historial": [
+          { "fecha": "2026-08-03", "numero_sesion": 1, "ciclo": 1, "tarifa": 40.0 },
+          { "fecha": "2026-08-03", "numero_sesion": 2, "ciclo": 1, "tarifa": 40.0 },
+          { "fecha": "2026-08-03", "numero_sesion": 3, "ciclo": 1, "tarifa": 40.0 },
+          { "fecha": "2026-08-03", "numero_sesion": 4, "ciclo": 1, "tarifa": 40.0 }
+        ],
+        "meses": [
+          { "anio": 2026, "mes": 8, "facturacion_total": 160.0, "horas_totales": 4 }
+        ]
+      }
+    },
+    {
+      "id": "E03",
+      "regla": "La renovacion conserva servicio, tarifa, sesiones y precio total",
+      "pasos": [
+        { "accion": "programa", "nombre": "Bono 5", "tarifa": 45, "sesiones": 5 },
+        { "accion": "alta", "cliente": "Cliente A", "programa": "Bono 5" },
+        { "accion": "servicio", "cliente": "Cliente A", "modalidad": "bono", "servicio": "Bono 5 sesiones", "sesiones_totales": 5, "precio_total": 225, "fecha": "2026-08-03" },
+        { "accion": "firmar", "cliente": "Cliente A", "fecha": "2026-08-03", "veces": 5 }
+      ],
+      "esperado": {
+        "ciclos": [
+          { "cliente": "Cliente A", "ciclo": 1, "modalidad": "bono", "servicio": "Bono 5 sesiones", "tarifa": 45.0, "sesiones_totales": 5, "precio_total": 225.0, "pagado": true },
+          { "cliente": "Cliente A", "ciclo": 2, "modalidad": "bono", "servicio": "Bono 5 sesiones", "tarifa": 45.0, "sesiones_totales": 5, "precio_total": 225.0, "pagado": false }
+        ],
+        "clientes": [
+          { "cliente": "Cliente A", "programa": "Bono 5", "ciclo": 2, "sesiones_completadas": 0 }
+        ],
+        "meses": [
+          { "anio": 2026, "mes": 8, "facturacion_total": 225.0, "horas_totales": 5 }
+        ]
+      }
+    },
+    {
+      "id": "E04",
+      "regla": "El programa nuevo queda pendiente de pago, y el que se cierra conserva su estado real",
+      "pasos": [
+        { "accion": "programa", "nombre": "Bono 4", "tarifa": 40, "sesiones": 4 },
+        { "accion": "alta", "cliente": "Cliente A", "programa": "Bono 4", "pendiente_pago": true },
+        { "accion": "firmar", "cliente": "Cliente A", "fecha": "2026-08-03", "veces": 4 }
+      ],
+      "esperado": {
+        "clientes": [
+          { "cliente": "Cliente A", "pendiente_pago": true, "ciclo": 2 }
+        ],
+        "ciclos": [
+          { "cliente": "Cliente A", "ciclo": 1, "pagado": false, "fecha_fin": "2026-08-03" },
+          { "cliente": "Cliente A", "ciclo": 2, "pagado": false, "fecha_fin": null }
+        ]
+      }
+    },
+    {
+      "id": "E05",
+      "regla": "Una pareja es una sola unidad y no consume dos veces",
+      "pasos": [
+        { "accion": "programa", "nombre": "Bono pareja", "tarifa": 60, "sesiones": 8 },
+        { "accion": "alta", "cliente": "Pareja C", "programa": "Bono pareja" },
+        { "accion": "firmar", "cliente": "Pareja C", "fecha": "2026-08-03", "veces": 1 }
+      ],
+      "esperado": {
+        "clientes": [
+          { "cliente": "Pareja C", "sesiones_completadas": 1, "ciclo": 1 }
+        ],
+        "historial": [
+          { "cliente": "Pareja C", "fecha": "2026-08-03", "numero_sesion": 1, "tarifa": 60.0 }
+        ],
+        "meses": [
+          { "anio": 2026, "mes": 8, "facturacion_total": 60.0, "horas_totales": 1 }
+        ]
+      }
+    },
+    {
+      "id": "E06",
+      "regla": "Dos sesiones el mismo dia quedan registradas por separado",
+      "pasos": [
+        { "accion": "programa", "nombre": "Bono 8", "tarifa": 45, "sesiones": 8 },
+        { "accion": "alta", "cliente": "Cliente A", "programa": "Bono 8" },
+        { "accion": "firmar", "cliente": "Cliente A", "fecha": "2026-08-05", "veces": 2 }
+      ],
+      "esperado": {
+        "clientes": [
+          { "cliente": "Cliente A", "sesiones_completadas": 2 }
+        ],
+        "historial": [
+          { "fecha": "2026-08-05", "numero_sesion": 1 },
+          { "fecha": "2026-08-05", "numero_sesion": 2 }
+        ],
+        "semanas": [
+          { "inicio": "2026-08-03", "fin": "2026-08-09", "facturacion_total": 90.0, "horas_totales": 2 }
+        ]
+      }
+    },
+    {
+      "id": "E07",
+      "regla": "Eliminar una sesion devuelve la unidad al bono",
+      "pasos": [
+        { "accion": "programa", "nombre": "Bono 8", "tarifa": 45, "sesiones": 8 },
+        { "accion": "alta", "cliente": "Cliente A", "programa": "Bono 8" },
+        { "accion": "firmar", "cliente": "Cliente A", "fecha": "2026-08-03", "veces": 3 },
+        { "accion": "borrar_sesion", "cliente": "Cliente A", "indice": 0 }
+      ],
+      "esperado": {
+        "clientes": [
+          { "cliente": "Cliente A", "sesiones_completadas": 2 }
+        ],
+        "historial": [
+          { "numero_sesion": 1, "tarifa": 45.0 },
+          { "numero_sesion": 2, "tarifa": 45.0 }
+        ]
+      }
+    },
+    {
+      "id": "E08",
+      "regla": "Eliminar una sesion corrige la economia de su semana y su mes",
+      "pasos": [
+        { "accion": "programa", "nombre": "Bono 8", "tarifa": 45, "sesiones": 8 },
+        { "accion": "alta", "cliente": "Cliente A", "programa": "Bono 8" },
+        { "accion": "firmar", "cliente": "Cliente A", "fecha": "2026-08-03", "veces": 3 },
+        { "accion": "borrar_sesion", "cliente": "Cliente A", "indice": 0 }
+      ],
+      "esperado": {
+        "semanas": [
+          { "inicio": "2026-08-03", "facturacion_total": 90.0, "horas_totales": 2 }
+        ],
+        "meses": [
+          { "anio": 2026, "mes": 8, "facturacion_total": 90.0, "horas_totales": 2, "precio_medio_hora": 45.0 }
+        ]
+      }
+    },
+    {
+      "id": "E09",
+      "regla": "Una firma repetida por reintento de red no se guarda dos veces (capa 2 anti-duplicado)",
+      "pasos": [
+        { "accion": "programa", "nombre": "Bono 8", "tarifa": 45, "sesiones": 8 },
+        { "accion": "alta", "cliente": "Cliente A", "programa": "Bono 8" },
+        { "accion": "firmar", "cliente": "Cliente A", "fecha": "2026-08-03", "veces": 2, "clave_idempotencia": "peticion-unica-1" }
+      ],
+      "esperado": {
+        "clientes": [
+          { "cliente": "Cliente A", "sesiones_completadas": 1 }
+        ],
+        "historial": [
+          { "fecha": "2026-08-03", "numero_sesion": 1, "tarifa": 45.0 }
+        ],
+        "meses": [
+          { "anio": 2026, "mes": 8, "facturacion_total": 45.0, "horas_totales": 1 }
+        ]
+      }
+    },
+    {
+      "id": "E10",
+      "regla": "Los totales semanales coinciden, y una semana a caballo entre dos meses se muestra entera",
+      "pasos": [
+        { "accion": "programa", "nombre": "Bono 10", "tarifa": 50, "sesiones": 10 },
+        { "accion": "alta", "cliente": "Cliente A", "programa": "Bono 10" },
+        { "accion": "firmar", "cliente": "Cliente A", "fecha": "2026-07-31", "veces": 1 },
+        { "accion": "firmar", "cliente": "Cliente A", "fecha": "2026-08-01", "veces": 1 },
+        { "accion": "firmar", "cliente": "Cliente A", "fecha": "2026-08-03", "veces": 2 }
+      ],
+      "esperado": {
+        "semanas": [
+          { "inicio": "2026-07-27", "fin": "2026-08-02", "facturacion_total": 100.0, "horas_totales": 2 },
+          { "inicio": "2026-08-03", "fin": "2026-08-09", "facturacion_total": 100.0, "horas_totales": 2 }
+        ]
+      }
+    },
+    {
+      "id": "E11",
+      "regla": "Los totales mensuales coinciden, y separan una semana a caballo por la fecha real de cada sesion",
+      "pasos": [
+        { "accion": "programa", "nombre": "Bono 10", "tarifa": 50, "sesiones": 10 },
+        { "accion": "alta", "cliente": "Cliente A", "programa": "Bono 10" },
+        { "accion": "firmar", "cliente": "Cliente A", "fecha": "2026-07-31", "veces": 1 },
+        { "accion": "firmar", "cliente": "Cliente A", "fecha": "2026-08-01", "veces": 1 },
+        { "accion": "firmar", "cliente": "Cliente A", "fecha": "2026-08-03", "veces": 2 }
+      ],
+      "esperado": {
+        "meses": [
+          { "anio": 2026, "mes": 7, "facturacion_total": 50.0, "horas_totales": 1, "precio_medio_hora": 50.0 },
+          { "anio": 2026, "mes": 8, "facturacion_total": 150.0, "horas_totales": 3, "precio_medio_hora": 50.0 }
+        ]
+      }
+    },
+    {
+      "id": "E12",
+      "regla": "El historial conserva las fechas, y el numero de sesion sigue el orden de firma, no el de fecha",
+      "pasos": [
+        { "accion": "programa", "nombre": "Bono 8", "tarifa": 45, "sesiones": 8 },
+        { "accion": "alta", "cliente": "Cliente A", "programa": "Bono 8" },
+        { "accion": "firmar", "cliente": "Cliente A", "fecha": "2026-08-05", "veces": 1 },
+        { "accion": "firmar", "cliente": "Cliente A", "fecha": "2026-08-03", "veces": 1 },
+        { "accion": "firmar", "cliente": "Cliente A", "fecha": "2026-08-04", "veces": 1 }
+      ],
+      "esperado": {
+        "historial": [
+          { "fecha": "2026-08-03", "numero_sesion": 2 },
+          { "fecha": "2026-08-04", "numero_sesion": 3 },
+          { "fecha": "2026-08-05", "numero_sesion": 1 }
+        ],
+        "clientes": [
+          { "cliente": "Cliente A", "sesiones_completadas": 3 }
+        ]
+      }
+    },
+    {
+      "id": "E13",
+      "regla": "CrossFit Lidomare se contabiliza a tarifa fija y suma horas",
+      "pasos": [
+        { "accion": "clase", "tipo": "lidomare", "fecha": "2026-08-03", "veces": 3 }
+      ],
+      "esperado": {
+        "clases_grupo": [
+          { "fecha": "2026-08-03", "tipo": "lidomare" },
+          { "fecha": "2026-08-03", "tipo": "lidomare" },
+          { "fecha": "2026-08-03", "tipo": "lidomare" }
+        ],
+        "semanas": [
+          { "inicio": "2026-08-03", "facturacion_total": 45.0, "horas_totales": 3 }
+        ],
+        "meses": [
+          { "anio": 2026, "mes": 8, "facturacion_total": 45.0, "horas_totales": 3, "precio_medio_hora": 15.0 }
+        ]
+      }
+    },
+    {
+      "id": "E14",
+      "regla": "CrossFit Kids es provisional hasta que se introduce su facturacion mensual",
+      "pasos": [
+        { "accion": "clase", "tipo": "kids", "fecha": "2026-08-03", "veces": 4 }
+      ],
+      "esperado": {
+        "meses": [
+          { "anio": 2026, "mes": 8, "sesiones_kids": 4, "facturacion_kids": null, "provisional": true, "facturacion_total": 0.0, "horas_totales": 0 }
+        ]
+      }
+    },
+    {
+      "id": "E14b",
+      "regla": "Al introducir la facturacion de Kids, el mes deja de ser provisional y sus horas cuentan",
+      "pasos": [
+        { "accion": "clase", "tipo": "kids", "fecha": "2026-08-03", "veces": 4 },
+        { "accion": "facturacion_kids", "anio": 2026, "mes": 8, "importe": 800 }
+      ],
+      "esperado": {
+        "meses": [
+          { "anio": 2026, "mes": 8, "sesiones_kids": 4, "facturacion_kids": 800.0, "provisional": false, "facturacion_total": 800.0, "horas_totales": 4, "precio_medio_hora": 200.0 }
+        ],
+        "semanas": [
+          { "inicio": "2026-08-03", "sesiones_kids": 4, "facturacion_kids": 800.0, "facturacion_total": 800.0, "horas_totales": 4, "provisional": false }
+        ]
+      }
+    },
+    {
+      "id": "E17",
+      "regla": "Pausar a un cliente no le quita nada: ficha, historial y economia se conservan",
+      "pasos": [
+        { "accion": "programa", "nombre": "Bono 8", "tarifa": 45, "sesiones": 8 },
+        { "accion": "alta", "cliente": "Cliente A", "programa": "Bono 8" },
+        { "accion": "firmar", "cliente": "Cliente A", "fecha": "2026-08-03", "veces": 2 },
+        { "accion": "estado", "cliente": "Cliente A", "estado": "pausado" }
+      ],
+      "esperado": {
+        "clientes": [
+          { "cliente": "Cliente A", "estado": "pausado", "sesiones_completadas": 2, "ciclo": 1 }
+        ],
+        "historial": [
+          { "numero_sesion": 1, "tarifa": 45.0 },
+          { "numero_sesion": 2, "tarifa": 45.0 }
+        ],
+        "meses": [
+          { "anio": 2026, "mes": 8, "facturacion_total": 90.0, "horas_totales": 2 }
+        ]
+      }
+    },
+    {
+      "id": "E17b",
+      "regla": "Un cliente cancelado con deuda sigue debiendo: estado y pago son independientes",
+      "pasos": [
+        { "accion": "programa", "nombre": "Bono 4", "tarifa": 40, "sesiones": 4 },
+        { "accion": "alta", "cliente": "Cliente A", "programa": "Bono 4", "pendiente_pago": true },
+        { "accion": "estado", "cliente": "Cliente A", "estado": "cancelado" }
+      ],
+      "esperado": {
+        "clientes": [
+          { "cliente": "Cliente A", "estado": "cancelado", "pendiente_pago": true }
+        ]
+      }
+    },
+    {
+      "id": "E18",
+      "regla": "El precio por sesion de un bono se redondea al centimo, y el bono factura por sesiones consumidas a esa tarifa",
+      "pasos": [
+        { "accion": "programa", "nombre": "Bono 3", "tarifa": 33.33, "sesiones": 3 },
+        { "accion": "alta", "cliente": "Cliente A", "programa": "Bono 3" },
+        { "accion": "servicio", "cliente": "Cliente A", "modalidad": "bono", "servicio": "Bono 3", "sesiones_totales": 3, "precio_total": 100, "fecha": "2026-08-03" },
+        { "accion": "firmar", "cliente": "Cliente A", "fecha": "2026-08-03", "veces": 3 }
+      ],
+      "esperado": {
+        "ciclos": [
+          { "cliente": "Cliente A", "ciclo": 1, "tarifa": 33.33, "precio_total": 100.0 },
+          { "cliente": "Cliente A", "ciclo": 2, "tarifa": 33.33, "precio_total": 100.0 }
+        ],
+        "meses": [
+          { "anio": 2026, "mes": 8, "facturacion_total": 99.99, "horas_totales": 3, "precio_medio_hora": 33.33 }
+        ]
+      }
+    },
+    {
+      "id": "E18b",
+      "regla": "Una suma de importes con decimales no arrastra error de coma flotante al centimo",
+      "pasos": [
+        { "accion": "programa", "nombre": "Bono 20.10", "tarifa": 20.1, "sesiones": 3 },
+        { "accion": "alta", "cliente": "Cliente A", "programa": "Bono 20.10" },
+        { "accion": "firmar", "cliente": "Cliente A", "fecha": "2026-08-03", "veces": 3 }
+      ],
+      "esperado": {
+        "meses": [
+          { "anio": 2026, "mes": 8, "facturacion_total": 60.3, "horas_totales": 3, "precio_medio_hora": 20.1 }
+        ],
+        "semanas": [
+          { "inicio": "2026-08-03", "facturacion_total": 60.3, "horas_totales": 3 }
+        ]
+      }
+    },
+    {
+      "id": "E21",
+      "regla": "Cambiar la tarifa NO reescribe las sesiones ya firmadas: cada una conserva la suya",
+      "pasos": [
+        { "accion": "programa", "nombre": "Bono 4", "tarifa": 40, "sesiones": 4 },
+        { "accion": "alta", "cliente": "Cliente A", "programa": "Bono 4" },
+        { "accion": "firmar", "cliente": "Cliente A", "fecha": "2026-08-03", "veces": 2 },
+        { "accion": "servicio", "cliente": "Cliente A", "modalidad": "bono", "servicio": "Bono 4", "sesiones_totales": 4, "precio_total": 240, "fecha": "2026-08-04" },
+        { "accion": "firmar", "cliente": "Cliente A", "fecha": "2026-08-04", "veces": 1 }
+      ],
+      "esperado": {
+        "historial": [
+          { "fecha": "2026-08-03", "numero_sesion": 1, "tarifa": 40.0 },
+          { "fecha": "2026-08-03", "numero_sesion": 2, "tarifa": 40.0 },
+          { "fecha": "2026-08-04", "numero_sesion": 3, "tarifa": 60.0 }
+        ],
+        "ciclos": [
+          { "cliente": "Cliente A", "ciclo": 1, "tarifa": 60.0, "precio_total": 240.0 }
+        ],
+        "meses": [
+          { "anio": 2026, "mes": 8, "facturacion_total": 140.0, "horas_totales": 3 }
+        ]
+      }
+    },
+    {
+      "id": "E22",
+      "regla": "Un servicio antiguo con el cobro sin registrar (pagado nulo) NO cuenta como deuda",
+      "pasos": [
+        { "accion": "programa", "nombre": "Bono 4", "tarifa": 40, "sesiones": 4 },
+        { "accion": "alta", "cliente": "Cliente A", "programa": "Bono 4" },
+        { "accion": "ciclo_legacy", "cliente": "Cliente A", "ciclo": 0, "servicio": "Bono 4", "modalidad": "bono", "tarifa": 40, "sesiones_totales": 4, "fecha_inicio": "2026-06-01", "fecha_fin": "2026-06-28", "pagado": null }
+      ],
+      "esperado": {
+        "ciclos": [
+          { "cliente": "Cliente A", "ciclo": 0, "pagado": null, "fecha_fin": "2026-06-28" },
+          { "cliente": "Cliente A", "ciclo": 1, "pagado": true, "fecha_fin": null }
+        ]
+      }
+    },
+    {
+      "id": "E22b",
+      "regla": "Un servicio cerrado y sin cobrar SI cuenta como deuda, y marcarlo pagado no mueve ni un euro",
+      "pasos": [
+        { "accion": "programa", "nombre": "Bono 4", "tarifa": 40, "sesiones": 4 },
+        { "accion": "alta", "cliente": "Cliente A", "programa": "Bono 4", "pendiente_pago": true },
+        { "accion": "firmar", "cliente": "Cliente A", "fecha": "2026-08-03", "veces": 4 },
+        { "accion": "marcar_pago", "cliente": "Cliente A", "pagado": true, "ciclo": 1 }
+      ],
+      "esperado": {
+        "ciclos": [
+          { "cliente": "Cliente A", "ciclo": 1, "pagado": true },
+          { "cliente": "Cliente A", "ciclo": 2, "pagado": false }
+        ],
+        "clientes": [
+          { "cliente": "Cliente A", "pendiente_pago": true }
+        ],
+        "meses": [
+          { "anio": 2026, "mes": 8, "facturacion_total": 160.0, "horas_totales": 4 }
+        ]
+      }
+    },
+    {
+      "id": "E23",
+      "regla": "Una mensualidad factura su cuota entera: sus sesiones suman hora pero no dinero (tarifa nula)",
+      "pasos": [
+        { "accion": "programa", "nombre": "Base", "tarifa": 45, "sesiones": 4 },
+        { "accion": "alta", "cliente": "Cliente B", "programa": "Base" },
+        { "accion": "servicio", "cliente": "Cliente B", "modalidad": "mensualidad", "servicio": "Mensualidad", "cuota_mensual": 720, "sesiones_referencia": 12, "fecha": "2026-08-03" },
+        { "accion": "firmar", "cliente": "Cliente B", "fecha": "2026-08-03", "veces": 3 }
+      ],
+      "esperado": {
+        "historial": [
+          { "cliente": "Cliente B", "fecha": "2026-08-03", "numero_sesion": 1, "tarifa": null, "sesiones_totales": 0, "ciclo": 2 },
+          { "cliente": "Cliente B", "fecha": "2026-08-03", "numero_sesion": 2, "tarifa": null, "sesiones_totales": 0, "ciclo": 2 },
+          { "cliente": "Cliente B", "fecha": "2026-08-03", "numero_sesion": 3, "tarifa": null, "sesiones_totales": 0, "ciclo": 2 }
+        ],
+        "ciclos": [
+          { "cliente": "Cliente B", "ciclo": 1, "modalidad": "bono" },
+          { "cliente": "Cliente B", "ciclo": 2, "modalidad": "mensualidad", "cuota_mensual": 720.0, "tarifa": null, "sesiones_totales": 0, "anio": 2026, "mes": 8 }
+        ],
+        "cargos_mensuales": [
+          { "cliente": "Cliente B", "anio": 2026, "mes": 8, "concepto": "mensualidad", "ciclo": 2, "importe": 720.0, "pagado": false }
+        ],
+        "meses": [
+          { "anio": 2026, "mes": 8, "facturacion_total": 720.0, "horas_totales": 3, "precio_medio_hora": 240.0, "cuotas": 1, "facturacion_cuotas": 720.0 }
+        ]
+      }
+    },
+    {
+      "id": "E23b",
+      "regla": "La mensualidad se renueva al cambiar de mes, no por numero de sesiones",
+      "pasos": [
+        { "accion": "programa", "nombre": "Base", "tarifa": 45, "sesiones": 4 },
+        { "accion": "alta", "cliente": "Cliente B", "programa": "Base" },
+        { "accion": "servicio", "cliente": "Cliente B", "modalidad": "mensualidad", "servicio": "Mensualidad", "cuota_mensual": 720, "sesiones_referencia": 12, "fecha": "2026-07-06" },
+        { "accion": "firmar", "cliente": "Cliente B", "fecha": "2026-07-06", "veces": 13 },
+        { "accion": "abrir_mes", "anio": 2026, "mes": 8 }
+      ],
+      "esperado": {
+        "clientes": [
+          { "cliente": "Cliente B", "ciclo": 3, "pendiente_pago": true }
+        ],
+        "ciclos": [
+          { "cliente": "Cliente B", "ciclo": 1, "modalidad": "bono" },
+          { "cliente": "Cliente B", "ciclo": 2, "modalidad": "mensualidad", "cuota_mensual": 720.0, "anio": 2026, "mes": 7, "fecha_inicio": "2026-07-06", "fecha_fin": "2026-07-06" },
+          { "cliente": "Cliente B", "ciclo": 3, "modalidad": "mensualidad", "cuota_mensual": 720.0, "anio": 2026, "mes": 8, "fecha_inicio": null, "fecha_fin": null, "pagado": false }
+        ],
+        "cargos_mensuales": [
+          { "cliente": "Cliente B", "anio": 2026, "mes": 7, "ciclo": 2, "importe": 720.0 },
+          { "cliente": "Cliente B", "anio": 2026, "mes": 8, "ciclo": 3, "importe": 720.0 }
+        ],
+        "meses": [
+          { "anio": 2026, "mes": 7, "facturacion_total": 720.0, "horas_totales": 13, "cuotas": 1 },
+          { "anio": 2026, "mes": 8, "facturacion_total": 720.0, "horas_totales": 0, "cuotas": 1 }
+        ]
+      }
+    },
+    {
+      "id": "E23c",
+      "regla": "Un cliente pausado no genera cuota mensual: no se inventan ingresos",
+      "pasos": [
+        { "accion": "programa", "nombre": "Base", "tarifa": 45, "sesiones": 4 },
+        { "accion": "alta", "cliente": "Cliente B", "programa": "Base" },
+        { "accion": "servicio", "cliente": "Cliente B", "modalidad": "mensualidad", "servicio": "Mensualidad", "cuota_mensual": 720, "sesiones_referencia": 12, "fecha": "2026-07-06" },
+        { "accion": "estado", "cliente": "Cliente B", "estado": "pausado" },
+        { "accion": "abrir_mes", "anio": 2026, "mes": 8 }
+      ],
+      "esperado": {
+        "cargos_mensuales": [
+          { "cliente": "Cliente B", "anio": 2026, "mes": 7, "ciclo": 2, "importe": 720.0 }
+        ]
+      }
+    },
+    {
+      "id": "E24",
+      "regla": "Una cuenta de cliente no tiene tope (sesiones_totales = 0) ni renueva por consumo",
+      "pasos": [
+        { "accion": "programa", "nombre": "Base", "tarifa": 45, "sesiones": 4 },
+        { "accion": "alta", "cliente": "Cliente D", "programa": "Base" },
+        { "accion": "servicio", "cliente": "Cliente D", "modalidad": "cuenta", "servicio": "Cuenta", "tarifa": 35, "fecha": "2026-08-03" },
+        { "accion": "firmar", "cliente": "Cliente D", "fecha": "2026-08-03", "veces": 10 }
+      ],
+      "esperado": {
+        "clientes": [
+          { "cliente": "Cliente D", "ciclo": 2 }
+        ],
+        "ciclos": [
+          { "cliente": "Cliente D", "ciclo": 1, "modalidad": "bono" },
+          { "cliente": "Cliente D", "ciclo": 2, "modalidad": "cuenta", "tarifa": 35.0, "sesiones_totales": 0, "cuota_mensual": null }
+        ],
+        "meses": [
+          { "anio": 2026, "mes": 8, "facturacion_total": 350.0, "horas_totales": 10, "precio_medio_hora": 35.0 }
+        ]
+      }
+    },
+    {
+      "id": "E25",
+      "regla": "Un ajuste historico anterior al registro de fechas se suma al mes y se ve como linea propia",
+      "pasos": [
+        { "accion": "programa", "nombre": "Bono 10", "tarifa": 37.5, "sesiones": 10 },
+        { "accion": "alta", "cliente": "Cliente A", "programa": "Bono 10" },
+        { "accion": "firmar", "cliente": "Cliente A", "fecha": "2026-07-29", "veces": 1 },
+        { "accion": "ajuste_mensual", "anio": 2026, "mes": 7, "importe": 112.5, "horas": 3, "motivo": "Sesiones cobradas antes del registro de fechas", "origen": "legacy" }
+      ],
+      "esperado": {
+        "meses": [
+          { "anio": 2026, "mes": 7, "facturacion_total": 150.0, "horas_totales": 4, "precio_medio_hora": 37.5, "ajuste_importe": 112.5, "ajuste_horas": 3 }
+        ]
+      }
+    },
+    {
+      "id": "E25b",
+      "regla": "Recalcular el mismo ajuste dos veces no lo acumula",
+      "pasos": [
+        { "accion": "programa", "nombre": "Bono 10", "tarifa": 37.5, "sesiones": 10 },
+        { "accion": "alta", "cliente": "Cliente A", "programa": "Bono 10" },
+        { "accion": "firmar", "cliente": "Cliente A", "fecha": "2026-07-29", "veces": 1 },
+        { "accion": "ajuste_mensual", "anio": 2026, "mes": 7, "importe": 112.5, "horas": 3, "motivo": "Sesiones cobradas antes del registro de fechas", "origen": "legacy" },
+        { "accion": "ajuste_mensual", "anio": 2026, "mes": 7, "importe": 112.5, "horas": 3, "motivo": "Sesiones cobradas antes del registro de fechas", "origen": "legacy" }
+      ],
+      "esperado": {
+        "meses": [
+          { "anio": 2026, "mes": 7, "facturacion_total": 150.0, "horas_totales": 4, "ajuste_importe": 112.5, "ajuste_horas": 3 }
+        ]
+      }
+    },
+    {
+      "id": "E26",
+      "regla": "Abrir la pantalla muchas veces no duplica la cuota del mes (capa 4 anti-duplicado: la clave primaria)",
+      "pasos": [
+        { "accion": "programa", "nombre": "Base", "tarifa": 45, "sesiones": 4 },
+        { "accion": "alta", "cliente": "Cliente B", "programa": "Base" },
+        { "accion": "servicio", "cliente": "Cliente B", "modalidad": "mensualidad", "servicio": "Mensualidad", "cuota_mensual": 720, "sesiones_referencia": 12, "fecha": "2026-08-03" },
+        { "accion": "abrir_mes", "anio": 2026, "mes": 8 },
+        { "accion": "abrir_mes", "anio": 2026, "mes": 8 },
+        { "accion": "abrir_mes", "anio": 2026, "mes": 8 },
+        { "accion": "firmar", "cliente": "Cliente B", "fecha": "2026-08-03", "veces": 2 }
+      ],
+      "esperado": {
+        "cargos_mensuales": [
+          { "cliente": "Cliente B", "anio": 2026, "mes": 8, "ciclo": 2, "importe": 720.0 }
+        ],
+        "clientes": [
+          { "cliente": "Cliente B", "ciclo": 2 }
+        ],
+        "meses": [
+          { "anio": 2026, "mes": 8, "facturacion_total": 720.0, "horas_totales": 2, "cuotas": 1 }
+        ]
+      }
+    },
+    {
+      "id": "E27",
+      "regla": "No se puede corregir una sesion de un servicio ya cerrado si despues hay sesiones de otro",
+      "pasos": [
+        { "accion": "programa", "nombre": "Bono 4", "tarifa": 40, "sesiones": 4 },
+        { "accion": "alta", "cliente": "Cliente A", "programa": "Bono 4" },
+        { "accion": "firmar", "cliente": "Cliente A", "fecha": "2026-08-03", "veces": 6 },
+        { "accion": "borrar_sesion", "cliente": "Cliente A", "indice": 5, "debe_fallar": true }
+      ],
+      "esperado": {
+        "clientes": [
+          { "cliente": "Cliente A", "ciclo": 2, "sesiones_completadas": 2 }
+        ],
+        "meses": [
+          { "anio": 2026, "mes": 8, "facturacion_total": 240.0, "horas_totales": 6 }
+        ]
+      }
+    },
+    {
+      "id": "E28",
+      "regla": "Borrar la sesion que cerro un bono deshace tambien su renovacion",
+      "pasos": [
+        { "accion": "programa", "nombre": "Bono 4", "tarifa": 40, "sesiones": 4 },
+        { "accion": "alta", "cliente": "Cliente A", "programa": "Bono 4" },
+        { "accion": "firmar", "cliente": "Cliente A", "fecha": "2026-08-03", "veces": 4 },
+        { "accion": "borrar_sesion", "cliente": "Cliente A", "indice": 0 }
+      ],
+      "esperado": {
+        "clientes": [
+          { "cliente": "Cliente A", "ciclo": 1, "sesiones_completadas": 3, "pendiente_pago": false }
+        ],
+        "meses": [
+          { "anio": 2026, "mes": 8, "facturacion_total": 120.0, "horas_totales": 3 }
+        ]
+      }
+    },
+    {
+      "id": "E29",
+      "regla": "Renombrar a un cliente con historial le arrastra sus sesiones y sus servicios",
+      "pasos": [
+        { "accion": "programa", "nombre": "Bono 8", "tarifa": 45, "sesiones": 8 },
+        { "accion": "alta", "cliente": "Cliente A", "programa": "Bono 8" },
+        { "accion": "firmar", "cliente": "Cliente A", "fecha": "2026-08-03", "veces": 2 },
+        { "accion": "renombrar", "cliente": "Cliente A", "nuevo": "Cliente A renombrado" }
+      ],
+      "esperado": {
+        "clientes": [
+          { "cliente": "Cliente A renombrado", "sesiones_completadas": 2 }
+        ],
+        "historial": [
+          { "cliente": "Cliente A renombrado", "numero_sesion": 1 },
+          { "cliente": "Cliente A renombrado", "numero_sesion": 2 }
+        ],
+        "ciclos": [
+          { "cliente": "Cliente A renombrado", "ciclo": 1 }
+        ]
+      }
+    },
+    {
+      "id": "E30",
+      "regla": "Borrar un cliente retira tambien su facturacion: no queda dinero contado sin sesion detras",
+      "pasos": [
+        { "accion": "programa", "nombre": "Bono 8", "tarifa": 45, "sesiones": 8 },
+        { "accion": "alta", "cliente": "Cliente A", "programa": "Bono 8" },
+        { "accion": "alta", "cliente": "Cliente B", "programa": "Bono 8" },
+        { "accion": "firmar", "cliente": "Cliente A", "fecha": "2026-08-03", "veces": 3 },
+        { "accion": "firmar", "cliente": "Cliente B", "fecha": "2026-08-03", "veces": 2 },
+        { "accion": "borrar_cliente", "cliente": "Cliente A" }
+      ],
+      "esperado": {
+        "clientes": [
+          { "cliente": "Cliente B", "sesiones_completadas": 2 }
+        ],
+        "historial": [
+          { "cliente": "Cliente B", "numero_sesion": 1 },
+          { "cliente": "Cliente B", "numero_sesion": 2 }
+        ],
+        "semanas": [
+          { "inicio": "2026-08-03", "facturacion_total": 90.0, "horas_totales": 2 }
+        ],
+        "meses": [
+          { "anio": 2026, "mes": 8, "facturacion_total": 90.0, "horas_totales": 2 }
+        ]
+      }
+    },
+    {
+      "id": "E31",
+      "regla": "Mover una sesion a otra semana traslada su dinero, con su tarifa historica",
+      "pasos": [
+        { "accion": "programa", "nombre": "Bono 10", "tarifa": 50, "sesiones": 10 },
+        { "accion": "alta", "cliente": "Cliente A", "programa": "Bono 10" },
+        { "accion": "firmar", "cliente": "Cliente A", "fecha": "2026-08-03", "veces": 2 },
+        { "accion": "editar_sesion", "cliente": "Cliente A", "indice": 0, "nueva_fecha": "2026-07-31", "nuevo_numero": 2 }
+      ],
+      "esperado": {
+        "semanas": [
+          { "inicio": "2026-07-27", "facturacion_total": 50.0, "horas_totales": 1 },
+          { "inicio": "2026-08-03", "facturacion_total": 50.0, "horas_totales": 1 }
+        ],
+        "meses": [
+          { "anio": 2026, "mes": 7, "facturacion_total": 50.0, "horas_totales": 1 },
+          { "anio": 2026, "mes": 8, "facturacion_total": 50.0, "horas_totales": 1 }
+        ]
+      }
+    },
+    {
+      "id": "E32",
+      "regla": "Cambiar de modalidad cierra el servicio anterior y no recalcula su pasado",
+      "pasos": [
+        { "accion": "programa", "nombre": "Bono 8", "tarifa": 45, "sesiones": 8 },
+        { "accion": "alta", "cliente": "Cliente A", "programa": "Bono 8" },
+        { "accion": "firmar", "cliente": "Cliente A", "fecha": "2026-08-03", "veces": 3 },
+        { "accion": "servicio", "cliente": "Cliente A", "modalidad": "mensualidad", "servicio": "Mensualidad", "cuota_mensual": 600, "fecha": "2026-08-04" }
+      ],
+      "esperado": {
+        "ciclos": [
+          { "cliente": "Cliente A", "ciclo": 1, "modalidad": "bono", "tarifa": 45.0, "sesiones_totales": 8 },
+          { "cliente": "Cliente A", "ciclo": 2, "modalidad": "mensualidad", "cuota_mensual": 600.0, "anio": 2026, "mes": 8, "tarifa": null }
+        ],
+        "historial": [
+          { "numero_sesion": 1, "tarifa": 45.0, "ciclo": 1 },
+          { "numero_sesion": 2, "tarifa": 45.0, "ciclo": 1 },
+          { "numero_sesion": 3, "tarifa": 45.0, "ciclo": 1 }
+        ]
+      }
+    },
+    {
+      "id": "E33",
+      "nota": "HALLAZGO ABIERTO (2026-08-03). Fija el comportamiento ACTUAL, no el deseable. Las sesiones de una mensualidad NO aparecen en la vista semanal: ni su dinero (defendible, la cuota es mensual) ni sus HORAS (no defendible, son horas trabajadas de verdad). El mes si las cuenta. Documentado para que la migracion no lo cambie en silencio y para que Fernando decida.",
+      "regla": "Hoy, las sesiones de una mensualidad no suman horas en la vista SEMANAL, aunque si en la mensual",
+      "pasos": [
+        { "accion": "programa", "nombre": "Base", "tarifa": 45, "sesiones": 4 },
+        { "accion": "alta", "cliente": "Cliente B", "programa": "Base" },
+        { "accion": "servicio", "cliente": "Cliente B", "modalidad": "mensualidad", "servicio": "Mensualidad", "cuota_mensual": 720, "fecha": "2026-08-03" },
+        { "accion": "firmar", "cliente": "Cliente B", "fecha": "2026-08-03", "veces": 3 }
+      ],
+      "esperado": {
+        "semanas": [
+          { "inicio": "2026-08-03", "facturacion_total": 0.0, "horas_totales": 0 }
+        ],
+        "meses": [
+          { "anio": 2026, "mes": 8, "facturacion_total": 720.0, "horas_totales": 3 }
+        ]
+      }
+    },
+    {
+      "id": "E34",
+      "nota": "HALLAZGO ABIERTO (2026-08-03). Fija el comportamiento ACTUAL. El ciclo de una mensualidad puede decir 'pagada' mientras su cargo del mismo mes dice 'sin cobrar': el ciclo hereda el estado de la ficha del cliente y el cargo nace siempre sin cobrar. Marcar el pago a mano si los escribe juntos; el camino automatico no.",
+      "regla": "Hoy, el estado de cobro del ciclo y el del cargo del mes pueden contradecirse",
+      "pasos": [
+        { "accion": "programa", "nombre": "Base", "tarifa": 45, "sesiones": 4 },
+        { "accion": "alta", "cliente": "Cliente B", "programa": "Base" },
+        { "accion": "servicio", "cliente": "Cliente B", "modalidad": "mensualidad", "servicio": "Mensualidad", "cuota_mensual": 720, "fecha": "2026-08-03" }
+      ],
+      "esperado": {
+        "ciclos": [
+          { "cliente": "Cliente B", "ciclo": 1, "modalidad": "bono" },
+          { "cliente": "Cliente B", "ciclo": 2, "modalidad": "mensualidad", "pagado": true }
+        ],
+        "cargos_mensuales": [
+          { "cliente": "Cliente B", "anio": 2026, "mes": 8, "ciclo": 2, "pagado": false }
+        ],
+        "clientes": [
+          { "cliente": "Cliente B", "pendiente_pago": false }
+        ]
+      }
+    },
+    {
+      "id": "E34b",
+      "regla": "Marcar el cobro a mano si deja de acuerdo al ciclo, al cargo del mes y a la ficha",
+      "pasos": [
+        { "accion": "programa", "nombre": "Base", "tarifa": 45, "sesiones": 4 },
+        { "accion": "alta", "cliente": "Cliente B", "programa": "Base" },
+        { "accion": "servicio", "cliente": "Cliente B", "modalidad": "mensualidad", "servicio": "Mensualidad", "cuota_mensual": 720, "fecha": "2026-08-03" },
+        { "accion": "firmar", "cliente": "Cliente B", "fecha": "2026-08-03", "veces": 2 },
+        { "accion": "marcar_pago", "cliente": "Cliente B", "pagado": true, "ciclo": 2 }
+      ],
+      "esperado": {
+        "ciclos": [
+          { "cliente": "Cliente B", "ciclo": 1, "modalidad": "bono" },
+          { "cliente": "Cliente B", "ciclo": 2, "modalidad": "mensualidad", "pagado": true }
+        ],
+        "cargos_mensuales": [
+          { "cliente": "Cliente B", "anio": 2026, "mes": 8, "pagado": true, "importe": 720.0 }
+        ],
+        "clientes": [
+          { "cliente": "Cliente B", "pendiente_pago": false }
+        ],
+        "meses": [
+          { "anio": 2026, "mes": 8, "facturacion_total": 720.0, "horas_totales": 2 }
+        ]
+      }
+    }
+  ]
+}

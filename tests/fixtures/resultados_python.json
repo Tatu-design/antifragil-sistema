@@ -1,0 +1,4014 @@
+{
+  "E01": {
+    "foto": {
+      "cargos_mensuales": [],
+      "ciclos": [
+        {
+          "anio": null,
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "cuota_mensual": null,
+          "fecha_fin": null,
+          "fecha_inicio": "2026-08-03",
+          "mes": null,
+          "modalidad": "bono",
+          "pagado": true,
+          "precio_total": null,
+          "servicio": "Bono 8",
+          "sesiones_referencia": null,
+          "sesiones_totales": 8,
+          "tarifa": 45.0
+        }
+      ],
+      "clases_grupo": [],
+      "clientes": [
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "estado": "activo",
+          "pendiente_pago": false,
+          "programa": "Bono 8",
+          "sesiones_completadas": 3
+        }
+      ],
+      "errores": [],
+      "historial": [
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-08-03",
+          "numero_sesion": 1,
+          "servicio": "Bono 8",
+          "sesiones_totales": 8,
+          "tarifa": 45.0
+        },
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-08-03",
+          "numero_sesion": 2,
+          "servicio": "Bono 8",
+          "sesiones_totales": 8,
+          "tarifa": 45.0
+        },
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-08-03",
+          "numero_sesion": 3,
+          "servicio": "Bono 8",
+          "sesiones_totales": 8,
+          "tarifa": 45.0
+        }
+      ],
+      "meses": [
+        {
+          "ajuste_horas": 0,
+          "ajuste_importe": 0.0,
+          "anio": 2026,
+          "cuotas": 0,
+          "facturacion_cuotas": 0.0,
+          "facturacion_kids": null,
+          "facturacion_total": 135.0,
+          "horas_totales": 3,
+          "mes": 8,
+          "por_modalidad": {
+            "bono": {
+              "facturacion": 135.0,
+              "horas": 3
+            }
+          },
+          "precio_medio_hora": 45.0,
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ],
+      "semanas": [
+        {
+          "facturacion_kids": null,
+          "facturacion_total": 135.0,
+          "fin": "2026-08-09",
+          "horas_totales": 3,
+          "inicio": "2026-08-03",
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ]
+    },
+    "regla": "Firmar una sesion descuenta exactamente una unidad"
+  },
+  "E02": {
+    "foto": {
+      "cargos_mensuales": [],
+      "ciclos": [
+        {
+          "anio": null,
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "cuota_mensual": null,
+          "fecha_fin": "2026-08-03",
+          "fecha_inicio": "2026-08-03",
+          "mes": null,
+          "modalidad": "bono",
+          "pagado": true,
+          "precio_total": null,
+          "servicio": "Bono 4",
+          "sesiones_referencia": null,
+          "sesiones_totales": 4,
+          "tarifa": 40.0
+        },
+        {
+          "anio": null,
+          "ciclo": 2,
+          "cliente": "Cliente A",
+          "cuota_mensual": null,
+          "fecha_fin": null,
+          "fecha_inicio": null,
+          "mes": null,
+          "modalidad": "bono",
+          "pagado": false,
+          "precio_total": null,
+          "servicio": "Bono 4",
+          "sesiones_referencia": null,
+          "sesiones_totales": 4,
+          "tarifa": 40.0
+        }
+      ],
+      "clases_grupo": [],
+      "clientes": [
+        {
+          "ciclo": 2,
+          "cliente": "Cliente A",
+          "estado": "activo",
+          "pendiente_pago": true,
+          "programa": "Bono 4",
+          "sesiones_completadas": 0
+        }
+      ],
+      "errores": [],
+      "historial": [
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-08-03",
+          "numero_sesion": 1,
+          "servicio": "Bono 4",
+          "sesiones_totales": 4,
+          "tarifa": 40.0
+        },
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-08-03",
+          "numero_sesion": 2,
+          "servicio": "Bono 4",
+          "sesiones_totales": 4,
+          "tarifa": 40.0
+        },
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-08-03",
+          "numero_sesion": 3,
+          "servicio": "Bono 4",
+          "sesiones_totales": 4,
+          "tarifa": 40.0
+        },
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-08-03",
+          "numero_sesion": 4,
+          "servicio": "Bono 4",
+          "sesiones_totales": 4,
+          "tarifa": 40.0
+        }
+      ],
+      "meses": [
+        {
+          "ajuste_horas": 0,
+          "ajuste_importe": 0.0,
+          "anio": 2026,
+          "cuotas": 0,
+          "facturacion_cuotas": 0.0,
+          "facturacion_kids": null,
+          "facturacion_total": 160.0,
+          "horas_totales": 4,
+          "mes": 8,
+          "por_modalidad": {
+            "bono": {
+              "facturacion": 160.0,
+              "horas": 4
+            }
+          },
+          "precio_medio_hora": 40.0,
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ],
+      "semanas": [
+        {
+          "facturacion_kids": null,
+          "facturacion_total": 160.0,
+          "fin": "2026-08-09",
+          "horas_totales": 4,
+          "inicio": "2026-08-03",
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ]
+    },
+    "regla": "Firmar la ultima sesion activa la renovacion correcta"
+  },
+  "E03": {
+    "foto": {
+      "cargos_mensuales": [],
+      "ciclos": [
+        {
+          "anio": null,
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "cuota_mensual": null,
+          "fecha_fin": "2026-08-03",
+          "fecha_inicio": "2026-08-03",
+          "mes": null,
+          "modalidad": "bono",
+          "pagado": true,
+          "precio_total": 225.0,
+          "servicio": "Bono 5 sesiones",
+          "sesiones_referencia": null,
+          "sesiones_totales": 5,
+          "tarifa": 45.0
+        },
+        {
+          "anio": null,
+          "ciclo": 2,
+          "cliente": "Cliente A",
+          "cuota_mensual": null,
+          "fecha_fin": null,
+          "fecha_inicio": null,
+          "mes": null,
+          "modalidad": "bono",
+          "pagado": false,
+          "precio_total": 225.0,
+          "servicio": "Bono 5 sesiones",
+          "sesiones_referencia": null,
+          "sesiones_totales": 5,
+          "tarifa": 45.0
+        }
+      ],
+      "clases_grupo": [],
+      "clientes": [
+        {
+          "ciclo": 2,
+          "cliente": "Cliente A",
+          "estado": "activo",
+          "pendiente_pago": true,
+          "programa": "Bono 5",
+          "sesiones_completadas": 0
+        }
+      ],
+      "errores": [],
+      "historial": [
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-08-03",
+          "numero_sesion": 1,
+          "servicio": "Bono 5 sesiones",
+          "sesiones_totales": 5,
+          "tarifa": 45.0
+        },
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-08-03",
+          "numero_sesion": 2,
+          "servicio": "Bono 5 sesiones",
+          "sesiones_totales": 5,
+          "tarifa": 45.0
+        },
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-08-03",
+          "numero_sesion": 3,
+          "servicio": "Bono 5 sesiones",
+          "sesiones_totales": 5,
+          "tarifa": 45.0
+        },
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-08-03",
+          "numero_sesion": 4,
+          "servicio": "Bono 5 sesiones",
+          "sesiones_totales": 5,
+          "tarifa": 45.0
+        },
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-08-03",
+          "numero_sesion": 5,
+          "servicio": "Bono 5 sesiones",
+          "sesiones_totales": 5,
+          "tarifa": 45.0
+        }
+      ],
+      "meses": [
+        {
+          "ajuste_horas": 0,
+          "ajuste_importe": 0.0,
+          "anio": 2026,
+          "cuotas": 0,
+          "facturacion_cuotas": 0.0,
+          "facturacion_kids": null,
+          "facturacion_total": 225.0,
+          "horas_totales": 5,
+          "mes": 8,
+          "por_modalidad": {
+            "bono": {
+              "facturacion": 225.0,
+              "horas": 5
+            }
+          },
+          "precio_medio_hora": 45.0,
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ],
+      "semanas": [
+        {
+          "facturacion_kids": null,
+          "facturacion_total": 225.0,
+          "fin": "2026-08-09",
+          "horas_totales": 5,
+          "inicio": "2026-08-03",
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ]
+    },
+    "regla": "La renovacion conserva servicio, tarifa, sesiones y precio total"
+  },
+  "E04": {
+    "foto": {
+      "cargos_mensuales": [],
+      "ciclos": [
+        {
+          "anio": null,
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "cuota_mensual": null,
+          "fecha_fin": "2026-08-03",
+          "fecha_inicio": "2026-08-03",
+          "mes": null,
+          "modalidad": "bono",
+          "pagado": false,
+          "precio_total": null,
+          "servicio": "Bono 4",
+          "sesiones_referencia": null,
+          "sesiones_totales": 4,
+          "tarifa": 40.0
+        },
+        {
+          "anio": null,
+          "ciclo": 2,
+          "cliente": "Cliente A",
+          "cuota_mensual": null,
+          "fecha_fin": null,
+          "fecha_inicio": null,
+          "mes": null,
+          "modalidad": "bono",
+          "pagado": false,
+          "precio_total": null,
+          "servicio": "Bono 4",
+          "sesiones_referencia": null,
+          "sesiones_totales": 4,
+          "tarifa": 40.0
+        }
+      ],
+      "clases_grupo": [],
+      "clientes": [
+        {
+          "ciclo": 2,
+          "cliente": "Cliente A",
+          "estado": "activo",
+          "pendiente_pago": true,
+          "programa": "Bono 4",
+          "sesiones_completadas": 0
+        }
+      ],
+      "errores": [],
+      "historial": [
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-08-03",
+          "numero_sesion": 1,
+          "servicio": "Bono 4",
+          "sesiones_totales": 4,
+          "tarifa": 40.0
+        },
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-08-03",
+          "numero_sesion": 2,
+          "servicio": "Bono 4",
+          "sesiones_totales": 4,
+          "tarifa": 40.0
+        },
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-08-03",
+          "numero_sesion": 3,
+          "servicio": "Bono 4",
+          "sesiones_totales": 4,
+          "tarifa": 40.0
+        },
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-08-03",
+          "numero_sesion": 4,
+          "servicio": "Bono 4",
+          "sesiones_totales": 4,
+          "tarifa": 40.0
+        }
+      ],
+      "meses": [
+        {
+          "ajuste_horas": 0,
+          "ajuste_importe": 0.0,
+          "anio": 2026,
+          "cuotas": 0,
+          "facturacion_cuotas": 0.0,
+          "facturacion_kids": null,
+          "facturacion_total": 160.0,
+          "horas_totales": 4,
+          "mes": 8,
+          "por_modalidad": {
+            "bono": {
+              "facturacion": 160.0,
+              "horas": 4
+            }
+          },
+          "precio_medio_hora": 40.0,
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ],
+      "semanas": [
+        {
+          "facturacion_kids": null,
+          "facturacion_total": 160.0,
+          "fin": "2026-08-09",
+          "horas_totales": 4,
+          "inicio": "2026-08-03",
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ]
+    },
+    "regla": "El programa nuevo queda pendiente de pago, y el que se cierra conserva su estado real"
+  },
+  "E05": {
+    "foto": {
+      "cargos_mensuales": [],
+      "ciclos": [
+        {
+          "anio": null,
+          "ciclo": 1,
+          "cliente": "Pareja C",
+          "cuota_mensual": null,
+          "fecha_fin": null,
+          "fecha_inicio": "2026-08-03",
+          "mes": null,
+          "modalidad": "bono",
+          "pagado": true,
+          "precio_total": null,
+          "servicio": "Bono pareja",
+          "sesiones_referencia": null,
+          "sesiones_totales": 8,
+          "tarifa": 60.0
+        }
+      ],
+      "clases_grupo": [],
+      "clientes": [
+        {
+          "ciclo": 1,
+          "cliente": "Pareja C",
+          "estado": "activo",
+          "pendiente_pago": false,
+          "programa": "Bono pareja",
+          "sesiones_completadas": 1
+        }
+      ],
+      "errores": [],
+      "historial": [
+        {
+          "ciclo": 1,
+          "cliente": "Pareja C",
+          "fecha": "2026-08-03",
+          "numero_sesion": 1,
+          "servicio": "Bono pareja",
+          "sesiones_totales": 8,
+          "tarifa": 60.0
+        }
+      ],
+      "meses": [
+        {
+          "ajuste_horas": 0,
+          "ajuste_importe": 0.0,
+          "anio": 2026,
+          "cuotas": 0,
+          "facturacion_cuotas": 0.0,
+          "facturacion_kids": null,
+          "facturacion_total": 60.0,
+          "horas_totales": 1,
+          "mes": 8,
+          "por_modalidad": {
+            "bono": {
+              "facturacion": 60.0,
+              "horas": 1
+            }
+          },
+          "precio_medio_hora": 60.0,
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ],
+      "semanas": [
+        {
+          "facturacion_kids": null,
+          "facturacion_total": 60.0,
+          "fin": "2026-08-09",
+          "horas_totales": 1,
+          "inicio": "2026-08-03",
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ]
+    },
+    "regla": "Una pareja es una sola unidad y no consume dos veces"
+  },
+  "E06": {
+    "foto": {
+      "cargos_mensuales": [],
+      "ciclos": [
+        {
+          "anio": null,
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "cuota_mensual": null,
+          "fecha_fin": null,
+          "fecha_inicio": "2026-08-05",
+          "mes": null,
+          "modalidad": "bono",
+          "pagado": true,
+          "precio_total": null,
+          "servicio": "Bono 8",
+          "sesiones_referencia": null,
+          "sesiones_totales": 8,
+          "tarifa": 45.0
+        }
+      ],
+      "clases_grupo": [],
+      "clientes": [
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "estado": "activo",
+          "pendiente_pago": false,
+          "programa": "Bono 8",
+          "sesiones_completadas": 2
+        }
+      ],
+      "errores": [],
+      "historial": [
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-08-05",
+          "numero_sesion": 1,
+          "servicio": "Bono 8",
+          "sesiones_totales": 8,
+          "tarifa": 45.0
+        },
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-08-05",
+          "numero_sesion": 2,
+          "servicio": "Bono 8",
+          "sesiones_totales": 8,
+          "tarifa": 45.0
+        }
+      ],
+      "meses": [
+        {
+          "ajuste_horas": 0,
+          "ajuste_importe": 0.0,
+          "anio": 2026,
+          "cuotas": 0,
+          "facturacion_cuotas": 0.0,
+          "facturacion_kids": null,
+          "facturacion_total": 90.0,
+          "horas_totales": 2,
+          "mes": 8,
+          "por_modalidad": {
+            "bono": {
+              "facturacion": 90.0,
+              "horas": 2
+            }
+          },
+          "precio_medio_hora": 45.0,
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ],
+      "semanas": [
+        {
+          "facturacion_kids": null,
+          "facturacion_total": 90.0,
+          "fin": "2026-08-09",
+          "horas_totales": 2,
+          "inicio": "2026-08-03",
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ]
+    },
+    "regla": "Dos sesiones el mismo dia quedan registradas por separado"
+  },
+  "E07": {
+    "foto": {
+      "cargos_mensuales": [],
+      "ciclos": [
+        {
+          "anio": null,
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "cuota_mensual": null,
+          "fecha_fin": null,
+          "fecha_inicio": "2026-08-03",
+          "mes": null,
+          "modalidad": "bono",
+          "pagado": true,
+          "precio_total": null,
+          "servicio": "Bono 8",
+          "sesiones_referencia": null,
+          "sesiones_totales": 8,
+          "tarifa": 45.0
+        }
+      ],
+      "clases_grupo": [],
+      "clientes": [
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "estado": "activo",
+          "pendiente_pago": false,
+          "programa": "Bono 8",
+          "sesiones_completadas": 2
+        }
+      ],
+      "errores": [],
+      "historial": [
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-08-03",
+          "numero_sesion": 1,
+          "servicio": "Bono 8",
+          "sesiones_totales": 8,
+          "tarifa": 45.0
+        },
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-08-03",
+          "numero_sesion": 2,
+          "servicio": "Bono 8",
+          "sesiones_totales": 8,
+          "tarifa": 45.0
+        }
+      ],
+      "meses": [
+        {
+          "ajuste_horas": 0,
+          "ajuste_importe": 0.0,
+          "anio": 2026,
+          "cuotas": 0,
+          "facturacion_cuotas": 0.0,
+          "facturacion_kids": null,
+          "facturacion_total": 90.0,
+          "horas_totales": 2,
+          "mes": 8,
+          "por_modalidad": {
+            "bono": {
+              "facturacion": 90.0,
+              "horas": 2
+            }
+          },
+          "precio_medio_hora": 45.0,
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ],
+      "semanas": [
+        {
+          "facturacion_kids": null,
+          "facturacion_total": 90.0,
+          "fin": "2026-08-09",
+          "horas_totales": 2,
+          "inicio": "2026-08-03",
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ]
+    },
+    "regla": "Eliminar una sesion devuelve la unidad al bono"
+  },
+  "E08": {
+    "foto": {
+      "cargos_mensuales": [],
+      "ciclos": [
+        {
+          "anio": null,
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "cuota_mensual": null,
+          "fecha_fin": null,
+          "fecha_inicio": "2026-08-03",
+          "mes": null,
+          "modalidad": "bono",
+          "pagado": true,
+          "precio_total": null,
+          "servicio": "Bono 8",
+          "sesiones_referencia": null,
+          "sesiones_totales": 8,
+          "tarifa": 45.0
+        }
+      ],
+      "clases_grupo": [],
+      "clientes": [
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "estado": "activo",
+          "pendiente_pago": false,
+          "programa": "Bono 8",
+          "sesiones_completadas": 2
+        }
+      ],
+      "errores": [],
+      "historial": [
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-08-03",
+          "numero_sesion": 1,
+          "servicio": "Bono 8",
+          "sesiones_totales": 8,
+          "tarifa": 45.0
+        },
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-08-03",
+          "numero_sesion": 2,
+          "servicio": "Bono 8",
+          "sesiones_totales": 8,
+          "tarifa": 45.0
+        }
+      ],
+      "meses": [
+        {
+          "ajuste_horas": 0,
+          "ajuste_importe": 0.0,
+          "anio": 2026,
+          "cuotas": 0,
+          "facturacion_cuotas": 0.0,
+          "facturacion_kids": null,
+          "facturacion_total": 90.0,
+          "horas_totales": 2,
+          "mes": 8,
+          "por_modalidad": {
+            "bono": {
+              "facturacion": 90.0,
+              "horas": 2
+            }
+          },
+          "precio_medio_hora": 45.0,
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ],
+      "semanas": [
+        {
+          "facturacion_kids": null,
+          "facturacion_total": 90.0,
+          "fin": "2026-08-09",
+          "horas_totales": 2,
+          "inicio": "2026-08-03",
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ]
+    },
+    "regla": "Eliminar una sesion corrige la economia de su semana y su mes"
+  },
+  "E09": {
+    "foto": {
+      "cargos_mensuales": [],
+      "ciclos": [
+        {
+          "anio": null,
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "cuota_mensual": null,
+          "fecha_fin": null,
+          "fecha_inicio": "2026-08-03",
+          "mes": null,
+          "modalidad": "bono",
+          "pagado": true,
+          "precio_total": null,
+          "servicio": "Bono 8",
+          "sesiones_referencia": null,
+          "sesiones_totales": 8,
+          "tarifa": 45.0
+        }
+      ],
+      "clases_grupo": [],
+      "clientes": [
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "estado": "activo",
+          "pendiente_pago": false,
+          "programa": "Bono 8",
+          "sesiones_completadas": 1
+        }
+      ],
+      "errores": [],
+      "historial": [
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-08-03",
+          "numero_sesion": 1,
+          "servicio": "Bono 8",
+          "sesiones_totales": 8,
+          "tarifa": 45.0
+        }
+      ],
+      "meses": [
+        {
+          "ajuste_horas": 0,
+          "ajuste_importe": 0.0,
+          "anio": 2026,
+          "cuotas": 0,
+          "facturacion_cuotas": 0.0,
+          "facturacion_kids": null,
+          "facturacion_total": 45.0,
+          "horas_totales": 1,
+          "mes": 8,
+          "por_modalidad": {
+            "bono": {
+              "facturacion": 45.0,
+              "horas": 1
+            }
+          },
+          "precio_medio_hora": 45.0,
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ],
+      "semanas": [
+        {
+          "facturacion_kids": null,
+          "facturacion_total": 45.0,
+          "fin": "2026-08-09",
+          "horas_totales": 1,
+          "inicio": "2026-08-03",
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ]
+    },
+    "regla": "Una firma repetida por reintento de red no se guarda dos veces (capa 2 anti-duplicado)"
+  },
+  "E10": {
+    "foto": {
+      "cargos_mensuales": [],
+      "ciclos": [
+        {
+          "anio": null,
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "cuota_mensual": null,
+          "fecha_fin": null,
+          "fecha_inicio": "2026-07-31",
+          "mes": null,
+          "modalidad": "bono",
+          "pagado": true,
+          "precio_total": null,
+          "servicio": "Bono 10",
+          "sesiones_referencia": null,
+          "sesiones_totales": 10,
+          "tarifa": 50.0
+        }
+      ],
+      "clases_grupo": [],
+      "clientes": [
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "estado": "activo",
+          "pendiente_pago": false,
+          "programa": "Bono 10",
+          "sesiones_completadas": 4
+        }
+      ],
+      "errores": [],
+      "historial": [
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-07-31",
+          "numero_sesion": 1,
+          "servicio": "Bono 10",
+          "sesiones_totales": 10,
+          "tarifa": 50.0
+        },
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-08-01",
+          "numero_sesion": 2,
+          "servicio": "Bono 10",
+          "sesiones_totales": 10,
+          "tarifa": 50.0
+        },
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-08-03",
+          "numero_sesion": 3,
+          "servicio": "Bono 10",
+          "sesiones_totales": 10,
+          "tarifa": 50.0
+        },
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-08-03",
+          "numero_sesion": 4,
+          "servicio": "Bono 10",
+          "sesiones_totales": 10,
+          "tarifa": 50.0
+        }
+      ],
+      "meses": [
+        {
+          "ajuste_horas": 0,
+          "ajuste_importe": 0.0,
+          "anio": 2026,
+          "cuotas": 0,
+          "facturacion_cuotas": 0.0,
+          "facturacion_kids": null,
+          "facturacion_total": 50.0,
+          "horas_totales": 1,
+          "mes": 7,
+          "por_modalidad": {
+            "bono": {
+              "facturacion": 50.0,
+              "horas": 1
+            }
+          },
+          "precio_medio_hora": 50.0,
+          "provisional": false,
+          "sesiones_kids": 0
+        },
+        {
+          "ajuste_horas": 0,
+          "ajuste_importe": 0.0,
+          "anio": 2026,
+          "cuotas": 0,
+          "facturacion_cuotas": 0.0,
+          "facturacion_kids": null,
+          "facturacion_total": 150.0,
+          "horas_totales": 3,
+          "mes": 8,
+          "por_modalidad": {
+            "bono": {
+              "facturacion": 150.0,
+              "horas": 3
+            }
+          },
+          "precio_medio_hora": 50.0,
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ],
+      "semanas": [
+        {
+          "facturacion_kids": null,
+          "facturacion_total": 100.0,
+          "fin": "2026-08-02",
+          "horas_totales": 2,
+          "inicio": "2026-07-27",
+          "provisional": false,
+          "sesiones_kids": 0
+        },
+        {
+          "facturacion_kids": null,
+          "facturacion_total": 100.0,
+          "fin": "2026-08-09",
+          "horas_totales": 2,
+          "inicio": "2026-08-03",
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ]
+    },
+    "regla": "Los totales semanales coinciden, y una semana a caballo entre dos meses se muestra entera"
+  },
+  "E11": {
+    "foto": {
+      "cargos_mensuales": [],
+      "ciclos": [
+        {
+          "anio": null,
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "cuota_mensual": null,
+          "fecha_fin": null,
+          "fecha_inicio": "2026-07-31",
+          "mes": null,
+          "modalidad": "bono",
+          "pagado": true,
+          "precio_total": null,
+          "servicio": "Bono 10",
+          "sesiones_referencia": null,
+          "sesiones_totales": 10,
+          "tarifa": 50.0
+        }
+      ],
+      "clases_grupo": [],
+      "clientes": [
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "estado": "activo",
+          "pendiente_pago": false,
+          "programa": "Bono 10",
+          "sesiones_completadas": 4
+        }
+      ],
+      "errores": [],
+      "historial": [
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-07-31",
+          "numero_sesion": 1,
+          "servicio": "Bono 10",
+          "sesiones_totales": 10,
+          "tarifa": 50.0
+        },
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-08-01",
+          "numero_sesion": 2,
+          "servicio": "Bono 10",
+          "sesiones_totales": 10,
+          "tarifa": 50.0
+        },
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-08-03",
+          "numero_sesion": 3,
+          "servicio": "Bono 10",
+          "sesiones_totales": 10,
+          "tarifa": 50.0
+        },
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-08-03",
+          "numero_sesion": 4,
+          "servicio": "Bono 10",
+          "sesiones_totales": 10,
+          "tarifa": 50.0
+        }
+      ],
+      "meses": [
+        {
+          "ajuste_horas": 0,
+          "ajuste_importe": 0.0,
+          "anio": 2026,
+          "cuotas": 0,
+          "facturacion_cuotas": 0.0,
+          "facturacion_kids": null,
+          "facturacion_total": 50.0,
+          "horas_totales": 1,
+          "mes": 7,
+          "por_modalidad": {
+            "bono": {
+              "facturacion": 50.0,
+              "horas": 1
+            }
+          },
+          "precio_medio_hora": 50.0,
+          "provisional": false,
+          "sesiones_kids": 0
+        },
+        {
+          "ajuste_horas": 0,
+          "ajuste_importe": 0.0,
+          "anio": 2026,
+          "cuotas": 0,
+          "facturacion_cuotas": 0.0,
+          "facturacion_kids": null,
+          "facturacion_total": 150.0,
+          "horas_totales": 3,
+          "mes": 8,
+          "por_modalidad": {
+            "bono": {
+              "facturacion": 150.0,
+              "horas": 3
+            }
+          },
+          "precio_medio_hora": 50.0,
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ],
+      "semanas": [
+        {
+          "facturacion_kids": null,
+          "facturacion_total": 100.0,
+          "fin": "2026-08-02",
+          "horas_totales": 2,
+          "inicio": "2026-07-27",
+          "provisional": false,
+          "sesiones_kids": 0
+        },
+        {
+          "facturacion_kids": null,
+          "facturacion_total": 100.0,
+          "fin": "2026-08-09",
+          "horas_totales": 2,
+          "inicio": "2026-08-03",
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ]
+    },
+    "regla": "Los totales mensuales coinciden, y separan una semana a caballo por la fecha real de cada sesion"
+  },
+  "E12": {
+    "foto": {
+      "cargos_mensuales": [],
+      "ciclos": [
+        {
+          "anio": null,
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "cuota_mensual": null,
+          "fecha_fin": null,
+          "fecha_inicio": "2026-08-05",
+          "mes": null,
+          "modalidad": "bono",
+          "pagado": true,
+          "precio_total": null,
+          "servicio": "Bono 8",
+          "sesiones_referencia": null,
+          "sesiones_totales": 8,
+          "tarifa": 45.0
+        }
+      ],
+      "clases_grupo": [],
+      "clientes": [
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "estado": "activo",
+          "pendiente_pago": false,
+          "programa": "Bono 8",
+          "sesiones_completadas": 3
+        }
+      ],
+      "errores": [],
+      "historial": [
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-08-03",
+          "numero_sesion": 2,
+          "servicio": "Bono 8",
+          "sesiones_totales": 8,
+          "tarifa": 45.0
+        },
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-08-04",
+          "numero_sesion": 3,
+          "servicio": "Bono 8",
+          "sesiones_totales": 8,
+          "tarifa": 45.0
+        },
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-08-05",
+          "numero_sesion": 1,
+          "servicio": "Bono 8",
+          "sesiones_totales": 8,
+          "tarifa": 45.0
+        }
+      ],
+      "meses": [
+        {
+          "ajuste_horas": 0,
+          "ajuste_importe": 0.0,
+          "anio": 2026,
+          "cuotas": 0,
+          "facturacion_cuotas": 0.0,
+          "facturacion_kids": null,
+          "facturacion_total": 135.0,
+          "horas_totales": 3,
+          "mes": 8,
+          "por_modalidad": {
+            "bono": {
+              "facturacion": 135.0,
+              "horas": 3
+            }
+          },
+          "precio_medio_hora": 45.0,
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ],
+      "semanas": [
+        {
+          "facturacion_kids": null,
+          "facturacion_total": 135.0,
+          "fin": "2026-08-09",
+          "horas_totales": 3,
+          "inicio": "2026-08-03",
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ]
+    },
+    "regla": "El historial conserva las fechas, y el numero de sesion sigue el orden de firma, no el de fecha"
+  },
+  "E13": {
+    "foto": {
+      "cargos_mensuales": [],
+      "ciclos": [],
+      "clases_grupo": [
+        {
+          "fecha": "2026-08-03",
+          "tipo": "lidomare"
+        },
+        {
+          "fecha": "2026-08-03",
+          "tipo": "lidomare"
+        },
+        {
+          "fecha": "2026-08-03",
+          "tipo": "lidomare"
+        }
+      ],
+      "clientes": [],
+      "errores": [],
+      "historial": [],
+      "meses": [
+        {
+          "ajuste_horas": 0,
+          "ajuste_importe": 0.0,
+          "anio": 2026,
+          "cuotas": 0,
+          "facturacion_cuotas": 0.0,
+          "facturacion_kids": null,
+          "facturacion_total": 45.0,
+          "horas_totales": 3,
+          "mes": 8,
+          "por_modalidad": {},
+          "precio_medio_hora": 15.0,
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ],
+      "semanas": [
+        {
+          "facturacion_kids": null,
+          "facturacion_total": 45.0,
+          "fin": "2026-08-09",
+          "horas_totales": 3,
+          "inicio": "2026-08-03",
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ]
+    },
+    "regla": "CrossFit Lidomare se contabiliza a tarifa fija y suma horas"
+  },
+  "E14": {
+    "foto": {
+      "cargos_mensuales": [],
+      "ciclos": [],
+      "clases_grupo": [
+        {
+          "fecha": "2026-08-03",
+          "tipo": "kids"
+        },
+        {
+          "fecha": "2026-08-03",
+          "tipo": "kids"
+        },
+        {
+          "fecha": "2026-08-03",
+          "tipo": "kids"
+        },
+        {
+          "fecha": "2026-08-03",
+          "tipo": "kids"
+        }
+      ],
+      "clientes": [],
+      "errores": [],
+      "historial": [],
+      "meses": [
+        {
+          "ajuste_horas": 0,
+          "ajuste_importe": 0.0,
+          "anio": 2026,
+          "cuotas": 0,
+          "facturacion_cuotas": 0.0,
+          "facturacion_kids": null,
+          "facturacion_total": 0.0,
+          "horas_totales": 0,
+          "mes": 8,
+          "por_modalidad": {},
+          "precio_medio_hora": 0.0,
+          "provisional": true,
+          "sesiones_kids": 4
+        }
+      ],
+      "semanas": [
+        {
+          "facturacion_kids": null,
+          "facturacion_total": 0.0,
+          "fin": "2026-08-09",
+          "horas_totales": 0,
+          "inicio": "2026-08-03",
+          "provisional": true,
+          "sesiones_kids": 4
+        }
+      ]
+    },
+    "regla": "CrossFit Kids es provisional hasta que se introduce su facturacion mensual"
+  },
+  "E14b": {
+    "foto": {
+      "cargos_mensuales": [],
+      "ciclos": [],
+      "clases_grupo": [
+        {
+          "fecha": "2026-08-03",
+          "tipo": "kids"
+        },
+        {
+          "fecha": "2026-08-03",
+          "tipo": "kids"
+        },
+        {
+          "fecha": "2026-08-03",
+          "tipo": "kids"
+        },
+        {
+          "fecha": "2026-08-03",
+          "tipo": "kids"
+        }
+      ],
+      "clientes": [],
+      "errores": [],
+      "historial": [],
+      "meses": [
+        {
+          "ajuste_horas": 0,
+          "ajuste_importe": 0.0,
+          "anio": 2026,
+          "cuotas": 0,
+          "facturacion_cuotas": 0.0,
+          "facturacion_kids": 800.0,
+          "facturacion_total": 800.0,
+          "horas_totales": 4,
+          "mes": 8,
+          "por_modalidad": {},
+          "precio_medio_hora": 200.0,
+          "provisional": false,
+          "sesiones_kids": 4
+        }
+      ],
+      "semanas": [
+        {
+          "facturacion_kids": 800.0,
+          "facturacion_total": 800.0,
+          "fin": "2026-08-09",
+          "horas_totales": 4,
+          "inicio": "2026-08-03",
+          "provisional": false,
+          "sesiones_kids": 4
+        }
+      ]
+    },
+    "regla": "Al introducir la facturacion de Kids, el mes deja de ser provisional y sus horas cuentan"
+  },
+  "E17": {
+    "foto": {
+      "cargos_mensuales": [],
+      "ciclos": [
+        {
+          "anio": null,
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "cuota_mensual": null,
+          "fecha_fin": null,
+          "fecha_inicio": "2026-08-03",
+          "mes": null,
+          "modalidad": "bono",
+          "pagado": true,
+          "precio_total": null,
+          "servicio": "Bono 8",
+          "sesiones_referencia": null,
+          "sesiones_totales": 8,
+          "tarifa": 45.0
+        }
+      ],
+      "clases_grupo": [],
+      "clientes": [
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "estado": "pausado",
+          "pendiente_pago": false,
+          "programa": "Bono 8",
+          "sesiones_completadas": 2
+        }
+      ],
+      "errores": [],
+      "historial": [
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-08-03",
+          "numero_sesion": 1,
+          "servicio": "Bono 8",
+          "sesiones_totales": 8,
+          "tarifa": 45.0
+        },
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-08-03",
+          "numero_sesion": 2,
+          "servicio": "Bono 8",
+          "sesiones_totales": 8,
+          "tarifa": 45.0
+        }
+      ],
+      "meses": [
+        {
+          "ajuste_horas": 0,
+          "ajuste_importe": 0.0,
+          "anio": 2026,
+          "cuotas": 0,
+          "facturacion_cuotas": 0.0,
+          "facturacion_kids": null,
+          "facturacion_total": 90.0,
+          "horas_totales": 2,
+          "mes": 8,
+          "por_modalidad": {
+            "bono": {
+              "facturacion": 90.0,
+              "horas": 2
+            }
+          },
+          "precio_medio_hora": 45.0,
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ],
+      "semanas": [
+        {
+          "facturacion_kids": null,
+          "facturacion_total": 90.0,
+          "fin": "2026-08-09",
+          "horas_totales": 2,
+          "inicio": "2026-08-03",
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ]
+    },
+    "regla": "Pausar a un cliente no le quita nada: ficha, historial y economia se conservan"
+  },
+  "E17b": {
+    "foto": {
+      "cargos_mensuales": [],
+      "ciclos": [
+        {
+          "anio": null,
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "cuota_mensual": null,
+          "fecha_fin": null,
+          "fecha_inicio": null,
+          "mes": null,
+          "modalidad": "bono",
+          "pagado": false,
+          "precio_total": null,
+          "servicio": "Bono 4",
+          "sesiones_referencia": null,
+          "sesiones_totales": 4,
+          "tarifa": 40.0
+        }
+      ],
+      "clases_grupo": [],
+      "clientes": [
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "estado": "cancelado",
+          "pendiente_pago": true,
+          "programa": "Bono 4",
+          "sesiones_completadas": 0
+        }
+      ],
+      "errores": [],
+      "historial": [],
+      "meses": [],
+      "semanas": []
+    },
+    "regla": "Un cliente cancelado con deuda sigue debiendo: estado y pago son independientes"
+  },
+  "E18": {
+    "foto": {
+      "cargos_mensuales": [],
+      "ciclos": [
+        {
+          "anio": null,
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "cuota_mensual": null,
+          "fecha_fin": "2026-08-03",
+          "fecha_inicio": "2026-08-03",
+          "mes": null,
+          "modalidad": "bono",
+          "pagado": true,
+          "precio_total": 100.0,
+          "servicio": "Bono 3",
+          "sesiones_referencia": null,
+          "sesiones_totales": 3,
+          "tarifa": 33.33
+        },
+        {
+          "anio": null,
+          "ciclo": 2,
+          "cliente": "Cliente A",
+          "cuota_mensual": null,
+          "fecha_fin": null,
+          "fecha_inicio": null,
+          "mes": null,
+          "modalidad": "bono",
+          "pagado": false,
+          "precio_total": 100.0,
+          "servicio": "Bono 3",
+          "sesiones_referencia": null,
+          "sesiones_totales": 3,
+          "tarifa": 33.33
+        }
+      ],
+      "clases_grupo": [],
+      "clientes": [
+        {
+          "ciclo": 2,
+          "cliente": "Cliente A",
+          "estado": "activo",
+          "pendiente_pago": true,
+          "programa": "Bono 3",
+          "sesiones_completadas": 0
+        }
+      ],
+      "errores": [],
+      "historial": [
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-08-03",
+          "numero_sesion": 1,
+          "servicio": "Bono 3",
+          "sesiones_totales": 3,
+          "tarifa": 33.33
+        },
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-08-03",
+          "numero_sesion": 2,
+          "servicio": "Bono 3",
+          "sesiones_totales": 3,
+          "tarifa": 33.33
+        },
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-08-03",
+          "numero_sesion": 3,
+          "servicio": "Bono 3",
+          "sesiones_totales": 3,
+          "tarifa": 33.33
+        }
+      ],
+      "meses": [
+        {
+          "ajuste_horas": 0,
+          "ajuste_importe": 0.0,
+          "anio": 2026,
+          "cuotas": 0,
+          "facturacion_cuotas": 0.0,
+          "facturacion_kids": null,
+          "facturacion_total": 99.99,
+          "horas_totales": 3,
+          "mes": 8,
+          "por_modalidad": {
+            "bono": {
+              "facturacion": 99.99,
+              "horas": 3
+            }
+          },
+          "precio_medio_hora": 33.33,
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ],
+      "semanas": [
+        {
+          "facturacion_kids": null,
+          "facturacion_total": 99.99,
+          "fin": "2026-08-09",
+          "horas_totales": 3,
+          "inicio": "2026-08-03",
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ]
+    },
+    "regla": "El precio por sesion de un bono se redondea al centimo, y el bono factura por sesiones consumidas a esa tarifa"
+  },
+  "E18b": {
+    "foto": {
+      "cargos_mensuales": [],
+      "ciclos": [
+        {
+          "anio": null,
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "cuota_mensual": null,
+          "fecha_fin": "2026-08-03",
+          "fecha_inicio": "2026-08-03",
+          "mes": null,
+          "modalidad": "bono",
+          "pagado": true,
+          "precio_total": null,
+          "servicio": "Bono 20.10",
+          "sesiones_referencia": null,
+          "sesiones_totales": 3,
+          "tarifa": 20.1
+        },
+        {
+          "anio": null,
+          "ciclo": 2,
+          "cliente": "Cliente A",
+          "cuota_mensual": null,
+          "fecha_fin": null,
+          "fecha_inicio": null,
+          "mes": null,
+          "modalidad": "bono",
+          "pagado": false,
+          "precio_total": null,
+          "servicio": "Bono 20.10",
+          "sesiones_referencia": null,
+          "sesiones_totales": 3,
+          "tarifa": 20.1
+        }
+      ],
+      "clases_grupo": [],
+      "clientes": [
+        {
+          "ciclo": 2,
+          "cliente": "Cliente A",
+          "estado": "activo",
+          "pendiente_pago": true,
+          "programa": "Bono 20.10",
+          "sesiones_completadas": 0
+        }
+      ],
+      "errores": [],
+      "historial": [
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-08-03",
+          "numero_sesion": 1,
+          "servicio": "Bono 20.10",
+          "sesiones_totales": 3,
+          "tarifa": 20.1
+        },
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-08-03",
+          "numero_sesion": 2,
+          "servicio": "Bono 20.10",
+          "sesiones_totales": 3,
+          "tarifa": 20.1
+        },
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-08-03",
+          "numero_sesion": 3,
+          "servicio": "Bono 20.10",
+          "sesiones_totales": 3,
+          "tarifa": 20.1
+        }
+      ],
+      "meses": [
+        {
+          "ajuste_horas": 0,
+          "ajuste_importe": 0.0,
+          "anio": 2026,
+          "cuotas": 0,
+          "facturacion_cuotas": 0.0,
+          "facturacion_kids": null,
+          "facturacion_total": 60.3,
+          "horas_totales": 3,
+          "mes": 8,
+          "por_modalidad": {
+            "bono": {
+              "facturacion": 60.3,
+              "horas": 3
+            }
+          },
+          "precio_medio_hora": 20.1,
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ],
+      "semanas": [
+        {
+          "facturacion_kids": null,
+          "facturacion_total": 60.3,
+          "fin": "2026-08-09",
+          "horas_totales": 3,
+          "inicio": "2026-08-03",
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ]
+    },
+    "regla": "Una suma de importes con decimales no arrastra error de coma flotante al centimo"
+  },
+  "E21": {
+    "foto": {
+      "cargos_mensuales": [],
+      "ciclos": [
+        {
+          "anio": null,
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "cuota_mensual": null,
+          "fecha_fin": null,
+          "fecha_inicio": "2026-08-03",
+          "mes": null,
+          "modalidad": "bono",
+          "pagado": true,
+          "precio_total": 240.0,
+          "servicio": "Bono 4",
+          "sesiones_referencia": null,
+          "sesiones_totales": 4,
+          "tarifa": 60.0
+        }
+      ],
+      "clases_grupo": [],
+      "clientes": [
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "estado": "activo",
+          "pendiente_pago": false,
+          "programa": "Bono 4",
+          "sesiones_completadas": 3
+        }
+      ],
+      "errores": [],
+      "historial": [
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-08-03",
+          "numero_sesion": 1,
+          "servicio": "Bono 4",
+          "sesiones_totales": 4,
+          "tarifa": 40.0
+        },
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-08-03",
+          "numero_sesion": 2,
+          "servicio": "Bono 4",
+          "sesiones_totales": 4,
+          "tarifa": 40.0
+        },
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-08-04",
+          "numero_sesion": 3,
+          "servicio": "Bono 4",
+          "sesiones_totales": 4,
+          "tarifa": 60.0
+        }
+      ],
+      "meses": [
+        {
+          "ajuste_horas": 0,
+          "ajuste_importe": 0.0,
+          "anio": 2026,
+          "cuotas": 0,
+          "facturacion_cuotas": 0.0,
+          "facturacion_kids": null,
+          "facturacion_total": 140.0,
+          "horas_totales": 3,
+          "mes": 8,
+          "por_modalidad": {
+            "bono": {
+              "facturacion": 140.0,
+              "horas": 3
+            }
+          },
+          "precio_medio_hora": 46.67,
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ],
+      "semanas": [
+        {
+          "facturacion_kids": null,
+          "facturacion_total": 140.0,
+          "fin": "2026-08-09",
+          "horas_totales": 3,
+          "inicio": "2026-08-03",
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ]
+    },
+    "regla": "Cambiar la tarifa NO reescribe las sesiones ya firmadas: cada una conserva la suya"
+  },
+  "E22": {
+    "foto": {
+      "cargos_mensuales": [],
+      "ciclos": [
+        {
+          "anio": null,
+          "ciclo": 0,
+          "cliente": "Cliente A",
+          "cuota_mensual": null,
+          "fecha_fin": "2026-06-28",
+          "fecha_inicio": "2026-06-01",
+          "mes": null,
+          "modalidad": "bono",
+          "pagado": null,
+          "precio_total": null,
+          "servicio": "Bono 4",
+          "sesiones_referencia": null,
+          "sesiones_totales": 4,
+          "tarifa": 40.0
+        },
+        {
+          "anio": null,
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "cuota_mensual": null,
+          "fecha_fin": null,
+          "fecha_inicio": null,
+          "mes": null,
+          "modalidad": "bono",
+          "pagado": true,
+          "precio_total": null,
+          "servicio": "Bono 4",
+          "sesiones_referencia": null,
+          "sesiones_totales": 4,
+          "tarifa": 40.0
+        }
+      ],
+      "clases_grupo": [],
+      "clientes": [
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "estado": "activo",
+          "pendiente_pago": false,
+          "programa": "Bono 4",
+          "sesiones_completadas": 0
+        }
+      ],
+      "errores": [],
+      "historial": [],
+      "meses": [],
+      "semanas": []
+    },
+    "regla": "Un servicio antiguo con el cobro sin registrar (pagado nulo) NO cuenta como deuda"
+  },
+  "E22b": {
+    "foto": {
+      "cargos_mensuales": [],
+      "ciclos": [
+        {
+          "anio": null,
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "cuota_mensual": null,
+          "fecha_fin": "2026-08-03",
+          "fecha_inicio": "2026-08-03",
+          "mes": null,
+          "modalidad": "bono",
+          "pagado": true,
+          "precio_total": null,
+          "servicio": "Bono 4",
+          "sesiones_referencia": null,
+          "sesiones_totales": 4,
+          "tarifa": 40.0
+        },
+        {
+          "anio": null,
+          "ciclo": 2,
+          "cliente": "Cliente A",
+          "cuota_mensual": null,
+          "fecha_fin": null,
+          "fecha_inicio": null,
+          "mes": null,
+          "modalidad": "bono",
+          "pagado": false,
+          "precio_total": null,
+          "servicio": "Bono 4",
+          "sesiones_referencia": null,
+          "sesiones_totales": 4,
+          "tarifa": 40.0
+        }
+      ],
+      "clases_grupo": [],
+      "clientes": [
+        {
+          "ciclo": 2,
+          "cliente": "Cliente A",
+          "estado": "activo",
+          "pendiente_pago": true,
+          "programa": "Bono 4",
+          "sesiones_completadas": 0
+        }
+      ],
+      "errores": [],
+      "historial": [
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-08-03",
+          "numero_sesion": 1,
+          "servicio": "Bono 4",
+          "sesiones_totales": 4,
+          "tarifa": 40.0
+        },
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-08-03",
+          "numero_sesion": 2,
+          "servicio": "Bono 4",
+          "sesiones_totales": 4,
+          "tarifa": 40.0
+        },
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-08-03",
+          "numero_sesion": 3,
+          "servicio": "Bono 4",
+          "sesiones_totales": 4,
+          "tarifa": 40.0
+        },
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-08-03",
+          "numero_sesion": 4,
+          "servicio": "Bono 4",
+          "sesiones_totales": 4,
+          "tarifa": 40.0
+        }
+      ],
+      "meses": [
+        {
+          "ajuste_horas": 0,
+          "ajuste_importe": 0.0,
+          "anio": 2026,
+          "cuotas": 0,
+          "facturacion_cuotas": 0.0,
+          "facturacion_kids": null,
+          "facturacion_total": 160.0,
+          "horas_totales": 4,
+          "mes": 8,
+          "por_modalidad": {
+            "bono": {
+              "facturacion": 160.0,
+              "horas": 4
+            }
+          },
+          "precio_medio_hora": 40.0,
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ],
+      "semanas": [
+        {
+          "facturacion_kids": null,
+          "facturacion_total": 160.0,
+          "fin": "2026-08-09",
+          "horas_totales": 4,
+          "inicio": "2026-08-03",
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ]
+    },
+    "regla": "Un servicio cerrado y sin cobrar SI cuenta como deuda, y marcarlo pagado no mueve ni un euro"
+  },
+  "E23": {
+    "foto": {
+      "cargos_mensuales": [
+        {
+          "anio": 2026,
+          "ciclo": 2,
+          "cliente": "Cliente B",
+          "concepto": "mensualidad",
+          "importe": 720.0,
+          "mes": 8,
+          "pagado": false
+        }
+      ],
+      "ciclos": [
+        {
+          "anio": null,
+          "ciclo": 1,
+          "cliente": "Cliente B",
+          "cuota_mensual": null,
+          "fecha_fin": "2026-08-03",
+          "fecha_inicio": null,
+          "mes": null,
+          "modalidad": "bono",
+          "pagado": true,
+          "precio_total": null,
+          "servicio": "Base",
+          "sesiones_referencia": null,
+          "sesiones_totales": 4,
+          "tarifa": 45.0
+        },
+        {
+          "anio": 2026,
+          "ciclo": 2,
+          "cliente": "Cliente B",
+          "cuota_mensual": 720.0,
+          "fecha_fin": null,
+          "fecha_inicio": "2026-08-03",
+          "mes": 8,
+          "modalidad": "mensualidad",
+          "pagado": true,
+          "precio_total": null,
+          "servicio": "Mensualidad",
+          "sesiones_referencia": 12,
+          "sesiones_totales": 0,
+          "tarifa": null
+        }
+      ],
+      "clases_grupo": [],
+      "clientes": [
+        {
+          "ciclo": 2,
+          "cliente": "Cliente B",
+          "estado": "activo",
+          "pendiente_pago": false,
+          "programa": "Base",
+          "sesiones_completadas": 0
+        }
+      ],
+      "errores": [],
+      "historial": [
+        {
+          "ciclo": 2,
+          "cliente": "Cliente B",
+          "fecha": "2026-08-03",
+          "numero_sesion": 1,
+          "servicio": "Mensualidad",
+          "sesiones_totales": 0,
+          "tarifa": null
+        },
+        {
+          "ciclo": 2,
+          "cliente": "Cliente B",
+          "fecha": "2026-08-03",
+          "numero_sesion": 2,
+          "servicio": "Mensualidad",
+          "sesiones_totales": 0,
+          "tarifa": null
+        },
+        {
+          "ciclo": 2,
+          "cliente": "Cliente B",
+          "fecha": "2026-08-03",
+          "numero_sesion": 3,
+          "servicio": "Mensualidad",
+          "sesiones_totales": 0,
+          "tarifa": null
+        }
+      ],
+      "meses": [
+        {
+          "ajuste_horas": 0,
+          "ajuste_importe": 0.0,
+          "anio": 2026,
+          "cuotas": 1,
+          "facturacion_cuotas": 720.0,
+          "facturacion_kids": null,
+          "facturacion_total": 720.0,
+          "horas_totales": 3,
+          "mes": 8,
+          "por_modalidad": {
+            "mensualidad": {
+              "facturacion": 720.0,
+              "horas": 3
+            }
+          },
+          "precio_medio_hora": 240.0,
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ],
+      "semanas": [
+        {
+          "facturacion_kids": null,
+          "facturacion_total": 0.0,
+          "fin": "2026-08-09",
+          "horas_totales": 0,
+          "inicio": "2026-08-03",
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ]
+    },
+    "regla": "Una mensualidad factura su cuota entera: sus sesiones suman hora pero no dinero (tarifa nula)"
+  },
+  "E23b": {
+    "foto": {
+      "cargos_mensuales": [
+        {
+          "anio": 2026,
+          "ciclo": 2,
+          "cliente": "Cliente B",
+          "concepto": "mensualidad",
+          "importe": 720.0,
+          "mes": 7,
+          "pagado": false
+        },
+        {
+          "anio": 2026,
+          "ciclo": 3,
+          "cliente": "Cliente B",
+          "concepto": "mensualidad",
+          "importe": 720.0,
+          "mes": 8,
+          "pagado": false
+        }
+      ],
+      "ciclos": [
+        {
+          "anio": null,
+          "ciclo": 1,
+          "cliente": "Cliente B",
+          "cuota_mensual": null,
+          "fecha_fin": "2026-07-06",
+          "fecha_inicio": null,
+          "mes": null,
+          "modalidad": "bono",
+          "pagado": true,
+          "precio_total": null,
+          "servicio": "Base",
+          "sesiones_referencia": null,
+          "sesiones_totales": 4,
+          "tarifa": 45.0
+        },
+        {
+          "anio": 2026,
+          "ciclo": 2,
+          "cliente": "Cliente B",
+          "cuota_mensual": 720.0,
+          "fecha_fin": "2026-07-06",
+          "fecha_inicio": "2026-07-06",
+          "mes": 7,
+          "modalidad": "mensualidad",
+          "pagado": true,
+          "precio_total": null,
+          "servicio": "Mensualidad",
+          "sesiones_referencia": 12,
+          "sesiones_totales": 0,
+          "tarifa": null
+        },
+        {
+          "anio": 2026,
+          "ciclo": 3,
+          "cliente": "Cliente B",
+          "cuota_mensual": 720.0,
+          "fecha_fin": null,
+          "fecha_inicio": null,
+          "mes": 8,
+          "modalidad": "mensualidad",
+          "pagado": false,
+          "precio_total": null,
+          "servicio": "Mensualidad",
+          "sesiones_referencia": 12,
+          "sesiones_totales": 0,
+          "tarifa": null
+        }
+      ],
+      "clases_grupo": [],
+      "clientes": [
+        {
+          "ciclo": 3,
+          "cliente": "Cliente B",
+          "estado": "activo",
+          "pendiente_pago": true,
+          "programa": "Base",
+          "sesiones_completadas": 0
+        }
+      ],
+      "errores": [],
+      "historial": [
+        {
+          "ciclo": 2,
+          "cliente": "Cliente B",
+          "fecha": "2026-07-06",
+          "numero_sesion": 1,
+          "servicio": "Mensualidad",
+          "sesiones_totales": 0,
+          "tarifa": null
+        },
+        {
+          "ciclo": 2,
+          "cliente": "Cliente B",
+          "fecha": "2026-07-06",
+          "numero_sesion": 2,
+          "servicio": "Mensualidad",
+          "sesiones_totales": 0,
+          "tarifa": null
+        },
+        {
+          "ciclo": 2,
+          "cliente": "Cliente B",
+          "fecha": "2026-07-06",
+          "numero_sesion": 3,
+          "servicio": "Mensualidad",
+          "sesiones_totales": 0,
+          "tarifa": null
+        },
+        {
+          "ciclo": 2,
+          "cliente": "Cliente B",
+          "fecha": "2026-07-06",
+          "numero_sesion": 4,
+          "servicio": "Mensualidad",
+          "sesiones_totales": 0,
+          "tarifa": null
+        },
+        {
+          "ciclo": 2,
+          "cliente": "Cliente B",
+          "fecha": "2026-07-06",
+          "numero_sesion": 5,
+          "servicio": "Mensualidad",
+          "sesiones_totales": 0,
+          "tarifa": null
+        },
+        {
+          "ciclo": 2,
+          "cliente": "Cliente B",
+          "fecha": "2026-07-06",
+          "numero_sesion": 6,
+          "servicio": "Mensualidad",
+          "sesiones_totales": 0,
+          "tarifa": null
+        },
+        {
+          "ciclo": 2,
+          "cliente": "Cliente B",
+          "fecha": "2026-07-06",
+          "numero_sesion": 7,
+          "servicio": "Mensualidad",
+          "sesiones_totales": 0,
+          "tarifa": null
+        },
+        {
+          "ciclo": 2,
+          "cliente": "Cliente B",
+          "fecha": "2026-07-06",
+          "numero_sesion": 8,
+          "servicio": "Mensualidad",
+          "sesiones_totales": 0,
+          "tarifa": null
+        },
+        {
+          "ciclo": 2,
+          "cliente": "Cliente B",
+          "fecha": "2026-07-06",
+          "numero_sesion": 9,
+          "servicio": "Mensualidad",
+          "sesiones_totales": 0,
+          "tarifa": null
+        },
+        {
+          "ciclo": 2,
+          "cliente": "Cliente B",
+          "fecha": "2026-07-06",
+          "numero_sesion": 10,
+          "servicio": "Mensualidad",
+          "sesiones_totales": 0,
+          "tarifa": null
+        },
+        {
+          "ciclo": 2,
+          "cliente": "Cliente B",
+          "fecha": "2026-07-06",
+          "numero_sesion": 11,
+          "servicio": "Mensualidad",
+          "sesiones_totales": 0,
+          "tarifa": null
+        },
+        {
+          "ciclo": 2,
+          "cliente": "Cliente B",
+          "fecha": "2026-07-06",
+          "numero_sesion": 12,
+          "servicio": "Mensualidad",
+          "sesiones_totales": 0,
+          "tarifa": null
+        },
+        {
+          "ciclo": 2,
+          "cliente": "Cliente B",
+          "fecha": "2026-07-06",
+          "numero_sesion": 13,
+          "servicio": "Mensualidad",
+          "sesiones_totales": 0,
+          "tarifa": null
+        }
+      ],
+      "meses": [
+        {
+          "ajuste_horas": 0,
+          "ajuste_importe": 0.0,
+          "anio": 2026,
+          "cuotas": 1,
+          "facturacion_cuotas": 720.0,
+          "facturacion_kids": null,
+          "facturacion_total": 720.0,
+          "horas_totales": 13,
+          "mes": 7,
+          "por_modalidad": {
+            "mensualidad": {
+              "facturacion": 720.0,
+              "horas": 13
+            }
+          },
+          "precio_medio_hora": 55.38,
+          "provisional": false,
+          "sesiones_kids": 0
+        },
+        {
+          "ajuste_horas": 0,
+          "ajuste_importe": 0.0,
+          "anio": 2026,
+          "cuotas": 1,
+          "facturacion_cuotas": 720.0,
+          "facturacion_kids": null,
+          "facturacion_total": 720.0,
+          "horas_totales": 0,
+          "mes": 8,
+          "por_modalidad": {
+            "mensualidad": {
+              "facturacion": 720.0,
+              "horas": 0
+            }
+          },
+          "precio_medio_hora": 0.0,
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ],
+      "semanas": [
+        {
+          "facturacion_kids": null,
+          "facturacion_total": 0.0,
+          "fin": "2026-07-12",
+          "horas_totales": 0,
+          "inicio": "2026-07-06",
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ]
+    },
+    "regla": "La mensualidad se renueva al cambiar de mes, no por numero de sesiones"
+  },
+  "E23c": {
+    "foto": {
+      "cargos_mensuales": [
+        {
+          "anio": 2026,
+          "ciclo": 2,
+          "cliente": "Cliente B",
+          "concepto": "mensualidad",
+          "importe": 720.0,
+          "mes": 7,
+          "pagado": false
+        }
+      ],
+      "ciclos": [
+        {
+          "anio": null,
+          "ciclo": 1,
+          "cliente": "Cliente B",
+          "cuota_mensual": null,
+          "fecha_fin": "2026-07-06",
+          "fecha_inicio": null,
+          "mes": null,
+          "modalidad": "bono",
+          "pagado": true,
+          "precio_total": null,
+          "servicio": "Base",
+          "sesiones_referencia": null,
+          "sesiones_totales": 4,
+          "tarifa": 45.0
+        },
+        {
+          "anio": 2026,
+          "ciclo": 2,
+          "cliente": "Cliente B",
+          "cuota_mensual": 720.0,
+          "fecha_fin": null,
+          "fecha_inicio": null,
+          "mes": 7,
+          "modalidad": "mensualidad",
+          "pagado": true,
+          "precio_total": null,
+          "servicio": "Mensualidad",
+          "sesiones_referencia": 12,
+          "sesiones_totales": 0,
+          "tarifa": null
+        },
+        {
+          "anio": 2026,
+          "ciclo": 3,
+          "cliente": "Cliente B",
+          "cuota_mensual": 720.0,
+          "fecha_fin": null,
+          "fecha_inicio": null,
+          "mes": 8,
+          "modalidad": "mensualidad",
+          "pagado": false,
+          "precio_total": null,
+          "servicio": "Mensualidad",
+          "sesiones_referencia": 12,
+          "sesiones_totales": 0,
+          "tarifa": null
+        }
+      ],
+      "clases_grupo": [],
+      "clientes": [
+        {
+          "ciclo": 3,
+          "cliente": "Cliente B",
+          "estado": "pausado",
+          "pendiente_pago": true,
+          "programa": "Base",
+          "sesiones_completadas": 0
+        }
+      ],
+      "errores": [],
+      "historial": [],
+      "meses": [
+        {
+          "ajuste_horas": 0,
+          "ajuste_importe": 0.0,
+          "anio": 2026,
+          "cuotas": 1,
+          "facturacion_cuotas": 720.0,
+          "facturacion_kids": null,
+          "facturacion_total": 720.0,
+          "horas_totales": 0,
+          "mes": 7,
+          "por_modalidad": {
+            "mensualidad": {
+              "facturacion": 720.0,
+              "horas": 0
+            }
+          },
+          "precio_medio_hora": 0.0,
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ],
+      "semanas": []
+    },
+    "regla": "Un cliente pausado no genera cuota mensual: no se inventan ingresos"
+  },
+  "E24": {
+    "foto": {
+      "cargos_mensuales": [],
+      "ciclos": [
+        {
+          "anio": null,
+          "ciclo": 1,
+          "cliente": "Cliente D",
+          "cuota_mensual": null,
+          "fecha_fin": "2026-08-03",
+          "fecha_inicio": null,
+          "mes": null,
+          "modalidad": "bono",
+          "pagado": true,
+          "precio_total": null,
+          "servicio": "Base",
+          "sesiones_referencia": null,
+          "sesiones_totales": 4,
+          "tarifa": 45.0
+        },
+        {
+          "anio": 2026,
+          "ciclo": 2,
+          "cliente": "Cliente D",
+          "cuota_mensual": null,
+          "fecha_fin": null,
+          "fecha_inicio": "2026-08-03",
+          "mes": 8,
+          "modalidad": "cuenta",
+          "pagado": true,
+          "precio_total": null,
+          "servicio": "Cuenta",
+          "sesiones_referencia": null,
+          "sesiones_totales": 0,
+          "tarifa": 35.0
+        }
+      ],
+      "clases_grupo": [],
+      "clientes": [
+        {
+          "ciclo": 2,
+          "cliente": "Cliente D",
+          "estado": "activo",
+          "pendiente_pago": false,
+          "programa": "Base",
+          "sesiones_completadas": 0
+        }
+      ],
+      "errores": [],
+      "historial": [
+        {
+          "ciclo": 2,
+          "cliente": "Cliente D",
+          "fecha": "2026-08-03",
+          "numero_sesion": 1,
+          "servicio": "Cuenta",
+          "sesiones_totales": 0,
+          "tarifa": 35.0
+        },
+        {
+          "ciclo": 2,
+          "cliente": "Cliente D",
+          "fecha": "2026-08-03",
+          "numero_sesion": 2,
+          "servicio": "Cuenta",
+          "sesiones_totales": 0,
+          "tarifa": 35.0
+        },
+        {
+          "ciclo": 2,
+          "cliente": "Cliente D",
+          "fecha": "2026-08-03",
+          "numero_sesion": 3,
+          "servicio": "Cuenta",
+          "sesiones_totales": 0,
+          "tarifa": 35.0
+        },
+        {
+          "ciclo": 2,
+          "cliente": "Cliente D",
+          "fecha": "2026-08-03",
+          "numero_sesion": 4,
+          "servicio": "Cuenta",
+          "sesiones_totales": 0,
+          "tarifa": 35.0
+        },
+        {
+          "ciclo": 2,
+          "cliente": "Cliente D",
+          "fecha": "2026-08-03",
+          "numero_sesion": 5,
+          "servicio": "Cuenta",
+          "sesiones_totales": 0,
+          "tarifa": 35.0
+        },
+        {
+          "ciclo": 2,
+          "cliente": "Cliente D",
+          "fecha": "2026-08-03",
+          "numero_sesion": 6,
+          "servicio": "Cuenta",
+          "sesiones_totales": 0,
+          "tarifa": 35.0
+        },
+        {
+          "ciclo": 2,
+          "cliente": "Cliente D",
+          "fecha": "2026-08-03",
+          "numero_sesion": 7,
+          "servicio": "Cuenta",
+          "sesiones_totales": 0,
+          "tarifa": 35.0
+        },
+        {
+          "ciclo": 2,
+          "cliente": "Cliente D",
+          "fecha": "2026-08-03",
+          "numero_sesion": 8,
+          "servicio": "Cuenta",
+          "sesiones_totales": 0,
+          "tarifa": 35.0
+        },
+        {
+          "ciclo": 2,
+          "cliente": "Cliente D",
+          "fecha": "2026-08-03",
+          "numero_sesion": 9,
+          "servicio": "Cuenta",
+          "sesiones_totales": 0,
+          "tarifa": 35.0
+        },
+        {
+          "ciclo": 2,
+          "cliente": "Cliente D",
+          "fecha": "2026-08-03",
+          "numero_sesion": 10,
+          "servicio": "Cuenta",
+          "sesiones_totales": 0,
+          "tarifa": 35.0
+        }
+      ],
+      "meses": [
+        {
+          "ajuste_horas": 0,
+          "ajuste_importe": 0.0,
+          "anio": 2026,
+          "cuotas": 0,
+          "facturacion_cuotas": 0.0,
+          "facturacion_kids": null,
+          "facturacion_total": 350.0,
+          "horas_totales": 10,
+          "mes": 8,
+          "por_modalidad": {
+            "cuenta": {
+              "facturacion": 350.0,
+              "horas": 10
+            }
+          },
+          "precio_medio_hora": 35.0,
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ],
+      "semanas": [
+        {
+          "facturacion_kids": null,
+          "facturacion_total": 350.0,
+          "fin": "2026-08-09",
+          "horas_totales": 10,
+          "inicio": "2026-08-03",
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ]
+    },
+    "regla": "Una cuenta de cliente no tiene tope (sesiones_totales = 0) ni renueva por consumo"
+  },
+  "E25": {
+    "foto": {
+      "cargos_mensuales": [],
+      "ciclos": [
+        {
+          "anio": null,
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "cuota_mensual": null,
+          "fecha_fin": null,
+          "fecha_inicio": "2026-07-29",
+          "mes": null,
+          "modalidad": "bono",
+          "pagado": true,
+          "precio_total": null,
+          "servicio": "Bono 10",
+          "sesiones_referencia": null,
+          "sesiones_totales": 10,
+          "tarifa": 37.5
+        }
+      ],
+      "clases_grupo": [],
+      "clientes": [
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "estado": "activo",
+          "pendiente_pago": false,
+          "programa": "Bono 10",
+          "sesiones_completadas": 1
+        }
+      ],
+      "errores": [],
+      "historial": [
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-07-29",
+          "numero_sesion": 1,
+          "servicio": "Bono 10",
+          "sesiones_totales": 10,
+          "tarifa": 37.5
+        }
+      ],
+      "meses": [
+        {
+          "ajuste_horas": 3,
+          "ajuste_importe": 112.5,
+          "anio": 2026,
+          "cuotas": 0,
+          "facturacion_cuotas": 0.0,
+          "facturacion_kids": null,
+          "facturacion_total": 150.0,
+          "horas_totales": 4,
+          "mes": 7,
+          "por_modalidad": {
+            "bono": {
+              "facturacion": 37.5,
+              "horas": 1
+            }
+          },
+          "precio_medio_hora": 37.5,
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ],
+      "semanas": [
+        {
+          "facturacion_kids": null,
+          "facturacion_total": 37.5,
+          "fin": "2026-08-02",
+          "horas_totales": 1,
+          "inicio": "2026-07-27",
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ]
+    },
+    "regla": "Un ajuste historico anterior al registro de fechas se suma al mes y se ve como linea propia"
+  },
+  "E25b": {
+    "foto": {
+      "cargos_mensuales": [],
+      "ciclos": [
+        {
+          "anio": null,
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "cuota_mensual": null,
+          "fecha_fin": null,
+          "fecha_inicio": "2026-07-29",
+          "mes": null,
+          "modalidad": "bono",
+          "pagado": true,
+          "precio_total": null,
+          "servicio": "Bono 10",
+          "sesiones_referencia": null,
+          "sesiones_totales": 10,
+          "tarifa": 37.5
+        }
+      ],
+      "clases_grupo": [],
+      "clientes": [
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "estado": "activo",
+          "pendiente_pago": false,
+          "programa": "Bono 10",
+          "sesiones_completadas": 1
+        }
+      ],
+      "errores": [],
+      "historial": [
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-07-29",
+          "numero_sesion": 1,
+          "servicio": "Bono 10",
+          "sesiones_totales": 10,
+          "tarifa": 37.5
+        }
+      ],
+      "meses": [
+        {
+          "ajuste_horas": 3,
+          "ajuste_importe": 112.5,
+          "anio": 2026,
+          "cuotas": 0,
+          "facturacion_cuotas": 0.0,
+          "facturacion_kids": null,
+          "facturacion_total": 150.0,
+          "horas_totales": 4,
+          "mes": 7,
+          "por_modalidad": {
+            "bono": {
+              "facturacion": 37.5,
+              "horas": 1
+            }
+          },
+          "precio_medio_hora": 37.5,
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ],
+      "semanas": [
+        {
+          "facturacion_kids": null,
+          "facturacion_total": 37.5,
+          "fin": "2026-08-02",
+          "horas_totales": 1,
+          "inicio": "2026-07-27",
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ]
+    },
+    "regla": "Recalcular el mismo ajuste dos veces no lo acumula"
+  },
+  "E26": {
+    "foto": {
+      "cargos_mensuales": [
+        {
+          "anio": 2026,
+          "ciclo": 2,
+          "cliente": "Cliente B",
+          "concepto": "mensualidad",
+          "importe": 720.0,
+          "mes": 8,
+          "pagado": false
+        }
+      ],
+      "ciclos": [
+        {
+          "anio": null,
+          "ciclo": 1,
+          "cliente": "Cliente B",
+          "cuota_mensual": null,
+          "fecha_fin": "2026-08-03",
+          "fecha_inicio": null,
+          "mes": null,
+          "modalidad": "bono",
+          "pagado": true,
+          "precio_total": null,
+          "servicio": "Base",
+          "sesiones_referencia": null,
+          "sesiones_totales": 4,
+          "tarifa": 45.0
+        },
+        {
+          "anio": 2026,
+          "ciclo": 2,
+          "cliente": "Cliente B",
+          "cuota_mensual": 720.0,
+          "fecha_fin": null,
+          "fecha_inicio": "2026-08-03",
+          "mes": 8,
+          "modalidad": "mensualidad",
+          "pagado": true,
+          "precio_total": null,
+          "servicio": "Mensualidad",
+          "sesiones_referencia": 12,
+          "sesiones_totales": 0,
+          "tarifa": null
+        }
+      ],
+      "clases_grupo": [],
+      "clientes": [
+        {
+          "ciclo": 2,
+          "cliente": "Cliente B",
+          "estado": "activo",
+          "pendiente_pago": false,
+          "programa": "Base",
+          "sesiones_completadas": 0
+        }
+      ],
+      "errores": [],
+      "historial": [
+        {
+          "ciclo": 2,
+          "cliente": "Cliente B",
+          "fecha": "2026-08-03",
+          "numero_sesion": 1,
+          "servicio": "Mensualidad",
+          "sesiones_totales": 0,
+          "tarifa": null
+        },
+        {
+          "ciclo": 2,
+          "cliente": "Cliente B",
+          "fecha": "2026-08-03",
+          "numero_sesion": 2,
+          "servicio": "Mensualidad",
+          "sesiones_totales": 0,
+          "tarifa": null
+        }
+      ],
+      "meses": [
+        {
+          "ajuste_horas": 0,
+          "ajuste_importe": 0.0,
+          "anio": 2026,
+          "cuotas": 1,
+          "facturacion_cuotas": 720.0,
+          "facturacion_kids": null,
+          "facturacion_total": 720.0,
+          "horas_totales": 2,
+          "mes": 8,
+          "por_modalidad": {
+            "mensualidad": {
+              "facturacion": 720.0,
+              "horas": 2
+            }
+          },
+          "precio_medio_hora": 360.0,
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ],
+      "semanas": [
+        {
+          "facturacion_kids": null,
+          "facturacion_total": 0.0,
+          "fin": "2026-08-09",
+          "horas_totales": 0,
+          "inicio": "2026-08-03",
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ]
+    },
+    "regla": "Abrir la pantalla muchas veces no duplica la cuota del mes (capa 4 anti-duplicado: la clave primaria)"
+  },
+  "E27": {
+    "foto": {
+      "cargos_mensuales": [],
+      "ciclos": [
+        {
+          "anio": null,
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "cuota_mensual": null,
+          "fecha_fin": "2026-08-03",
+          "fecha_inicio": "2026-08-03",
+          "mes": null,
+          "modalidad": "bono",
+          "pagado": true,
+          "precio_total": null,
+          "servicio": "Bono 4",
+          "sesiones_referencia": null,
+          "sesiones_totales": 4,
+          "tarifa": 40.0
+        },
+        {
+          "anio": null,
+          "ciclo": 2,
+          "cliente": "Cliente A",
+          "cuota_mensual": null,
+          "fecha_fin": null,
+          "fecha_inicio": "2026-08-03",
+          "mes": null,
+          "modalidad": "bono",
+          "pagado": false,
+          "precio_total": null,
+          "servicio": "Bono 4",
+          "sesiones_referencia": null,
+          "sesiones_totales": 4,
+          "tarifa": 40.0
+        }
+      ],
+      "clases_grupo": [],
+      "clientes": [
+        {
+          "ciclo": 2,
+          "cliente": "Cliente A",
+          "estado": "activo",
+          "pendiente_pago": true,
+          "programa": "Bono 4",
+          "sesiones_completadas": 2
+        }
+      ],
+      "errores": [
+        "No se puede borrar la sesión 1 de 'Cliente A': pertenece a un bono ya cerrado y después hay 2 sesiones de bonos posteriores que dependen de ella. Corrige primero las sesiones del bono actual, de la más reciente hacia atrás."
+      ],
+      "historial": [
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-08-03",
+          "numero_sesion": 1,
+          "servicio": "Bono 4",
+          "sesiones_totales": 4,
+          "tarifa": 40.0
+        },
+        {
+          "ciclo": 2,
+          "cliente": "Cliente A",
+          "fecha": "2026-08-03",
+          "numero_sesion": 1,
+          "servicio": "Bono 4",
+          "sesiones_totales": 4,
+          "tarifa": 40.0
+        },
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-08-03",
+          "numero_sesion": 2,
+          "servicio": "Bono 4",
+          "sesiones_totales": 4,
+          "tarifa": 40.0
+        },
+        {
+          "ciclo": 2,
+          "cliente": "Cliente A",
+          "fecha": "2026-08-03",
+          "numero_sesion": 2,
+          "servicio": "Bono 4",
+          "sesiones_totales": 4,
+          "tarifa": 40.0
+        },
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-08-03",
+          "numero_sesion": 3,
+          "servicio": "Bono 4",
+          "sesiones_totales": 4,
+          "tarifa": 40.0
+        },
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-08-03",
+          "numero_sesion": 4,
+          "servicio": "Bono 4",
+          "sesiones_totales": 4,
+          "tarifa": 40.0
+        }
+      ],
+      "meses": [
+        {
+          "ajuste_horas": 0,
+          "ajuste_importe": 0.0,
+          "anio": 2026,
+          "cuotas": 0,
+          "facturacion_cuotas": 0.0,
+          "facturacion_kids": null,
+          "facturacion_total": 240.0,
+          "horas_totales": 6,
+          "mes": 8,
+          "por_modalidad": {
+            "bono": {
+              "facturacion": 240.0,
+              "horas": 6
+            }
+          },
+          "precio_medio_hora": 40.0,
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ],
+      "semanas": [
+        {
+          "facturacion_kids": null,
+          "facturacion_total": 240.0,
+          "fin": "2026-08-09",
+          "horas_totales": 6,
+          "inicio": "2026-08-03",
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ]
+    },
+    "regla": "No se puede corregir una sesion de un servicio ya cerrado si despues hay sesiones de otro"
+  },
+  "E28": {
+    "foto": {
+      "cargos_mensuales": [],
+      "ciclos": [
+        {
+          "anio": null,
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "cuota_mensual": null,
+          "fecha_fin": "2026-08-03",
+          "fecha_inicio": "2026-08-03",
+          "mes": null,
+          "modalidad": "bono",
+          "pagado": true,
+          "precio_total": null,
+          "servicio": "Bono 4",
+          "sesiones_referencia": null,
+          "sesiones_totales": 4,
+          "tarifa": 40.0
+        },
+        {
+          "anio": null,
+          "ciclo": 2,
+          "cliente": "Cliente A",
+          "cuota_mensual": null,
+          "fecha_fin": null,
+          "fecha_inicio": null,
+          "mes": null,
+          "modalidad": "bono",
+          "pagado": false,
+          "precio_total": null,
+          "servicio": "Bono 4",
+          "sesiones_referencia": null,
+          "sesiones_totales": 4,
+          "tarifa": 40.0
+        }
+      ],
+      "clases_grupo": [],
+      "clientes": [
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "estado": "activo",
+          "pendiente_pago": false,
+          "programa": "Bono 4",
+          "sesiones_completadas": 3
+        }
+      ],
+      "errores": [],
+      "historial": [
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-08-03",
+          "numero_sesion": 1,
+          "servicio": "Bono 4",
+          "sesiones_totales": 4,
+          "tarifa": 40.0
+        },
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-08-03",
+          "numero_sesion": 2,
+          "servicio": "Bono 4",
+          "sesiones_totales": 4,
+          "tarifa": 40.0
+        },
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-08-03",
+          "numero_sesion": 3,
+          "servicio": "Bono 4",
+          "sesiones_totales": 4,
+          "tarifa": 40.0
+        }
+      ],
+      "meses": [
+        {
+          "ajuste_horas": 0,
+          "ajuste_importe": 0.0,
+          "anio": 2026,
+          "cuotas": 0,
+          "facturacion_cuotas": 0.0,
+          "facturacion_kids": null,
+          "facturacion_total": 120.0,
+          "horas_totales": 3,
+          "mes": 8,
+          "por_modalidad": {
+            "bono": {
+              "facturacion": 120.0,
+              "horas": 3
+            }
+          },
+          "precio_medio_hora": 40.0,
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ],
+      "semanas": [
+        {
+          "facturacion_kids": null,
+          "facturacion_total": 120.0,
+          "fin": "2026-08-09",
+          "horas_totales": 3,
+          "inicio": "2026-08-03",
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ]
+    },
+    "regla": "Borrar la sesion que cerro un bono deshace tambien su renovacion"
+  },
+  "E29": {
+    "foto": {
+      "cargos_mensuales": [],
+      "ciclos": [
+        {
+          "anio": null,
+          "ciclo": 1,
+          "cliente": "Cliente A renombrado",
+          "cuota_mensual": null,
+          "fecha_fin": null,
+          "fecha_inicio": "2026-08-03",
+          "mes": null,
+          "modalidad": "bono",
+          "pagado": true,
+          "precio_total": null,
+          "servicio": "Bono 8",
+          "sesiones_referencia": null,
+          "sesiones_totales": 8,
+          "tarifa": 45.0
+        }
+      ],
+      "clases_grupo": [],
+      "clientes": [
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A renombrado",
+          "estado": "activo",
+          "pendiente_pago": false,
+          "programa": "Bono 8",
+          "sesiones_completadas": 2
+        }
+      ],
+      "errores": [],
+      "historial": [
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A renombrado",
+          "fecha": "2026-08-03",
+          "numero_sesion": 1,
+          "servicio": "Bono 8",
+          "sesiones_totales": 8,
+          "tarifa": 45.0
+        },
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A renombrado",
+          "fecha": "2026-08-03",
+          "numero_sesion": 2,
+          "servicio": "Bono 8",
+          "sesiones_totales": 8,
+          "tarifa": 45.0
+        }
+      ],
+      "meses": [
+        {
+          "ajuste_horas": 0,
+          "ajuste_importe": 0.0,
+          "anio": 2026,
+          "cuotas": 0,
+          "facturacion_cuotas": 0.0,
+          "facturacion_kids": null,
+          "facturacion_total": 90.0,
+          "horas_totales": 2,
+          "mes": 8,
+          "por_modalidad": {
+            "bono": {
+              "facturacion": 90.0,
+              "horas": 2
+            }
+          },
+          "precio_medio_hora": 45.0,
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ],
+      "semanas": [
+        {
+          "facturacion_kids": null,
+          "facturacion_total": 90.0,
+          "fin": "2026-08-09",
+          "horas_totales": 2,
+          "inicio": "2026-08-03",
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ]
+    },
+    "regla": "Renombrar a un cliente con historial le arrastra sus sesiones y sus servicios"
+  },
+  "E30": {
+    "foto": {
+      "cargos_mensuales": [],
+      "ciclos": [
+        {
+          "anio": null,
+          "ciclo": 1,
+          "cliente": "Cliente B",
+          "cuota_mensual": null,
+          "fecha_fin": null,
+          "fecha_inicio": "2026-08-03",
+          "mes": null,
+          "modalidad": "bono",
+          "pagado": true,
+          "precio_total": null,
+          "servicio": "Bono 8",
+          "sesiones_referencia": null,
+          "sesiones_totales": 8,
+          "tarifa": 45.0
+        }
+      ],
+      "clases_grupo": [],
+      "clientes": [
+        {
+          "ciclo": 1,
+          "cliente": "Cliente B",
+          "estado": "activo",
+          "pendiente_pago": false,
+          "programa": "Bono 8",
+          "sesiones_completadas": 2
+        }
+      ],
+      "errores": [],
+      "historial": [
+        {
+          "ciclo": 1,
+          "cliente": "Cliente B",
+          "fecha": "2026-08-03",
+          "numero_sesion": 1,
+          "servicio": "Bono 8",
+          "sesiones_totales": 8,
+          "tarifa": 45.0
+        },
+        {
+          "ciclo": 1,
+          "cliente": "Cliente B",
+          "fecha": "2026-08-03",
+          "numero_sesion": 2,
+          "servicio": "Bono 8",
+          "sesiones_totales": 8,
+          "tarifa": 45.0
+        }
+      ],
+      "meses": [
+        {
+          "ajuste_horas": 0,
+          "ajuste_importe": 0.0,
+          "anio": 2026,
+          "cuotas": 0,
+          "facturacion_cuotas": 0.0,
+          "facturacion_kids": null,
+          "facturacion_total": 90.0,
+          "horas_totales": 2,
+          "mes": 8,
+          "por_modalidad": {
+            "bono": {
+              "facturacion": 90.0,
+              "horas": 2
+            }
+          },
+          "precio_medio_hora": 45.0,
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ],
+      "semanas": [
+        {
+          "facturacion_kids": null,
+          "facturacion_total": 90.0,
+          "fin": "2026-08-09",
+          "horas_totales": 2,
+          "inicio": "2026-08-03",
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ]
+    },
+    "regla": "Borrar un cliente retira tambien su facturacion: no queda dinero contado sin sesion detras"
+  },
+  "E31": {
+    "foto": {
+      "cargos_mensuales": [],
+      "ciclos": [
+        {
+          "anio": null,
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "cuota_mensual": null,
+          "fecha_fin": null,
+          "fecha_inicio": "2026-08-03",
+          "mes": null,
+          "modalidad": "bono",
+          "pagado": true,
+          "precio_total": null,
+          "servicio": "Bono 10",
+          "sesiones_referencia": null,
+          "sesiones_totales": 10,
+          "tarifa": 50.0
+        }
+      ],
+      "clases_grupo": [],
+      "clientes": [
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "estado": "activo",
+          "pendiente_pago": false,
+          "programa": "Bono 10",
+          "sesiones_completadas": 1
+        }
+      ],
+      "errores": [],
+      "historial": [
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-07-31",
+          "numero_sesion": 2,
+          "servicio": "Bono 10",
+          "sesiones_totales": 10,
+          "tarifa": 50.0
+        },
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-08-03",
+          "numero_sesion": 1,
+          "servicio": "Bono 10",
+          "sesiones_totales": 10,
+          "tarifa": 50.0
+        }
+      ],
+      "meses": [
+        {
+          "ajuste_horas": 0,
+          "ajuste_importe": 0.0,
+          "anio": 2026,
+          "cuotas": 0,
+          "facturacion_cuotas": 0.0,
+          "facturacion_kids": null,
+          "facturacion_total": 50.0,
+          "horas_totales": 1,
+          "mes": 7,
+          "por_modalidad": {
+            "bono": {
+              "facturacion": 50.0,
+              "horas": 1
+            }
+          },
+          "precio_medio_hora": 50.0,
+          "provisional": false,
+          "sesiones_kids": 0
+        },
+        {
+          "ajuste_horas": 0,
+          "ajuste_importe": 0.0,
+          "anio": 2026,
+          "cuotas": 0,
+          "facturacion_cuotas": 0.0,
+          "facturacion_kids": null,
+          "facturacion_total": 50.0,
+          "horas_totales": 1,
+          "mes": 8,
+          "por_modalidad": {
+            "bono": {
+              "facturacion": 50.0,
+              "horas": 1
+            }
+          },
+          "precio_medio_hora": 50.0,
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ],
+      "semanas": [
+        {
+          "facturacion_kids": null,
+          "facturacion_total": 50.0,
+          "fin": "2026-08-02",
+          "horas_totales": 1,
+          "inicio": "2026-07-27",
+          "provisional": false,
+          "sesiones_kids": 0
+        },
+        {
+          "facturacion_kids": null,
+          "facturacion_total": 50.0,
+          "fin": "2026-08-09",
+          "horas_totales": 1,
+          "inicio": "2026-08-03",
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ]
+    },
+    "regla": "Mover una sesion a otra semana traslada su dinero, con su tarifa historica"
+  },
+  "E32": {
+    "foto": {
+      "cargos_mensuales": [
+        {
+          "anio": 2026,
+          "ciclo": 2,
+          "cliente": "Cliente A",
+          "concepto": "mensualidad",
+          "importe": 600.0,
+          "mes": 8,
+          "pagado": false
+        }
+      ],
+      "ciclos": [
+        {
+          "anio": null,
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "cuota_mensual": null,
+          "fecha_fin": "2026-08-03",
+          "fecha_inicio": "2026-08-03",
+          "mes": null,
+          "modalidad": "bono",
+          "pagado": true,
+          "precio_total": null,
+          "servicio": "Bono 8",
+          "sesiones_referencia": null,
+          "sesiones_totales": 8,
+          "tarifa": 45.0
+        },
+        {
+          "anio": 2026,
+          "ciclo": 2,
+          "cliente": "Cliente A",
+          "cuota_mensual": 600.0,
+          "fecha_fin": null,
+          "fecha_inicio": null,
+          "mes": 8,
+          "modalidad": "mensualidad",
+          "pagado": true,
+          "precio_total": null,
+          "servicio": "Mensualidad",
+          "sesiones_referencia": null,
+          "sesiones_totales": 0,
+          "tarifa": null
+        }
+      ],
+      "clases_grupo": [],
+      "clientes": [
+        {
+          "ciclo": 2,
+          "cliente": "Cliente A",
+          "estado": "activo",
+          "pendiente_pago": false,
+          "programa": "Bono 8",
+          "sesiones_completadas": 0
+        }
+      ],
+      "errores": [],
+      "historial": [
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-08-03",
+          "numero_sesion": 1,
+          "servicio": "Bono 8",
+          "sesiones_totales": 8,
+          "tarifa": 45.0
+        },
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-08-03",
+          "numero_sesion": 2,
+          "servicio": "Bono 8",
+          "sesiones_totales": 8,
+          "tarifa": 45.0
+        },
+        {
+          "ciclo": 1,
+          "cliente": "Cliente A",
+          "fecha": "2026-08-03",
+          "numero_sesion": 3,
+          "servicio": "Bono 8",
+          "sesiones_totales": 8,
+          "tarifa": 45.0
+        }
+      ],
+      "meses": [
+        {
+          "ajuste_horas": 0,
+          "ajuste_importe": 0.0,
+          "anio": 2026,
+          "cuotas": 1,
+          "facturacion_cuotas": 600.0,
+          "facturacion_kids": null,
+          "facturacion_total": 735.0,
+          "horas_totales": 3,
+          "mes": 8,
+          "por_modalidad": {
+            "bono": {
+              "facturacion": 135.0,
+              "horas": 3
+            },
+            "mensualidad": {
+              "facturacion": 600.0,
+              "horas": 0
+            }
+          },
+          "precio_medio_hora": 245.0,
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ],
+      "semanas": [
+        {
+          "facturacion_kids": null,
+          "facturacion_total": 135.0,
+          "fin": "2026-08-09",
+          "horas_totales": 3,
+          "inicio": "2026-08-03",
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ]
+    },
+    "regla": "Cambiar de modalidad cierra el servicio anterior y no recalcula su pasado"
+  },
+  "E33": {
+    "foto": {
+      "cargos_mensuales": [
+        {
+          "anio": 2026,
+          "ciclo": 2,
+          "cliente": "Cliente B",
+          "concepto": "mensualidad",
+          "importe": 720.0,
+          "mes": 8,
+          "pagado": false
+        }
+      ],
+      "ciclos": [
+        {
+          "anio": null,
+          "ciclo": 1,
+          "cliente": "Cliente B",
+          "cuota_mensual": null,
+          "fecha_fin": "2026-08-03",
+          "fecha_inicio": null,
+          "mes": null,
+          "modalidad": "bono",
+          "pagado": true,
+          "precio_total": null,
+          "servicio": "Base",
+          "sesiones_referencia": null,
+          "sesiones_totales": 4,
+          "tarifa": 45.0
+        },
+        {
+          "anio": 2026,
+          "ciclo": 2,
+          "cliente": "Cliente B",
+          "cuota_mensual": 720.0,
+          "fecha_fin": null,
+          "fecha_inicio": "2026-08-03",
+          "mes": 8,
+          "modalidad": "mensualidad",
+          "pagado": true,
+          "precio_total": null,
+          "servicio": "Mensualidad",
+          "sesiones_referencia": null,
+          "sesiones_totales": 0,
+          "tarifa": null
+        }
+      ],
+      "clases_grupo": [],
+      "clientes": [
+        {
+          "ciclo": 2,
+          "cliente": "Cliente B",
+          "estado": "activo",
+          "pendiente_pago": false,
+          "programa": "Base",
+          "sesiones_completadas": 0
+        }
+      ],
+      "errores": [],
+      "historial": [
+        {
+          "ciclo": 2,
+          "cliente": "Cliente B",
+          "fecha": "2026-08-03",
+          "numero_sesion": 1,
+          "servicio": "Mensualidad",
+          "sesiones_totales": 0,
+          "tarifa": null
+        },
+        {
+          "ciclo": 2,
+          "cliente": "Cliente B",
+          "fecha": "2026-08-03",
+          "numero_sesion": 2,
+          "servicio": "Mensualidad",
+          "sesiones_totales": 0,
+          "tarifa": null
+        },
+        {
+          "ciclo": 2,
+          "cliente": "Cliente B",
+          "fecha": "2026-08-03",
+          "numero_sesion": 3,
+          "servicio": "Mensualidad",
+          "sesiones_totales": 0,
+          "tarifa": null
+        }
+      ],
+      "meses": [
+        {
+          "ajuste_horas": 0,
+          "ajuste_importe": 0.0,
+          "anio": 2026,
+          "cuotas": 1,
+          "facturacion_cuotas": 720.0,
+          "facturacion_kids": null,
+          "facturacion_total": 720.0,
+          "horas_totales": 3,
+          "mes": 8,
+          "por_modalidad": {
+            "mensualidad": {
+              "facturacion": 720.0,
+              "horas": 3
+            }
+          },
+          "precio_medio_hora": 240.0,
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ],
+      "semanas": [
+        {
+          "facturacion_kids": null,
+          "facturacion_total": 0.0,
+          "fin": "2026-08-09",
+          "horas_totales": 0,
+          "inicio": "2026-08-03",
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ]
+    },
+    "regla": "Hoy, las sesiones de una mensualidad no suman horas en la vista SEMANAL, aunque si en la mensual"
+  },
+  "E34": {
+    "foto": {
+      "cargos_mensuales": [
+        {
+          "anio": 2026,
+          "ciclo": 2,
+          "cliente": "Cliente B",
+          "concepto": "mensualidad",
+          "importe": 720.0,
+          "mes": 8,
+          "pagado": false
+        }
+      ],
+      "ciclos": [
+        {
+          "anio": null,
+          "ciclo": 1,
+          "cliente": "Cliente B",
+          "cuota_mensual": null,
+          "fecha_fin": "2026-08-03",
+          "fecha_inicio": null,
+          "mes": null,
+          "modalidad": "bono",
+          "pagado": true,
+          "precio_total": null,
+          "servicio": "Base",
+          "sesiones_referencia": null,
+          "sesiones_totales": 4,
+          "tarifa": 45.0
+        },
+        {
+          "anio": 2026,
+          "ciclo": 2,
+          "cliente": "Cliente B",
+          "cuota_mensual": 720.0,
+          "fecha_fin": null,
+          "fecha_inicio": null,
+          "mes": 8,
+          "modalidad": "mensualidad",
+          "pagado": true,
+          "precio_total": null,
+          "servicio": "Mensualidad",
+          "sesiones_referencia": null,
+          "sesiones_totales": 0,
+          "tarifa": null
+        }
+      ],
+      "clases_grupo": [],
+      "clientes": [
+        {
+          "ciclo": 2,
+          "cliente": "Cliente B",
+          "estado": "activo",
+          "pendiente_pago": false,
+          "programa": "Base",
+          "sesiones_completadas": 0
+        }
+      ],
+      "errores": [],
+      "historial": [],
+      "meses": [
+        {
+          "ajuste_horas": 0,
+          "ajuste_importe": 0.0,
+          "anio": 2026,
+          "cuotas": 1,
+          "facturacion_cuotas": 720.0,
+          "facturacion_kids": null,
+          "facturacion_total": 720.0,
+          "horas_totales": 0,
+          "mes": 8,
+          "por_modalidad": {
+            "mensualidad": {
+              "facturacion": 720.0,
+              "horas": 0
+            }
+          },
+          "precio_medio_hora": 0.0,
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ],
+      "semanas": []
+    },
+    "regla": "Hoy, el estado de cobro del ciclo y el del cargo del mes pueden contradecirse"
+  },
+  "E34b": {
+    "foto": {
+      "cargos_mensuales": [
+        {
+          "anio": 2026,
+          "ciclo": 2,
+          "cliente": "Cliente B",
+          "concepto": "mensualidad",
+          "importe": 720.0,
+          "mes": 8,
+          "pagado": true
+        }
+      ],
+      "ciclos": [
+        {
+          "anio": null,
+          "ciclo": 1,
+          "cliente": "Cliente B",
+          "cuota_mensual": null,
+          "fecha_fin": "2026-08-03",
+          "fecha_inicio": null,
+          "mes": null,
+          "modalidad": "bono",
+          "pagado": true,
+          "precio_total": null,
+          "servicio": "Base",
+          "sesiones_referencia": null,
+          "sesiones_totales": 4,
+          "tarifa": 45.0
+        },
+        {
+          "anio": 2026,
+          "ciclo": 2,
+          "cliente": "Cliente B",
+          "cuota_mensual": 720.0,
+          "fecha_fin": null,
+          "fecha_inicio": "2026-08-03",
+          "mes": 8,
+          "modalidad": "mensualidad",
+          "pagado": true,
+          "precio_total": null,
+          "servicio": "Mensualidad",
+          "sesiones_referencia": null,
+          "sesiones_totales": 0,
+          "tarifa": null
+        }
+      ],
+      "clases_grupo": [],
+      "clientes": [
+        {
+          "ciclo": 2,
+          "cliente": "Cliente B",
+          "estado": "activo",
+          "pendiente_pago": false,
+          "programa": "Base",
+          "sesiones_completadas": 0
+        }
+      ],
+      "errores": [],
+      "historial": [
+        {
+          "ciclo": 2,
+          "cliente": "Cliente B",
+          "fecha": "2026-08-03",
+          "numero_sesion": 1,
+          "servicio": "Mensualidad",
+          "sesiones_totales": 0,
+          "tarifa": null
+        },
+        {
+          "ciclo": 2,
+          "cliente": "Cliente B",
+          "fecha": "2026-08-03",
+          "numero_sesion": 2,
+          "servicio": "Mensualidad",
+          "sesiones_totales": 0,
+          "tarifa": null
+        }
+      ],
+      "meses": [
+        {
+          "ajuste_horas": 0,
+          "ajuste_importe": 0.0,
+          "anio": 2026,
+          "cuotas": 1,
+          "facturacion_cuotas": 720.0,
+          "facturacion_kids": null,
+          "facturacion_total": 720.0,
+          "horas_totales": 2,
+          "mes": 8,
+          "por_modalidad": {
+            "mensualidad": {
+              "facturacion": 720.0,
+              "horas": 2
+            }
+          },
+          "precio_medio_hora": 360.0,
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ],
+      "semanas": [
+        {
+          "facturacion_kids": null,
+          "facturacion_total": 0.0,
+          "fin": "2026-08-09",
+          "horas_totales": 0,
+          "inicio": "2026-08-03",
+          "provisional": false,
+          "sesiones_kids": 0
+        }
+      ]
+    },
+    "regla": "Marcar el cobro a mano si deja de acuerdo al ciclo, al cargo del mes y a la ficha"
+  }
+}

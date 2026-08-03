@@ -16,8 +16,15 @@
 
 Fernando quiere aprender a construir herramientas que en el futuro puedan
 usar también sus clientes (cada uno viendo su propio perfil). Es un
-objetivo de aprendizaje, no una necesidad urgente del negocio — por eso va
-en su propia rama (`feat/webapp-flask`) y con su propio ritmo.
+objetivo de aprendizaje, no una necesidad urgente del negocio — por eso
+arrancó en su propia rama (`feat/webapp-flask`) y con su propio ritmo.
+
+> **Aviso de estado (2026-08-03):** `feat/webapp-flask` **ya no es la rama
+> vigente**. Se quedó parada el 2026-07-28 y va 42 commits por detrás; todo
+> su contenido está incluido en `feat/modalidades-servicio`, que es la base
+> real del sistema. Ver `docs/MIGRACION_NEXT_DECISIONES.md` (decisión D-01).
+> La rama antigua se conserva intacta, pero no debe usarse como punto de
+> partida para nada.
 
 ## Milestones (de menos a más complejidad)
 

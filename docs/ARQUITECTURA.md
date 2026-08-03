@@ -5,6 +5,44 @@
 
 ## Estado actual
 
+### Migración a Next.js/Supabase/Vercel — Fases 0 a 3 (2026-08-03)
+
+Trabajo en `feat/migracion-next-vercel`, salida de `feat/modalidades-servicio`.
+**La aplicación Flask de PythonAnywhere no se ha tocado en ningún momento** y
+sigue siendo la oficial. Cero líneas modificadas del código de producción.
+
+- **Fase 0**: copia de la base de datos verificada (`integrity_check` correcto,
+  0 claves rotas), rama nueva, `main` y `feat/webapp-flask` intactas.
+- **Fase 1**: `docs/MIGRACION_NEXT_AUDITORIA.md` — inventario de las 40 rutas,
+  13 tablas y las reglas de negocio, con 12 riesgos.
+- **Fase 2**: `docs/MIGRACION_NEXT_EQUIVALENCIA.md` — la matriz que hace de
+  contrato: qué hace cada regla hoy, qué prueba lo demuestra y en qué estado está.
+- **Fase 3**: **94 pruebas nuevas** (de 245 a **339**), en dos piezas:
+  - `tests/fixtures/escenarios.json` — 38 escenarios descritos como **datos**,
+    no como código, para que Python y la futura versión TypeScript ejecuten
+    exactamente lo mismo. Los resultados esperados están **calculados a mano**
+    desde las reglas de negocio, nunca capturados de la salida del sistema.
+  - `tests/test_equivalencia_reglas.py` — 50 pruebas para lo que no cabe en un
+    archivo de datos: autenticación, aislamiento del enlace público, las cuatro
+    capas anti-duplicado (incluida la de dos hilos firmando a la vez),
+    atomicidad ante un fallo provocado, y precisión de los importes.
+
+**Corrección de partida importante:** el encargo señalaba `feat/webapp-flask`
+como fuente de verdad y estaba **42 commits por detrás**. Ver decisión D-01 en
+`docs/MIGRACION_NEXT_DECISIONES.md`.
+
+**Dos hallazgos abiertos**, fijados como escenarios pero **sin corregir**, porque
+cambian cifras que Fernando ya está mirando y la decisión es suya:
+
+1. Las sesiones de una **mensualidad no suman horas en la vista semanal** (sí en
+   la mensual): el precio medio por hora de la semana sale inflado (`E33`).
+2. El ciclo de una mensualidad puede decir **«pagada» mientras su cuota del mes
+   dice «sin cobrar»** (`E34`).
+
+Rendimiento sin cambios: 106,7 KB en la primera visita, 0 elementos desenfocados
+al hacer scroll, 3-4 conexiones por pantalla.
+
+
 - Paso 1 construido: resumen semanal de sesiones vía skill `resumen-semanal`.
   Solo lectura, no escribe todavía en ningún sitio.
 - Paso 2 construido: lógica de descuento/renovación de programas
