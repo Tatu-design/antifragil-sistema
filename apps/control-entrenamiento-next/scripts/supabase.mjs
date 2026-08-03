@@ -127,6 +127,12 @@ async function migrar(cliente) {
       aplicada  timestamptz not null default now()
     )`);
 
+  // Con protección de filas y SIN ninguna política: nadie puede leerla desde
+  // la aplicación. Este script entra por conexión directa como dueño de la
+  // base de datos, así que a él no le afecta.
+  // Se hace aquí y no en una migración porque la tabla la crea este script.
+  await cliente.query("alter table public.migraciones enable row level security");
+
   const yaAplicadas = new Set(
     (await cliente.query("select nombre from public.migraciones")).rows.map((f) => f.nombre),
   );

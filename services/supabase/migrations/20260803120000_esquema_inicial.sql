@@ -186,7 +186,12 @@ create table public.sesiones (
 -- que quitarlo reconstruyendo la tabla.
 create index sesiones_cliente_fecha on public.sesiones (cliente_id, fecha desc, id desc);
 create index sesiones_por_ciclo on public.sesiones (cliente_id, ciclo);
-create index sesiones_por_mes on public.sesiones (date_trunc('month', fecha));
+-- Índice liso sobre la fecha, no sobre `date_trunc('month', fecha)`.
+-- PostgreSQL rechaza lo segundo porque esa función depende de la zona horaria
+-- configurada y por tanto no puede indexarse. Y además sobra: la economía
+-- mensual se consulta por rango (`fecha >= '2026-08-01' and fecha < '2026-09-01'`),
+-- que este índice resuelve igual de bien.
+create index sesiones_por_fecha on public.sesiones (fecha);
 
 comment on column public.sesiones.tarifa is
   'null = hora trabajada sin importe (mensualidad). Distinto de 0 €.';
