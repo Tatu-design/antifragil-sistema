@@ -25,7 +25,7 @@
     </div>
 
     <div class="perfil-hero">
-      <div class="programa-nombre">{{ cliente.tipo_programa }}</div>
+      <div class="programa-nombre">{{ resumen.nombre_servicio or cliente.tipo_programa }}</div>
 
       {% if resumen.modalidad == 'bono' %}
       {% if cliente.sesiones_totales %}
@@ -45,15 +45,15 @@
       {# Sin barra ni "te quedan": no hay nada que agotar. #}
       <div class="perfil-progreso">
         <div class="perfil-progreso-numeros">
-          <span class="grande">{{ resumen.sesiones_reales }}</span>
+          <span class="grande">{{ resumen.sesiones_hechas }}</span>
           <span class="de">
-            {{ 'sesión' if resumen.sesiones_reales == 1 else 'sesiones' }}
-            {%- if cliente.mes %} en {{ cliente.mes|mes_es|lower }}{% else %} este mes{% endif %}
+            {{ 'sesión' if resumen.sesiones_hechas == 1 else 'sesiones' }}
+            {%- if resumen.mes %} en {{ resumen.mes|mes_es|lower }}{% else %} este mes{% endif %}
           </span>
         </div>
       </div>
       <dl class="datos-servicio">
-        <div><dt>Cuota del mes</dt><dd>{{ resumen.facturacion|euros }}</dd></div>
+        <div><dt>Cuota del mes</dt><dd>{{ resumen.cuota_mensual|euros }}</dd></div>
         {% if resumen.sesiones_referencia %}
         <div><dt>Previstas</dt><dd>{{ resumen.sesiones_referencia }}</dd></div>
         {% endif %}
@@ -62,16 +62,16 @@
       {% elif resumen.modalidad == 'cuenta' %}
       <div class="perfil-progreso">
         <div class="perfil-progreso-numeros">
-          <span class="grande">{{ resumen.sesiones_reales }}</span>
+          <span class="grande">{{ resumen.sesiones_hechas }}</span>
           <span class="de">
-            {{ 'sesión' if resumen.sesiones_reales == 1 else 'sesiones' }}
-            {%- if cliente.mes %} en {{ cliente.mes|mes_es|lower }}{% else %} este mes{% endif %}
+            {{ 'sesión' if resumen.sesiones_hechas == 1 else 'sesiones' }}
+            {%- if resumen.mes %} en {{ resumen.mes|mes_es|lower }}{% else %} este mes{% endif %}
           </span>
         </div>
       </div>
       <dl class="datos-servicio">
-        <div><dt>Precio por sesión</dt><dd>{{ cliente.tarifa|euros }}</dd></div>
-        <div><dt>Total</dt><dd class="acumulado">{{ resumen.facturacion|euros }}</dd></div>
+        <div><dt>Precio por sesión</dt><dd>{{ resumen.tarifa|euros }}</dd></div>
+        <div><dt>Total del mes</dt><dd class="acumulado">{{ resumen.facturacion|euros }}</dd></div>
       </dl>
       {% endif %}
 

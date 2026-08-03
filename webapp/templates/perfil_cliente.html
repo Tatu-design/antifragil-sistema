@@ -21,8 +21,8 @@
        subtítulo que ocupe espacio. #}
     <div class="ficha-titulo">
       <h1>{{ nombre }}</h1>
-      <a class="pill estado-{{ cliente.estado }}" href="{{ url_for('editar_datos', nombre=nombre) }}">
-        {{ cliente.estado|capitalize }}
+      <a class="pill estado-{{ ficha.estado }}" href="{{ url_for('editar_datos', nombre=nombre) }}">
+        {{ ficha.estado|capitalize }}
       </a>
     </div>
 
@@ -34,94 +34,116 @@
     <div class="aviso-guardado">✔ Sesión borrada — {{ borrado }}</div>
     {% endif %}
 
-    {% if not puede_firmar %}
+    {% if ficha.estado != 'activo' %}
     <div class="aviso-texto">
-      {% if cliente.estado == 'pausado' %}
+      {% if ficha.estado == 'pausado' %}
       Este cliente está <strong>pausado</strong>: no se pueden firmar sesiones mientras lo esté.
       {% else %}
       Este cliente está <strong>cancelado</strong>: no se pueden firmar sesiones.
       {% endif %}
-      Su bono y su historial se conservan intactos. Puedes reactivarlo en «Editar datos».
+      Su servicio y su historial se conservan intactos. Puedes reactivarlo en «Editar datos».
+    </div>
+    {% elif not ficha.completo %}
+    {# Falta algún dato obligatorio de su modalidad. Se dice cuál, en vez de
+       dejar una pantalla muda sin botón. #}
+    <div class="aviso-texto">
+      No se pueden firmar sesiones todavía: a este servicio le falta
+      <strong>{{ ficha.faltan|join(' y ') }}</strong>.
+      Rellénalo en «Editar programa».
     </div>
     {% endif %}
 
-    {# ---- Servicio en curso. Cambia de forma según la modalidad: un bono se
-       consume, una mensualidad y una cuenta no. ---- #}
+    {# ---- Servicio en curso. Todo sale de `ficha`, que se construye desde el
+       ciclo en curso: la plantilla no decide nada ni mezcla dos fuentes. ---- #}
     <div class="perfil-hero">
       <div class="programa-nombre">
-        {{ cliente.tipo_programa or "sin programa asignado" }}
-        {% if resumen.modalidad != 'bono' %}
-        <span class="etiqueta-modalidad">{{ resumen.etiqueta }}</span>
+        {{ ficha.nombre_servicio or "sin servicio asignado" }}
+        {% if ficha.modalidad != 'bono' %}
+        <span class="etiqueta-modalidad">{{ ficha.etiqueta }}</span>
         {% endif %}
       </div>
 
-      {% if resumen.modalidad == 'bono' %}
-      {% if cliente.sesiones_totales %}
+      {% if ficha.modalidad == 'bono' %}
+      {% if ficha.sesiones_totales %}
       <div class="perfil-progreso">
         <div class="perfil-progreso-numeros">
-          <span class="grande">{{ cliente.sesiones_completadas }}</span>
-          <span class="de">de {{ cliente.sesiones_totales }} sesiones</span>
+          <span class="grande">{{ ficha.sesiones_hechas }}</span>
+          <span class="de">de {{ ficha.sesiones_totales }} sesiones</span>
         </div>
         <div class="perfil-progreso-barra">
-          <span style="width: {{ (cliente.sesiones_completadas / cliente.sesiones_totales * 100) | round(0, 'floor') }}%;"></span>
+          <span style="width: {{ ficha.porcentaje }}%;"></span>
         </div>
-        <div class="perfil-progreso-restantes">Quedan {{ cliente.sesiones_restantes }}</div>
+        <div class="perfil-progreso-restantes">Quedan {{ ficha.sesiones_restantes }}</div>
       </div>
-      <dl class="datos-servicio">
-        {% if cliente.precio_total %}<div><dt>Precio del bono</dt><dd>{{ cliente.precio_total|euros }}</dd></div>{% endif %}
-        {% if cliente.tarifa %}<div><dt>Por sesión</dt><dd>{{ cliente.tarifa|euros }}</dd></div>{% endif %}
-      </dl>
       {% endif %}
+      <dl class="datos-servicio">
+        {% if ficha.precio_total %}<div><dt>Precio del bono</dt><dd>{{ ficha.precio_total|euros }}</dd></div>{% endif %}
+        {% if ficha.tarifa %}<div><dt>Por sesión</dt><dd>{{ ficha.tarifa|euros }}</dd></div>{% endif %}
+      </dl>
 
-      {% elif resumen.modalidad == 'mensualidad' %}
+      {% elif ficha.modalidad == 'mensualidad' %}
       {# Sin barra ni sesiones restantes: no hay nada que agotar. #}
       <div class="perfil-progreso">
         <div class="perfil-progreso-numeros">
-          <span class="grande">{{ resumen.sesiones_reales }}</span>
+          <span class="grande">{{ ficha.sesiones_hechas }}</span>
           <span class="de">
-            {{ 'sesión' if resumen.sesiones_reales == 1 else 'sesiones' }} este mes
-            {%- if resumen.sesiones_referencia %} · {{ resumen.sesiones_referencia }} de referencia{% endif %}
+            {{ 'sesión' if ficha.sesiones_hechas == 1 else 'sesiones' }} este mes
+            {%- if ficha.sesiones_referencia %} · {{ ficha.sesiones_referencia }} de referencia{% endif %}
           </span>
         </div>
       </div>
       <dl class="datos-servicio">
-        <div><dt>Cuota del mes</dt><dd>{{ resumen.facturacion|euros }}</dd></div>
+        <div><dt>Cuota del mes</dt><dd>{{ ficha.cuota_mensual|euros }}</dd></div>
         <div>
           <dt>Sale a</dt>
-          <dd>{% if resumen.precio_efectivo %}{{ resumen.precio_efectivo|euros }}/h{% else %}—{% endif %}</dd>
+          <dd>{% if ficha.precio_efectivo %}{{ ficha.precio_efectivo|euros }}/h{% else %}—{% endif %}</dd>
         </div>
-        {% if cliente.mes %}<div><dt>Periodo</dt><dd>{{ cliente.mes|mes_es }} {{ cliente.anio }}</dd></div>{% endif %}
+        {% if ficha.mes %}<div><dt>Periodo</dt><dd>{{ ficha.mes|mes_es }} {{ ficha.anio }}</dd></div>{% endif %}
       </dl>
 
-      {% elif resumen.modalidad == 'cuenta' %}
+      {% elif ficha.modalidad == 'cuenta' %}
       <div class="perfil-progreso">
         <div class="perfil-progreso-numeros">
-          <span class="grande">{{ resumen.sesiones_reales }}</span>
-          <span class="de">{{ 'sesión' if resumen.sesiones_reales == 1 else 'sesiones' }} este mes</span>
+          <span class="grande">{{ ficha.sesiones_hechas }}</span>
+          <span class="de">{{ 'sesión' if ficha.sesiones_hechas == 1 else 'sesiones' }} este mes</span>
         </div>
       </div>
       <dl class="datos-servicio">
-        <div><dt>Precio por hora</dt><dd>{{ cliente.tarifa|euros }}</dd></div>
-        <div><dt>Acumulado</dt><dd class="acumulado">{{ resumen.facturacion|euros }}</dd></div>
-        {% if cliente.mes %}<div><dt>Periodo</dt><dd>{{ cliente.mes|mes_es }} {{ cliente.anio }}</dd></div>{% endif %}
+        <div><dt>Precio por sesión</dt><dd>{{ ficha.tarifa|euros }}</dd></div>
+        <div>
+          <dt>Total del mes</dt>
+          <dd class="acumulado">{{ ficha.facturacion|euros }}</dd>
+        </div>
+        {% if ficha.mes %}<div><dt>Periodo</dt><dd>{{ ficha.mes|mes_es }} {{ ficha.anio }}</dd></div>{% endif %}
       </dl>
+      {# El cálculo a la vista, para que el total no haya que creérselo. #}
+      <p class="meta calculo-total">
+        {{ ficha.sesiones_hechas }} {{ 'sesión' if ficha.sesiones_hechas == 1 else 'sesiones' }}
+        × {{ ficha.tarifa|euros }} = {{ ficha.facturacion|euros }}
+      </p>
+      <p class="meta">Es lo producido este periodo, no necesariamente lo ya cobrado.</p>
       {% endif %}
 
       {# El pago se cambia desde aquí mismo, con una confirmación previa. Solo
-         toca el estado de pago: no altera sesiones ni economía. #}
+         toca el estado de COBRO: no altera sesiones, horas, historial ni
+         economía, ni hacia adelante ni hacia atrás. #}
       <form method="post" action="{{ url_for('cambiar_pago', nombre=nombre) }}" class="estado"
-            onsubmit="return confirm({{ ('¿Volver a marcar este programa como pendiente?' if not cliente.pendiente_pago else '¿Marcar este programa como pagado?')|tojson }});">
+            onsubmit="return confirm({{ (('¿Volver a marcar %s como pendiente de cobro?' % ficha.etiqueta|lower) if not ficha.pendiente_pago else ('¿Marcar %s como cobrada?' % ficha.etiqueta|lower))|tojson }});">
         <input type="hidden" name="csrf" value="{{ token_csrf() }}">
-        <input type="hidden" name="pagado" value="{{ 'no' if not cliente.pendiente_pago else 'si' }}">
-        <button type="submit" class="pill {{ 'pendiente' if cliente.pendiente_pago else 'aldia' }} pill-boton">
-          {{ 'Pago pendiente' if cliente.pendiente_pago else 'Programa pagado' }}
+        <input type="hidden" name="pagado" value="{{ 'no' if not ficha.pendiente_pago else 'si' }}">
+        <button type="submit" class="pill {{ 'pendiente' if ficha.pendiente_pago else 'aldia' }} pill-boton">
+          {{ ficha.etiqueta_pago }}
           <svg class="icono icono-sm" aria-hidden="true"><use href="#i-chevron-right"></use></svg>
         </button>
       </form>
     </div>
 
-    {# ---- Acción principal ---- #}
-    {% if cliente.sesiones_totales and puede_firmar %}
+    {# ---- Acción principal ----
+       Depende de `ficha.puede_firmar`, que mira el estado del cliente y los
+       datos que SU modalidad necesita. Antes dependía de `sesiones_totales`,
+       que vale 0 en mensualidad y cuenta: el botón desaparecía justo en las
+       dos modalidades nuevas (encontrado por Fernando, 2026-08-04). #}
+    {% if puede_firmar %}
     <form method="post" action="{{ url_for('firmar_sesion', nombre=nombre) }}" class="accion-principal"
           onsubmit="this.querySelector('button').disabled = true; this.querySelector('button').textContent = 'Guardando…';">
       <input type="hidden" name="csrf" value="{{ token_csrf() }}">

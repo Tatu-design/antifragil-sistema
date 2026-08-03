@@ -736,6 +736,16 @@ class TestSeguridadWeb(unittest.TestCase):
         self._original_leer = app_module.leer_clientes
         self._original_historial = app_module.obtener_historial
         self._original_firmar = app_module.registrar_sesion_pt
+        # Desde el 2026-08-04 la ruta de firmar comprueba también el ciclo
+        # del cliente: sin redirigirla, leería la base de datos REAL.
+        self._original_ciclo = app_module.obtener_ciclo_actual
+        self._original_ciclos = app_module.obtener_programas_cliente
+        app_module.obtener_ciclo_actual = lambda nombre, conexion=None, ruta=self.ruta: (
+            cr.obtener_ciclo_actual(nombre, ruta=self.ruta)
+        )
+        app_module.obtener_programas_cliente = lambda nombre, ruta=self.ruta: (
+            cr.obtener_programas_cliente(nombre, ruta=self.ruta)
+        )
         app_module.leer_clientes = lambda ruta=self.ruta: cr.leer_clientes(self.ruta)
         app_module.obtener_historial = lambda nombre, ruta=self.ruta: cr.obtener_historial(nombre, ruta=self.ruta)
         app_module.registrar_sesion_pt = lambda nombre, clave_idempotencia=None, ruta=self.ruta: (
@@ -749,6 +759,8 @@ class TestSeguridadWeb(unittest.TestCase):
         self.app_module.leer_clientes = self._original_leer
         self.app_module.obtener_historial = self._original_historial
         self.app_module.registrar_sesion_pt = self._original_firmar
+        self.app_module.obtener_ciclo_actual = self._original_ciclo
+        self.app_module.obtener_programas_cliente = self._original_ciclos
         _borrar(self.ruta)
 
     def test_un_post_sin_token_csrf_se_rechaza(self):

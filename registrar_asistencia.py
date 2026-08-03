@@ -228,6 +228,9 @@ def registrar_sesion_pt(
                     "renovado": False,
                     "aviso_ultima_sesion": False,
                     "duplicado": True,
+                    "modalidad": modalidad,
+                    "anio": fecha.year,
+                    "mes": fecha.month,
                 }
             conexion.execute(
                 "INSERT INTO firmas_idempotencia (clave, creado) VALUES (?, ?)",
@@ -313,6 +316,12 @@ def registrar_sesion_pt(
         "sesiones_totales": programa["sesiones_totales"],
         "renovado": paso.renovado,
         "aviso_ultima_sesion": paso.aviso_ultima_sesion,
+        # Añadido el 2026-08-04 para que quien avise por pantalla sepa qué
+        # decir: "sesión 3 de 5" solo vale para un bono. Las claves de
+        # arriba no cambian, así que nada de lo que ya llamaba se rompe.
+        "modalidad": modalidad,
+        "anio": fecha.year,
+        "mes": fecha.month,
     }
 
 

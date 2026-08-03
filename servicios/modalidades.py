@@ -189,6 +189,150 @@ def precio_efectivo(facturacion: float | None, sesiones: int | None) -> float | 
     return round(facturacion / sesiones, 2)
 
 
+ETIQUETAS_PAGO = {
+    BONO: ("Bono pagado", "Pago pendiente"),
+    MENSUALIDAD: ("Mensualidad pagada", "Pago pendiente"),
+    CUENTA: ("Cuenta pagada", "Pendiente de pago"),
+}
+
+
+def datos_que_faltan(ciclo: dict) -> list[str]:
+    """Qué le falta a un servicio para poder funcionar, en lenguaje llano.
+
+    Devuelve una lista vacía si está completo. Se usa para decidir si se
+    puede firmar y, cuando no, para decir exactamente qué hay que rellenar
+    en vez de dejar una pantalla muda."""
+    modalidad = ciclo.get("modalidad") or MODALIDAD_POR_DEFECTO
+    validar_modalidad(modalidad)
+    faltan: list[str] = []
+
+    if modalidad == BONO:
+        if not ciclo.get("sesiones_totales"):
+            faltan.append("el número de sesiones del bono")
+        if not ciclo.get("tarifa") and not ciclo.get("precio_total"):
+            faltan.append("el precio del bono")
+    elif modalidad == MENSUALIDAD:
+        if not ciclo.get("cuota_mensual"):
+            faltan.append("la cuota mensual")
+    else:
+        if not ciclo.get("tarifa"):
+            faltan.append("el precio por sesión")
+
+    return faltan
+
+
+def puede_firmarse(ciclo: dict | None, estado: str) -> bool:
+    """¿Se puede firmar una sesión de este cliente ahora mismo?
+
+    Tres condiciones, y ninguna es "tener sesiones_totales" — ese era
+    justamente el error: una mensualidad y una cuenta valen 0 ahí porque no
+    consumen saldo, así que el botón desaparecía para las dos modalidades
+    nuevas (encontrado por Fernando, 2026-08-04).
+
+    1. El cliente está activo.
+    2. Tiene un ciclo en curso.
+    3. Ese ciclo tiene completos los datos que SU modalidad necesita.
+    """
+    if estado != "activo":
+        return False
+    if not ciclo or ciclo.get("ciclo_bono") is None:
+        return False
+    return not datos_que_faltan(ciclo)
+
+
+def etiqueta_pago(modalidad: str, pendiente: bool) -> str:
+    """Cómo se llama el estado de cobro en cada modalidad. Un bono no es una
+    mensualidad: llamar "Programa pagado" a todo confundía."""
+    validar_modalidad(modalidad)
+    pagado, debe = ETIQUETAS_PAGO[modalidad]
+    return debe if pendiente else pagado
+
+
+def ficha_servicio(
+    ciclo: dict | None,
+    *,
+    sesiones_del_ciclo: int,
+    sesiones_completadas: int | None = None,
+    estado: str = "activo",
+    pendiente_pago: bool = False,
+) -> dict:
+    """TODO lo que la ficha del cliente necesita enseñar, en una sola
+    estructura construida desde el CICLO EN CURSO (2026-08-04).
+
+    Antes la plantilla mezclaba dos fuentes —los campos heredados de
+    `clientes` y el ciclo— y podían contradecirse: el formulario guardaba
+    bien el ciclo y la pantalla seguía leyendo lo viejo. Ahora la plantilla
+    no decide nada ni consulta nada: pinta lo que hay aquí.
+
+    `sesiones_del_ciclo`: sesiones realmente firmadas en el ciclo en curso.
+    `sesiones_completadas`: el contador del bono, que Fernando puede
+    corregir a mano (p. ej. un cliente que ya venía con 5 hechas). Solo
+    tiene sentido en un bono, y es el que manda ahí, porque es el que decide
+    la renovación al firmar — si la ficha enseñara otro número, diría una
+    cosa y pasaría otra.
+    """
+    ciclo = ciclo or {}
+    modalidad = ciclo.get("modalidad") or MODALIDAD_POR_DEFECTO
+    validar_modalidad(modalidad)
+
+    faltan = datos_que_faltan(ciclo) if ciclo.get("ciclo_bono") is not None else ["el servicio del cliente"]
+    hechas = sesiones_completadas if (modalidad == BONO and sesiones_completadas is not None) else sesiones_del_ciclo
+
+    ficha = {
+        "modalidad": modalidad,
+        "etiqueta": ETIQUETAS[modalidad],
+        "nombre_servicio": ciclo.get("tipo_programa"),
+        "ciclo": ciclo.get("ciclo_bono"),
+        "anio": ciclo.get("anio"),
+        "mes": ciclo.get("mes"),
+        "tarifa": ciclo.get("tarifa"),
+        "precio_total": ciclo.get("precio_total"),
+        "cuota_mensual": ciclo.get("cuota_mensual"),
+        "sesiones_referencia": ciclo.get("sesiones_referencia"),
+        "sesiones_hechas": hechas,
+        "pendiente_pago": bool(pendiente_pago),
+        "etiqueta_pago": etiqueta_pago(modalidad, bool(pendiente_pago)),
+        "estado": estado,
+        "faltan": faltan,
+        "completo": not faltan,
+        "puede_firmar": puede_firmarse(ciclo, estado),
+    }
+
+    if modalidad == BONO:
+        totales = ciclo.get("sesiones_totales") or 0
+        ficha.update({
+            "sesiones_totales": totales or None,
+            "sesiones_restantes": max(totales - hechas, 0) if totales else None,
+            "muestra_barra": bool(totales),
+            "porcentaje": min(int(hechas / totales * 100), 100) if totales else 0,
+            "facturacion": round((ciclo.get("tarifa") or 0) * hechas, 2),
+            "precio_efectivo": ciclo.get("tarifa"),
+        })
+    elif modalidad == MENSUALIDAD:
+        cuota = ciclo.get("cuota_mensual")
+        ficha.update({
+            # Sin tope: no hay sesiones restantes ni barra que llenar.
+            "sesiones_totales": None,
+            "sesiones_restantes": None,
+            "muestra_barra": False,
+            "porcentaje": None,
+            "facturacion": cuota,
+            "precio_efectivo": precio_efectivo(cuota, hechas),
+        })
+    else:
+        tarifa = ciclo.get("tarifa") or 0
+        ficha.update({
+            "sesiones_totales": None,
+            "sesiones_restantes": None,
+            "muestra_barra": False,
+            "porcentaje": None,
+            "facturacion": round(tarifa * hechas, 2),
+            "precio_efectivo": ciclo.get("tarifa"),
+        })
+
+    return ficha
+
+
 def resumen_ciclo(ciclo: dict, sesiones_reales: int) -> dict:
     """Traduce un ciclo guardado a lo que hay que enseñar en pantalla,
     según su modalidad. Devuelve siempre las mismas claves para que la

@@ -22,6 +22,75 @@
   cuenta en sesiones pero su importe se reparte hacia atrás sobre las
   semanas del mes en cuanto Fernando indica la facturación mensual total.
 
+### Corrección de la ficha: una sola fuente para la pantalla (2026-08-04)
+
+Fernando probó las tres modalidades y encontró un fallo que ninguna de las
+198 pruebas había detectado: **el botón «Firmar sesión» no aparecía en
+mensualidad ni en cuenta de cliente**. Se podían configurar, pero no usar.
+
+**La causa exacta.** La plantilla decidía así:
+
+```
+{% if cliente.sesiones_totales and puede_firmar %}
+```
+
+`sesiones_totales` vale 0 en mensualidad y en cuenta, precisamente porque no
+consumen saldo — 0 es falso en una condición, así que el bloque entero
+desaparecía. Y `puede_firmar` solo miraba el estado del cliente, no si su
+servicio estaba completo.
+
+**La causa de fondo era peor:** la ficha leía de DOS sitios a la vez, los
+campos heredados de `clientes` y el ciclo en curso, y podían contradecirse.
+El formulario guardaba correctamente el ciclo mientras la pantalla seguía
+enseñando lo viejo.
+
+**La corrección: `ficha_servicio()`.** Una única estructura de presentación,
+construida desde el ciclo en curso, con todo lo que la pantalla necesita ya
+resuelto — sesiones hechas y totales, restantes, barra y porcentaje, precios,
+cuota, facturación, precio efectivo, periodo, etiqueta de pago, qué datos
+faltan y si se puede firmar. La plantilla ya no decide nada ni consulta dos
+fuentes: pinta lo que hay ahí. La usan la ficha de Fernando y el perfil
+público del cliente, así que las dos pantallas no pueden discrepar.
+
+**La regla nueva para firmar** (`puede_firmarse`), en la interfaz y en la
+ruta POST, son tres condiciones y ninguna es "tener sesiones_totales":
+
+1. El cliente está activo.
+2. Tiene un ciclo en curso.
+3. Ese ciclo tiene completos los datos que SU modalidad necesita — un bono,
+   sesiones y precio; una mensualidad, cuota; una cuenta, precio por sesión.
+
+Cuando falta algo, no se deja una pantalla muda: se dice qué falta
+(«le falta la cuota mensual») y se enlaza a «Editar programa». El servidor
+responde 409 con el mismo mensaje si alguien llama a la ruta a mano.
+
+**Textos corregidos**, que decían cosas objetivamente falsas:
+
+| Antes | Ahora |
+|---|---|
+| «sesión 3 de 0» en mensualidad y cuenta | «sesión 3 de agosto registrada» |
+| «Acumulado» | «Total del mes» + el cálculo «3 sesiones × 35,00 € = 105,00 €» |
+| «Programa pagado» para todo | «Bono pagado» / «Mensualidad pagada» / «Cuenta pagada» |
+| «Su bono y su historial se conservan» | «Su servicio y su historial se conservan» |
+
+Bajo «Total del mes» se aclara además que es lo **producido** en el periodo,
+no necesariamente lo ya cobrado — era la duda concreta de Fernando.
+
+**El pago ya no puede contradecirse.** `marcar_pago_del_ciclo` escribe el
+estado de cobro en los tres sitios a la vez y en una sola transacción: la
+ficha del cliente, su ciclo en curso y, si es una mensualidad, su cargo del
+mes. Sigue sin tocar sesiones, horas, historial, facturación ni precio medio.
+
+**Pruebas nuevas: `tests/test_ficha_interfaz.py`** (28). Piden la página y
+comprueban el HTML real, no lo que devuelven las funciones — que es
+exactamente lo que se le escapó a la tanda anterior. Cubren la presencia y
+la ausencia del botón en las tres modalidades y en los tres estados, el
+bloqueo por el servidor, los mensajes tras firmar, los textos de cada
+tarjeta, que la pantalla refleje al momento un cambio de condiciones o de
+modalidad, y los tres ejemplos económicos del encargo.
+
+**226 pruebas en verde.**
+
 ### Tres modalidades de servicio: bono, mensualidad y cuenta (2026-08-03)
 
 Hasta ahora todos los clientes funcionaban igual: un bono de N sesiones que

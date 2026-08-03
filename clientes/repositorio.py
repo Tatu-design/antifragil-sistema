@@ -997,6 +997,48 @@ def registrar_programa_cliente(
             _hacer(conexion)
 
 
+def marcar_pago_del_ciclo(
+    cliente: str, pagado: bool, ruta: Path = RUTA_POR_DEFECTO
+) -> None:
+    """Cambia el estado de COBRO del servicio en curso, y nada más.
+
+    No toca sesiones, ni historial, ni economía, ni el precio medio: cobrar
+    o no cobrar no cambia lo que ya se ha producido ni las horas que ya se
+    han trabajado.
+
+    Escribe en los DOS sitios a la vez —la ficha del cliente y su ciclo en
+    curso— dentro de una misma transacción, para que no puedan contradecirse
+    (2026-08-04). Si solo se actualizara uno, la pantalla podría enseñar
+    "pagado" mientras el ciclo guardado dice lo contrario."""
+    with conectar(ruta) as conexion:
+        conexion.execute("BEGIN")
+        try:
+            fila = conexion.execute(
+                "SELECT ciclo_bono FROM clientes WHERE nombre = ?", (cliente,)
+            ).fetchone()
+            if fila is None:
+                raise ValueError(f"No existe el cliente '{cliente}'")
+
+            conexion.execute(
+                "UPDATE clientes SET pendiente_pago = ? WHERE nombre = ?",
+                (int(not pagado), cliente),
+            )
+            conexion.execute(
+                "UPDATE programas_cliente SET pagado = ? WHERE cliente = ? AND ciclo_bono = ?",
+                (int(pagado), cliente, fila["ciclo_bono"]),
+            )
+            # Si es una mensualidad, su cuota del mes también queda marcada:
+            # es el cargo concreto que se cobra o se debe.
+            conexion.execute(
+                "UPDATE cargos_mensuales SET pagado = ? WHERE cliente = ? AND ciclo = ?",
+                (int(pagado), cliente, fila["ciclo_bono"]),
+            )
+            conexion.commit()
+        except Exception:
+            conexion.rollback()
+            raise
+
+
 def configurar_servicio(
     cliente: str,
     modalidad: str,

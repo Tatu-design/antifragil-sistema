@@ -51,6 +51,7 @@ from clientes.repositorio import (
     crear_cliente,
     leer_clientes,
     listar_tipos_programa,
+    marcar_pago_del_ciclo,
     obtener_ciclo_actual,
     obtener_cliente_por_token,
     obtener_historial,
@@ -62,6 +63,9 @@ from servicios.modalidades import (
     ETIQUETAS as ETIQUETAS_MODALIDAD,
     MODALIDAD_POR_DEFECTO,
     MODALIDADES,
+    datos_que_faltan,
+    ficha_servicio,
+    puede_firmarse,
     resumen_ciclo,
     validar_condiciones,
 )
@@ -448,6 +452,20 @@ def firmar_sesion(nombre):
         )
         return render_template("error.html", mensaje=motivo), 409
 
+    # La misma regla que decide si se enseña el botón se comprueba AQUÍ, en
+    # el servidor: esconder un botón no impide llamar a la ruta a mano, y
+    # esta operación escribe historial y mueve dinero.
+    ciclo = obtener_ciclo_actual(nombre)
+    if not puede_firmarse(ciclo, estado):
+        faltan = datos_que_faltan(ciclo) if ciclo else ["el servicio del cliente"]
+        return render_template(
+            "error.html",
+            mensaje=(
+                f"A '{nombre}' le falta {' y '.join(faltan)} — rellénalo en «Editar programa» "
+                f"antes de firmar sesiones."
+            ),
+        ), 409
+
     clave_idempotencia = request.form.get("clave_idempotencia")
     try:
         resultado = registrar_sesion_pt(nombre, clave_idempotencia=clave_idempotencia)
@@ -459,9 +477,18 @@ def firmar_sesion(nombre):
     except ValueError as error:
         return render_template("error.html", mensaje=str(error)), 400
 
-    mensaje = f"sesión {resultado['numero_sesion']} de {resultado['sesiones_totales']}"
-    if resultado["renovado"]:
-        mensaje += " — ¡bono renovado!"
+    # "sesión 3 de 5" solo tiene sentido en un bono. Una mensualidad o una
+    # cuenta no tienen tope, y decir "sesión 3 de 0" era absurdo.
+    if resultado.get("modalidad") == BONO and resultado.get("sesiones_totales"):
+        mensaje = f"sesión {resultado['numero_sesion']} de {resultado['sesiones_totales']}"
+        if resultado["renovado"]:
+            mensaje += " — ¡bono renovado!"
+    else:
+        periodo = MESES_ES.get(resultado.get("mes") or 0, "").lower()
+        mensaje = f"sesión {resultado['numero_sesion']}"
+        if periodo:
+            mensaje += f" de {periodo}"
+        mensaje += " registrada"
     return redirect(url_for("perfil_cliente", nombre=nombre, firmado=mensaje))
 
 
@@ -484,24 +511,31 @@ def perfil_cliente(nombre):
     firmado = request.args.get("firmado")
 
     # Cada ciclo se traduce a lo que hay que enseñar según su modalidad, para
-    # que la plantilla no tenga que decidir nada: un bono enseña sesiones
-    # restantes y barra, una mensualidad su cuota y su precio efectivo, y una
-    # cuenta lo acumulado.
+    # que la plantilla no tenga que decidir nada.
     ciclos = obtener_programas_cliente(nombre)
     for ciclo in ciclos:
         ciclo["resumen"] = resumen_ciclo(ciclo, len(ciclo["sesiones"]))
 
     actual = next((c for c in ciclos if c.get("es_actual")), None)
-    resumen = actual["resumen"] if actual else resumen_ciclo(cliente, cliente.get("sesiones_ciclo") or 0)
+
+    # UNA sola estructura para toda la ficha, construida desde el CICLO EN
+    # CURSO (2026-08-04). Antes la plantilla mezclaba el ciclo con los campos
+    # heredados de `clientes` y podían contradecirse — el formulario guardaba
+    # bien y la pantalla seguía enseñando lo viejo.
+    ficha = ficha_servicio(
+        actual,
+        sesiones_del_ciclo=len(actual["sesiones"]) if actual else 0,
+        sesiones_completadas=cliente.get("sesiones_completadas"),
+        estado=cliente["estado"],
+        pendiente_pago=cliente["pendiente_pago"],
+    )
 
     return render_template(
         "perfil_cliente.html",
-        puede_firmar=cliente["estado"] == "activo",
+        ficha=ficha,
+        puede_firmar=ficha["puede_firmar"],
         nombre=nombre,
         cliente=cliente,
-        ciclo_actual=actual,
-        resumen=resumen,
-        etiquetas_modalidad=ETIQUETAS_MODALIDAD,
         clave_idempotencia=uuid.uuid4().hex,
         firmado=firmado,
         borrado=request.args.get("borrado"),
@@ -600,25 +634,21 @@ def eliminar_cliente_ruta(nombre):
 
 @app.route("/cliente/<nombre>/pago", methods=["POST"])
 def cambiar_pago(nombre):
-    """Marca el bono en curso como pagado o pendiente, desde la propia ficha.
+    """Marca el servicio en curso como cobrado o pendiente, desde la ficha.
 
-    Solo toca `pendiente_pago`: no cambia sesiones, ni programa, ni
-    historial, ni economía. La confirmación («¿seguro?») la pide el
-    navegador antes de enviar."""
-    clientes = leer_clientes()
-    if nombre not in clientes:
+    Solo toca el estado de COBRO. No cambia sesiones, ni horas, ni
+    historial, ni facturación, ni precio medio — ni hacia adelante ni hacia
+    atrás. Cobrar más tarde no hace que el trabajo se haya hecho más tarde.
+    La confirmación («¿seguro?») la pide el navegador antes de enviar."""
+    if nombre not in leer_clientes():
         return render_template("error.html", mensaje=f"No existe el cliente '{nombre}'"), 404
 
-    actual = clientes[nombre]
     pagado = request.form.get("pagado") == "si"
     try:
-        actualizar_cliente(
-            nombre=nombre,
-            nuevo_nombre=nombre,
-            tipo_programa=actual["tipo_programa"],
-            sesiones_completadas=int(actual["sesiones_completadas"]),
-            pendiente_pago=not pagado,
-        )
+        # Cambia el estado de COBRO y nada más: no toca sesiones, ni
+        # historial, ni economía. Se escribe en los dos sitios (la ficha del
+        # cliente y su ciclo en curso) para que no puedan contradecirse.
+        marcar_pago_del_ciclo(nombre, pagado)
     except sqlite3.OperationalError:
         return render_template(
             "error.html", mensaje="No se pudo guardar: la base de datos está ocupada. Reintenta."
@@ -871,12 +901,19 @@ def mi_perfil(token):
         return render_template("error.html", mensaje="Este enlace no es válido. Pide uno nuevo a Fernando."), 404
 
     nombre, cliente = encontrado
-    filas = _con_sesiones_restantes({nombre: cliente})
-    datos = filas[0]
+    datos = _con_sesiones_restantes({nombre: cliente})[0]
     # El cliente ve lo suyo con la forma que le corresponde: un bono, lo que
     # le queda; una mensualidad, su cuota y las sesiones del mes; una cuenta,
-    # lo que lleva acumulado.
-    resumen = resumen_ciclo(datos, datos.get("sesiones_ciclo") or 0)
+    # lo que lleva hecho. Se construye desde su CICLO EN CURSO, igual que la
+    # ficha de Fernando, para que las dos pantallas no puedan discrepar.
+    ciclo = obtener_ciclo_actual(nombre)
+    resumen = ficha_servicio(
+        ciclo,
+        sesiones_del_ciclo=datos.get("sesiones_ciclo") or 0,
+        sesiones_completadas=datos.get("sesiones_completadas"),
+        estado=datos.get("estado") or ESTADO_POR_DEFECTO,
+        pendiente_pago=datos.get("pendiente_pago", False),
+    )
     return render_template(
         "mi_perfil.html",
         token=token,

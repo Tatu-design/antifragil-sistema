@@ -398,3 +398,37 @@ que las funciones devuelvan lo correcto. Y en general: desconfiar de
 `UPDATE ... WHERE` cuando la fila puede no existir todavía — casi siempre
 lo que se quiere es `INSERT ... ON CONFLICT DO UPDATE`, que funciona en los
 dos casos.
+
+---
+
+## 2026-08-04 — Una condición de plantilla que borró una funcionalidad entera
+
+**Qué pasó:** entregué las tres modalidades con 198 pruebas en verde y la
+economía cuadrando al céntimo. Fernando abrió la app y **el botón «Firmar
+sesión» no estaba en mensualidad ni en cuenta de cliente**. Es decir:
+entregué una funcionalidad que no se podía usar en dos de sus tres casos.
+
+**Por qué pasó:** la plantilla decidía con
+`{% if cliente.sesiones_totales and puede_firmar %}`. En las dos modalidades
+nuevas ese valor es 0 —justamente porque no consumen saldo— y 0 es falso.
+La condición era un resto de cuando solo existían bonos, y al añadir las
+modalidades no la revisé: comprobé que el motor calculaba bien, no que la
+pantalla dejara operar. Detrás había algo peor que no vi: la ficha leía de
+dos fuentes a la vez (los campos heredados del cliente y el ciclo en curso),
+así que podían contradecirse en silencio.
+
+**Qué se hace distinto a partir de ahora:**
+
+1. **Cuando un cambio añade casos nuevos a algo que ya existía, hay que
+   releer TODAS las condiciones que decidían el comportamiento anterior.**
+   Cada `{% if %}` escrito cuando solo había un caso es un candidato a
+   excluir los casos nuevos, y no lanza ningún error al hacerlo.
+2. **Una pantalla, una fuente.** Si los datos pueden venir de dos sitios, se
+   construye una única estructura antes de renderizar (aquí,
+   `ficha_servicio()`) y la plantilla no decide nada. Dos fuentes acaban
+   discrepando siempre, y la discrepancia no falla: solo enseña lo que no es.
+3. Y la lección del 2026-08-03 llevada al extremo que le faltaba: la prueba
+   de interfaz no basta con que compruebe lo que SE VE — tiene que comprobar
+   también **que lo que hay que poder hacer se puede hacer**, caso a caso.
+   Ahora `tests/test_ficha_interfaz.py` verifica la presencia del botón en
+   las tres modalidades y su ausencia en los tres estados bloqueantes.

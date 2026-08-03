@@ -1169,3 +1169,10 @@ a.pill { text-decoration: none; }
 /* Desglose del mes por modalidad, en Economía. */
 .desglose-modalidad { display: flex; flex-direction: column; gap: 0.1rem; }
 .desglose-modalidad .cifra { font-variant-numeric: tabular-nums; }
+
+/* El cálculo del total de una cuenta de cliente, a la vista: "8 sesiones ×
+   35,00 € = 280,00 €". Así el importe no hay que creérselo. */
+.calculo-total {
+  margin: 0.5rem 0 0;
+  font-variant-numeric: tabular-nums;
+}
