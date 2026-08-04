@@ -59,6 +59,21 @@ export const esquemaRenombrar = z.object({
   nombre: z.string().trim().min(1, "El nombre del cliente no puede estar vacío").max(80),
 });
 
+export const esquemaClase = z.object({
+  tipo: z.enum(["lidomare", "kids"]),
+});
+
+export const esquemaKids = z.object({
+  anio: z.coerce.number().int().min(2000).max(2100),
+  mes: z.coerce.number().int().min(1).max(12),
+  importe: z
+    .string()
+    .trim()
+    .min(1, "Escribe el importe")
+    .transform((v) => Number(v.replace(",", ".")))
+    .refine((v) => Number.isFinite(v) && v > 0, { message: "Tiene que ser un importe positivo" }),
+});
+
 export const esquemaCobro = z.object({
   clienteId: z.string().min(1),
   ciclo: z.coerce.number().int().min(0),

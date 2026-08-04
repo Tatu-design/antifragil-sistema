@@ -2,6 +2,7 @@ import { Plus } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { BarraInferior } from "@/components/BarraInferior";
 import { BotonSalir } from "@/components/BotonSalir";
 import { FiltrosClientes } from "@/components/FiltrosClientes";
 import { haySesion } from "@/lib/auth";
@@ -32,6 +33,8 @@ export default async function PaginaClientes() {
       <FiltrosClientes clientes={clientes} />
 
       <BotonSalir />
+
+      <BarraInferior activa="clientes" />
     </main>
   );
 }

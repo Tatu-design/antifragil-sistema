@@ -195,9 +195,7 @@ cuando("las reglas contra Supabase", () => {
     expect(lista.filter((s) => s.fecha === "2026-08-03")).toHaveLength(1);
   });
 
-  // Doce firmas seguidas contra una base remota tardan mas que el limite por
-  // defecto: no es lentitud del codigo, es la ida y vuelta a Irlanda.
-  it("una cuenta de cliente no tiene tope", { timeout: 30000 }, async () => {
+  it("una cuenta de cliente no tiene tope", async () => {
     for (let i = 0; i < 12; i += 1) {
       await sesiones.firmarSesion(ids["Cliente D"], { fecha: "2026-08-03" });
     }

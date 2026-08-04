@@ -47,8 +47,10 @@ import pg, { Pool, type PoolClient } from "pg";
 pg.types.setTypeParser(1082, (valor) => valor);
 pg.types.setTypeParser(1114, (valor) => valor);
 
+import type { TipoClase } from "@/domain/economia";
 import { MENSUALIDAD, type Modalidad } from "@/domain/modalidades";
 import type { CargoMensual, Ciclo, Cliente, Estado, Sesion } from "@/domain/tipos";
+import { TARIFA_LIDOMARE } from "@/domain/economia";
 import { rangoSemana } from "@/lib/fechas";
 import type { Repositorio, SemanaEconomica } from "./tipos";
 
@@ -349,14 +351,133 @@ export class RepositorioPostgres implements Repositorio {
   }
 
   async listarSemanas(): Promise<SemanaEconomica[]> {
-    const filas = await consultar("select * from semanas order by inicio desc");
+    // Las clases de Kids de cada semana y el importe de SU mes se resuelven
+    // aquí para no tener que ir consultando semana a semana desde arriba.
+    const filas = await consultar(
+      `select s.*,
+              (select count(*) from clases_grupo c
+                where c.tipo = 'kids' and c.fecha between s.inicio and s.fin)::int as kids,
+              (select k.importe from facturacion_kids_mensual k
+                where k.anio = extract(year from s.inicio)::int
+                  and k.mes = extract(month from s.inicio)::int) as importe_kids
+         from semanas s order by s.inicio desc`,
+    );
     return filas.map((f) => ({
       inicio: fecha(f.inicio)!,
       fin: fecha(f.fin)!,
       facturacion: Number(f.facturacion),
       horas: Number(f.horas),
       horasSinImporte: Number(f.horas_sin_importe),
+      sesionesKids: Number(f.kids ?? 0),
+      facturacionKids: numero(f.importe_kids),
     }));
+  }
+
+  async registrarClase(fechaIso: string, tipo: TipoClase): Promise<void> {
+    await consultar("insert into clases_grupo (fecha, tipo) values ($1, $2)", [fechaIso, tipo]);
+    if (tipo === "lidomare") {
+      // Lidomare tiene tarifa fija, así que suma a la semana como una sesión
+      // más. Kids no: su dinero no se conoce hasta acabar el mes.
+      await this.sumarASemana(fechaIso, TARIFA_LIDOMARE, 1);
+    }
+  }
+
+  async deshacerUltimaClase(tipo: TipoClase): Promise<string | null> {
+    const filas = await consultar(
+      `delete from clases_grupo where id = (
+         select id from clases_grupo where tipo = $1 order by fecha desc, creado desc limit 1
+       ) returning fecha`,
+      [tipo],
+    );
+    const cuando = filas[0] ? fecha(filas[0].fecha) : null;
+    if (cuando && tipo === "lidomare") await this.sumarASemana(cuando, TARIFA_LIDOMARE, -1);
+    return cuando;
+  }
+
+  async contarClases(desde: string, hasta: string): Promise<Record<TipoClase, number>> {
+    const filas = await consultar<{ tipo: TipoClase; n: number }>(
+      "select tipo, count(*)::int as n from clases_grupo where fecha between $1 and $2 group by tipo",
+      [desde, hasta],
+    );
+    const cuenta: Record<TipoClase, number> = { lidomare: 0, kids: 0 };
+    for (const f of filas) cuenta[f.tipo] = Number(f.n);
+    return cuenta;
+  }
+
+  async facturacionKids(anio: number, mes: number): Promise<number | null> {
+    const filas = await consultar(
+      "select importe from facturacion_kids_mensual where anio = $1 and mes = $2",
+      [anio, mes],
+    );
+    return filas[0] ? Number(filas[0].importe) : null;
+  }
+
+  async guardarFacturacionKids(anio: number, mes: number, importe: number): Promise<void> {
+    await consultar(
+      `insert into facturacion_kids_mensual (anio, mes, importe) values ($1,$2,$3)
+       on conflict (anio, mes) do update set importe = excluded.importe`,
+      [anio, mes, importe],
+    );
+  }
+
+  async mesesConDatos(): Promise<Array<{ anio: number; mes: number }>> {
+    // Un mes puede existir solo por su cuota o por su ajuste, sin ninguna
+    // sesión detrás. Si no se incluyeran, ese dinero desaparecería.
+    const filas = await consultar<{ anio: number; mes: number }>(
+      `select distinct extract(year from fecha)::int as anio, extract(month from fecha)::int as mes
+         from sesiones
+       union
+       select distinct extract(year from fecha)::int, extract(month from fecha)::int from clases_grupo
+       union select distinct anio, mes from cargos_mensuales
+       union select distinct anio, mes from ajustes_mensuales
+       order by 1 desc, 2 desc`,
+    );
+    return filas.map((f) => ({ anio: Number(f.anio), mes: Number(f.mes) }));
+  }
+
+  async datosDelMes(anio: number, mes: number) {
+    const desde = `${anio}-${String(mes).padStart(2, "0")}-01`;
+    const sesiones = await consultar(
+      `select s.fecha, s.tarifa, coalesce(c.modalidad::text, 'bono') as modalidad
+         from sesiones s
+         left join ciclos c on c.cliente_id = s.cliente_id and c.ciclo = s.ciclo
+        where s.fecha >= $1::date and s.fecha < ($1::date + interval '1 month')`,
+      [desde],
+    );
+    const cuotas = await consultar(
+      "select importe from cargos_mensuales where anio = $1 and mes = $2",
+      [anio, mes],
+    );
+    const clases = await consultar<{ tipo: TipoClase; n: number }>(
+      `select tipo, count(*)::int as n from clases_grupo
+        where fecha >= $1::date and fecha < ($1::date + interval '1 month') group by tipo`,
+      [desde],
+    );
+    const ajustes = await consultar(
+      "select origen, importe, horas, motivo from ajustes_mensuales where anio = $1 and mes = $2 order by origen",
+      [anio, mes],
+    );
+
+    const porTipo: Record<string, number> = {};
+    for (const c of clases) porTipo[c.tipo] = Number(c.n);
+
+    return {
+      sesiones: sesiones.map((s) => ({
+        fecha: fecha(s.fecha)!,
+        tarifa: numero(s.tarifa),
+        modalidad: s.modalidad as Modalidad,
+      })),
+      cuotas: cuotas.map((c) => Number(c.importe)),
+      clasesLidomare: porTipo.lidomare ?? 0,
+      clasesKids: porTipo.kids ?? 0,
+      facturacionKids: await this.facturacionKids(anio, mes),
+      ajustes: ajustes.map((a) => ({
+        origen: a.origen as string,
+        importe: Number(a.importe),
+        horas: Number(a.horas),
+        motivo: a.motivo as string,
+      })),
+    };
   }
 
   async registrarIdempotencia(clave: string): Promise<boolean> {

@@ -23,7 +23,9 @@ import {
   desdeFormulario,
   esquemaAlta,
   esquemaBorrarSesion,
+  esquemaClase,
   esquemaCobro,
+  esquemaKids,
   esquemaEstado,
   esquemaFirma,
   esquemaLogin,
@@ -38,6 +40,12 @@ import {
   renombrarCliente,
 } from "@/services/clientes";
 import { eliminarSesion, firmarSesion } from "@/services/sesiones";
+import {
+  deshacerClase,
+  etiqueta as etiquetaClase,
+  guardarFacturacionKids,
+  registrarClase,
+} from "@/services/economia";
 
 export interface Resultado {
   ok: boolean;
@@ -238,6 +246,68 @@ export async function accionBorrarSesion(_previo: Resultado | null, datos: FormD
     revalidatePath(`/clientes/${validado.data.clienteId}`);
     revalidatePath("/clientes");
     return { ok: true, mensaje: "Sesión borrada y su importe descontado.", tono: "exito" };
+  } catch (error) {
+    return comoMensaje(error);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Economía
+// ---------------------------------------------------------------------------
+
+export async function accionRegistrarClase(_previo: Resultado | null, datos: FormData): Promise<Resultado> {
+  await exigirSesion();
+  const validado = esquemaClase.safeParse(desdeFormulario(datos));
+  if (!validado.success) return { ok: false, mensaje: "Tipo de clase no válido.", tono: "error" };
+
+  try {
+    await registrarClase(validado.data.tipo);
+    revalidatePath("/economia");
+    return { ok: true, mensaje: `${etiquetaClase(validado.data.tipo)}: clase de hoy registrada.`, tono: "exito" };
+  } catch (error) {
+    return comoMensaje(error);
+  }
+}
+
+export async function accionDeshacerClase(_previo: Resultado | null, datos: FormData): Promise<Resultado> {
+  await exigirSesion();
+  const validado = esquemaClase.safeParse(desdeFormulario(datos));
+  if (!validado.success) return { ok: false, mensaje: "Tipo de clase no válido.", tono: "error" };
+
+  try {
+    const cuando = await deshacerClase(validado.data.tipo);
+    revalidatePath("/economia");
+    return {
+      ok: true,
+      mensaje: `Deshecha la última clase de ${etiquetaClase(validado.data.tipo)} (${cuando}).`,
+      tono: "exito",
+    };
+  } catch (error) {
+    return comoMensaje(error);
+  }
+}
+
+export async function accionFacturacionKids(_previo: Resultado | null, datos: FormData): Promise<Resultado> {
+  await exigirSesion();
+  const validado = esquemaKids.safeParse(desdeFormulario(datos));
+  if (!validado.success) {
+    return { ok: false, mensaje: validado.error.issues[0]?.message ?? "Revisa el importe.", tono: "error" };
+  }
+
+  try {
+    const precio = await guardarFacturacionKids(
+      validado.data.anio,
+      validado.data.mes,
+      validado.data.importe,
+    );
+    revalidatePath("/economia");
+    return {
+      ok: true,
+      tono: "exito",
+      mensaje: precio
+        ? `Guardado. Sale a ${precio.toFixed(2).replace(".", ",")} € por clase.`
+        : "Guardado. Todavía no hay clases de Kids ese mes.",
+    };
   } catch (error) {
     return comoMensaje(error);
   }

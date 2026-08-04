@@ -17,6 +17,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
+import { TARIFA_LIDOMARE, type TipoClase } from "@/domain/economia";
 import { BONO, CUENTA, MENSUALIDAD } from "@/domain/modalidades";
 import type { CargoMensual, Ciclo, Cliente, Sesion } from "@/domain/tipos";
 import { rangoSemana } from "@/lib/fechas";
@@ -28,6 +29,9 @@ interface Almacen {
   sesiones: Sesion[];
   cargos: CargoMensual[];
   semanas: SemanaEconomica[];
+  clases: Array<{ id: string; fecha: string; tipo: TipoClase }>;
+  facturacionKids: Array<{ anio: number; mes: number; importe: number }>;
+  ajustes: Array<{ anio: number; mes: number; origen: string; importe: number; horas: number; motivo: string }>;
   idempotencia: string[];
   siguienteSesion: number;
 }
@@ -74,7 +78,7 @@ function semilla(): Almacen {
     const { inicio, fin } = rangoSemana(sesion.fecha);
     let semana = semanas.find((s) => s.inicio === inicio);
     if (!semana) {
-      semana = { inicio, fin, facturacion: 0, horas: 0, horasSinImporte: 0 };
+      semana = { inicio, fin, facturacion: 0, horas: 0, horasSinImporte: 0, sesionesKids: 0, facturacionKids: null };
       semanas.push(semana);
     }
     if (sesion.tarifa === null) semana.horasSinImporte += 1;
@@ -84,7 +88,11 @@ function semilla(): Almacen {
     }
   }
 
-  return { clientes, ciclos, sesiones, cargos, semanas, idempotencia: [], siguienteSesion: n };
+  return {
+    clientes, ciclos, sesiones, cargos, semanas,
+    clases: [], facturacionKids: [], ajustes: [],
+    idempotencia: [], siguienteSesion: n,
+  };
 }
 
 /**
@@ -267,7 +275,7 @@ export class RepositorioStaging implements Repositorio {
     const { inicio, fin } = rangoSemana(fecha);
     let semana = datos.semanas.find((s) => s.inicio === inicio);
     if (!semana) {
-      semana = { inicio, fin, facturacion: 0, horas: 0, horasSinImporte: 0 };
+      semana = { inicio, fin, facturacion: 0, horas: 0, horasSinImporte: 0, sesionesKids: 0, facturacionKids: null };
       datos.semanas.push(semana);
     }
     if (tarifa === null) {
@@ -283,7 +291,92 @@ export class RepositorioStaging implements Repositorio {
 
   async listarSemanas(): Promise<SemanaEconomica[]> {
     const datos = await cargar();
-    return clonar(datos.semanas).sort((a, b) => b.inicio.localeCompare(a.inicio));
+    return clonar(datos.semanas)
+      .map((s) => {
+        const kids = datos.clases.filter(
+          (c) => c.tipo === "kids" && c.fecha >= s.inicio && c.fecha <= s.fin,
+        ).length;
+        const anio = Number(s.inicio.slice(0, 4));
+        const mes = Number(s.inicio.slice(5, 7));
+        const importe = datos.facturacionKids.find((f) => f.anio === anio && f.mes === mes);
+        return { ...s, sesionesKids: kids, facturacionKids: importe ? importe.importe : null };
+      })
+      .sort((a, b) => b.inicio.localeCompare(a.inicio));
+  }
+
+  async registrarClase(fecha: string, tipo: TipoClase): Promise<void> {
+    const datos = await cargar();
+    datos.clases.push({ id: `cls-${Date.now()}-${datos.clases.length}`, fecha, tipo });
+    await volcar();
+    // Lidomare tiene tarifa fija y suma a la semana como una sesión más. Kids
+    // no: su dinero no se conoce hasta acabar el mes.
+    if (tipo === "lidomare") await this.sumarASemana(fecha, TARIFA_LIDOMARE, 1);
+    // Kids no suma dinero todavía, pero su semana tiene que existir igual:
+    // si no, la clase no aparecería en ningún sitio hasta acabar el mes.
+    else await this.sumarASemana(fecha, null, 0);
+  }
+
+  async deshacerUltimaClase(tipo: TipoClase): Promise<string | null> {
+    const datos = await cargar();
+    const suyas = datos.clases.filter((c) => c.tipo === tipo);
+    const ultima = suyas.sort((a, b) => a.fecha.localeCompare(b.fecha) || a.id.localeCompare(b.id)).at(-1);
+    if (!ultima) return null;
+    datos.clases = datos.clases.filter((c) => c.id !== ultima.id);
+    await volcar();
+    if (tipo === "lidomare") await this.sumarASemana(ultima.fecha, TARIFA_LIDOMARE, -1);
+    return ultima.fecha;
+  }
+
+  async contarClases(desde: string, hasta: string): Promise<Record<TipoClase, number>> {
+    const datos = await cargar();
+    const cuenta: Record<TipoClase, number> = { lidomare: 0, kids: 0 };
+    for (const c of datos.clases) if (c.fecha >= desde && c.fecha <= hasta) cuenta[c.tipo] += 1;
+    return cuenta;
+  }
+
+  async facturacionKids(anio: number, mes: number): Promise<number | null> {
+    const datos = await cargar();
+    return datos.facturacionKids.find((f) => f.anio === anio && f.mes === mes)?.importe ?? null;
+  }
+
+  async guardarFacturacionKids(anio: number, mes: number, importe: number): Promise<void> {
+    const datos = await cargar();
+    const existente = datos.facturacionKids.find((f) => f.anio === anio && f.mes === mes);
+    if (existente) existente.importe = importe;
+    else datos.facturacionKids.push({ anio, mes, importe });
+    await volcar();
+  }
+
+  async mesesConDatos(): Promise<Array<{ anio: number; mes: number }>> {
+    const datos = await cargar();
+    const claves = new Set<string>();
+    for (const s of datos.sesiones) claves.add(s.fecha.slice(0, 7));
+    for (const c of datos.clases) claves.add(c.fecha.slice(0, 7));
+    for (const c of datos.cargos) claves.add(`${c.anio}-${String(c.mes).padStart(2, "0")}`);
+    for (const a of datos.ajustes) claves.add(`${a.anio}-${String(a.mes).padStart(2, "0")}`);
+    return [...claves]
+      .sort((a, b) => b.localeCompare(a))
+      .map((k) => ({ anio: Number(k.slice(0, 4)), mes: Number(k.slice(5, 7)) }));
+  }
+
+  async datosDelMes(anio: number, mes: number) {
+    const datos = await cargar();
+    const prefijo = `${anio}-${String(mes).padStart(2, "0")}`;
+    const modalidadDe = (clienteId: string, ciclo: number) =>
+      datos.ciclos.find((c) => c.clienteId === clienteId && c.ciclo === ciclo)?.modalidad ?? BONO;
+
+    return {
+      sesiones: datos.sesiones
+        .filter((s) => s.fecha.startsWith(prefijo))
+        .map((s) => ({ fecha: s.fecha, tarifa: s.tarifa, modalidad: modalidadDe(s.clienteId, s.ciclo) })),
+      cuotas: datos.cargos.filter((c) => c.anio === anio && c.mes === mes).map((c) => c.importe),
+      clasesLidomare: datos.clases.filter((c) => c.tipo === "lidomare" && c.fecha.startsWith(prefijo)).length,
+      clasesKids: datos.clases.filter((c) => c.tipo === "kids" && c.fecha.startsWith(prefijo)).length,
+      facturacionKids: await this.facturacionKids(anio, mes),
+      ajustes: datos.ajustes
+        .filter((a) => a.anio === anio && a.mes === mes)
+        .map((a) => ({ origen: a.origen, importe: a.importe, horas: a.horas, motivo: a.motivo })),
+    };
   }
 
   async registrarIdempotencia(clave: string): Promise<boolean> {
