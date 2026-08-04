@@ -10,6 +10,7 @@
     "type-check": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "comprobar:pantallas": "node scripts/comprobar-pantallas.mjs",
     "supabase:comprobar": "node scripts/supabase.mjs comprobar",
     "supabase:migrar": "node scripts/supabase.mjs migrar",
     "supabase:sembrar": "node scripts/sembrar.mjs",
