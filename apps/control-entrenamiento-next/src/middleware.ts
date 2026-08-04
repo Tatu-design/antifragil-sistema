@@ -30,6 +30,13 @@ export function middleware(peticion: NextRequest) {
   return NextResponse.next();
 }
 
+/**
+ * Se excluye cualquier ruta con extensión de archivo.
+ *
+ * Sin esto, la propia hoja de estilos (`/style.css`), las fuentes y el logo se
+ * redirigían al login por no llevar cookie, y la pantalla de entrada salía sin
+ * un solo estilo. Son archivos públicos: no hay nada que proteger en ellos.
+ */
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!_next/static|_next/image|.*\\.[a-zA-Z0-9]+$).*)"],
 };
