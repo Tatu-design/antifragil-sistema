@@ -89,10 +89,54 @@ function pool(): Pool {
 /** Dentro de una transacción se usa su conexión; fuera, el pool. */
 let enCurso: PoolClient | null = null;
 
+/**
+ * Fallos de red, no del código.
+ *
+ * El pooler del plan gratuito cierra conexiones inactivas, así que la primera
+ * consulta tras un rato puede llegar cortada. Volver a intentarlo suele
+ * bastar; insistir con un error de datos, no.
+ */
+const TRANSITORIOS = new Set(["ECONNRESET", "ETIMEDOUT", "EPIPE", "ECONNREFUSED", "57P01"]);
+
+export class BaseNoDisponible extends Error {
+  constructor() {
+    super("No se ha podido conectar con la base de datos");
+    this.name = "BaseNoDisponible";
+  }
+}
+
+/** El pool avisa de algunos cortes sin código, solo con el texto. */
+const TEXTOS_TRANSITORIOS = [
+  "connection terminated",
+  "connection ended",
+  "server closed the connection",
+  "timeout exceeded",
+  "socket hang up",
+];
+
+function esTransitorio(error: unknown): boolean {
+  const codigo = (error as { code?: string })?.code;
+  if (codigo && TRANSITORIOS.has(codigo)) return true;
+  const mensaje = String((error as { message?: string })?.message ?? "").toLowerCase();
+  return TEXTOS_TRANSITORIOS.some((texto) => mensaje.includes(texto));
+}
+
 async function consultar<T = Record<string, unknown>>(sql: string, valores: unknown[] = []): Promise<T[]> {
-  const ejecutor = enCurso ?? pool();
-  const resultado = await ejecutor.query(sql, valores);
-  return resultado.rows as T[];
+  // Dentro de una transacción NO se reintenta: la conexión ya está en un
+  // estado concreto y repetir una sentencia a medias sería peor que fallar.
+  const intentos = enCurso ? 1 : 3;
+
+  for (let intento = 1; ; intento += 1) {
+    try {
+      const ejecutor = enCurso ?? pool();
+      const resultado = await ejecutor.query(sql, valores);
+      return resultado.rows as T[];
+    } catch (error) {
+      if (!esTransitorio(error)) throw error;
+      if (intento >= intentos) throw new BaseNoDisponible();
+      await new Promise((sigue) => setTimeout(sigue, 300 * intento));
+    }
+  }
 }
 
 // -----------------------------------------------------------------------------

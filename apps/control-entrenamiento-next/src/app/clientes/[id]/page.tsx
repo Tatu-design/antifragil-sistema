@@ -11,6 +11,8 @@ import { ZonaPeligrosa } from "@/components/ZonaPeligrosa";
 import { TarjetaServicio } from "@/components/TarjetaServicio";
 import { haySesion } from "@/lib/auth";
 import { obtenerPerfil } from "@/services/clientes";
+import { SinConexion } from "@/components/SinConexion";
+import { BaseNoDisponible } from "@/repositories/postgres";
 import { headers } from "next/headers";
 import QRCode from "qrcode";
 
@@ -20,7 +22,13 @@ export default async function PaginaPerfil({ params }: { params: Promise<{ id: s
   if (!(await haySesion())) redirect("/login");
 
   const { id } = await params;
-  const perfil = await obtenerPerfil(id);
+  let perfil;
+  try {
+    perfil = await obtenerPerfil(id);
+  } catch (error) {
+    if (error instanceof BaseNoDisponible) return <SinConexion />;
+    throw error;
+  }
   if (!perfil) notFound();
 
   const { cliente, ficha, servicios } = perfil;

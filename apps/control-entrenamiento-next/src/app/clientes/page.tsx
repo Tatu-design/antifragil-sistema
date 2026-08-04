@@ -6,6 +6,8 @@ import { BarraInferior } from "@/components/BarraInferior";
 import { BotonSalir } from "@/components/BotonSalir";
 import { FiltrosClientes } from "@/components/FiltrosClientes";
 import { contarNoLeidos } from "@/services/avisos";
+import { SinConexion } from "@/components/SinConexion";
+import { BaseNoDisponible } from "@/repositories/postgres";
 import { haySesion } from "@/lib/auth";
 import { listarClientes } from "@/services/clientes";
 
@@ -16,8 +18,15 @@ export const dynamic = "force-dynamic";
 export default async function PaginaClientes() {
   if (!(await haySesion())) redirect("/login");
 
-  const clientes = await listarClientes();
-  const sinLeer = await contarNoLeidos();
+  let clientes;
+  let sinLeer = 0;
+  try {
+    clientes = await listarClientes();
+    sinLeer = await contarNoLeidos();
+  } catch (error) {
+    if (error instanceof BaseNoDisponible) return <SinConexion />;
+    throw error;
+  }
 
   return (
     <main className="flex flex-col gap-4">
