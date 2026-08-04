@@ -12,7 +12,8 @@
     "test:watch": "vitest",
     "supabase:comprobar": "node scripts/supabase.mjs comprobar",
     "supabase:migrar": "node scripts/supabase.mjs migrar",
-    "supabase:sembrar": "node scripts/sembrar.mjs"
+    "supabase:sembrar": "node scripts/sembrar.mjs",
+    "migrar:datos": "node scripts/migrar-datos.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",

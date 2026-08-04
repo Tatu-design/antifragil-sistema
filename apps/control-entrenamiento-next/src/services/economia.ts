@@ -20,6 +20,7 @@ import {
 } from "@/domain/economia";
 import { hoyNegocio, rangoSemana } from "@/lib/fechas";
 import { repositorio } from "@/repositories";
+import { comprobarYAvisar } from "./verificacion";
 
 export interface VistaEconomia {
   /** La semana más reciente con movimiento, no necesariamente la de hoy. */
@@ -67,7 +68,9 @@ export async function obtenerMes(anio: number, mes: number): Promise<ResumenMes 
 /** Suma una clase de grupo de hoy. */
 export async function registrarClase(tipo: TipoClase, fecha?: string): Promise<void> {
   const repo = repositorio();
-  await repo.transaccion(() => repo.registrarClase(fecha ?? hoyNegocio(), tipo));
+  const cuando = fecha ?? hoyNegocio();
+  await repo.transaccion(() => repo.registrarClase(cuando, tipo));
+  await comprobarYAvisar(cuando);
 }
 
 /** Deshace la última clase de ese tipo — un toque de más se puede corregir. */
@@ -76,6 +79,9 @@ export async function deshacerClase(tipo: TipoClase): Promise<string> {
   return repo.transaccion(async () => {
     const cuando = await repo.deshacerUltimaClase(tipo);
     if (!cuando) throw new ErrorDeNegocio(`No hay ninguna clase de ${etiqueta(tipo)} registrada todavía`);
+    return cuando;
+  }).then(async (cuando) => {
+    await comprobarYAvisar(cuando);
     return cuando;
   });
 }

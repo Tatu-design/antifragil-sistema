@@ -18,6 +18,7 @@ import { procesarUnaSesion } from "@/domain/programas";
 import type { Ciclo, ResultadoFirma, Sesion } from "@/domain/tipos";
 import { anioDe, hoyNegocio, horaNegocio, mesDe, rangoSemana } from "@/lib/fechas";
 import { repositorio } from "@/repositories";
+import { comprobarYAvisar } from "./verificacion";
 
 export interface OpcionesFirma {
   fecha?: string;
@@ -30,7 +31,7 @@ export async function firmarSesion(clienteId: string, opciones: OpcionesFirma = 
   const repo = repositorio();
   const fecha = opciones.fecha ?? hoyNegocio();
 
-  return repo.transaccion(async () => {
+  const resultado = await repo.transaccion(async () => {
     const cliente = await repo.obtenerCliente(clienteId);
     if (!cliente) throw new ErrorDeNegocio("Ese cliente ya no existe");
 
@@ -160,6 +161,11 @@ export async function firmarSesion(clienteId: string, opciones: OpcionesFirma = 
       mes: mesDe(fecha),
     } satisfies ResultadoFirma;
   });
+
+  // Ya está guardado: ahora se comprueba que la economía de esa semana sigue
+  // cuadrando con lo firmado. Si no, deja un aviso — nunca corrige sola.
+  await comprobarYAvisar(fecha);
+  return resultado;
 }
 
 /**
@@ -173,6 +179,7 @@ export async function firmarSesion(clienteId: string, opciones: OpcionesFirma = 
  */
 export async function eliminarSesion(clienteId: string, sesionId: string): Promise<void> {
   const repo = repositorio();
+  let cuando = "";
 
   await repo.transaccion(async () => {
     const cliente = await repo.obtenerCliente(clienteId);
@@ -197,6 +204,7 @@ export async function eliminarSesion(clienteId: string, sesionId: string): Promi
     const eraLaMasReciente = delCiclo[0]?.id === sesion.id;
     const completabaElCiclo = sesion.numeroSesion === sesion.sesionesTotales && sesion.sesionesTotales > 0;
 
+    cuando = sesion.fecha;
     await repo.eliminarSesion(sesionId);
     await repo.sumarASemana(sesion.fecha, sesion.tarifa, -1);
 
@@ -212,6 +220,8 @@ export async function eliminarSesion(clienteId: string, sesionId: string): Promi
 
     await repo.actualizarCliente(cliente);
   });
+
+  if (cuando) await comprobarYAvisar(cuando);
 }
 
 /**
@@ -228,6 +238,7 @@ export async function editarSesion(
   nuevoNumero: number,
 ): Promise<void> {
   const repo = repositorio();
+  let semanaAnterior = "";
 
   await repo.transaccion(async () => {
     const cliente = await repo.obtenerCliente(clienteId);
@@ -236,6 +247,7 @@ export async function editarSesion(
     const sesiones = await repo.listarSesiones(clienteId);
     const sesion = sesiones.find((s) => s.id === sesionId);
     if (!sesion) throw new ErrorDeNegocio("Esa sesión ya no existe");
+    semanaAnterior = sesion.fecha;
 
     if (!/^\d{4}-\d{2}-\d{2}$/.test(nuevaFecha)) {
       throw new ErrorDeNegocio(`Fecha no válida: «${nuevaFecha}»`);
@@ -272,6 +284,10 @@ export async function editarSesion(
       sesionesCompletadas: quedan.length ? Math.max(...quedan.map((s) => s.numeroSesion)) : 0,
     });
   });
+
+  // Las dos semanas: la que pierde la sesión y la que la recibe.
+  if (semanaAnterior) await comprobarYAvisar(semanaAnterior);
+  if (nuevaFecha !== semanaAnterior) await comprobarYAvisar(nuevaFecha);
 }
 
 /**
