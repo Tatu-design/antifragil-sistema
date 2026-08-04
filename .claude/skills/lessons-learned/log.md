@@ -432,3 +432,44 @@ así que podían contradecirse en silencio.
    también **que lo que hay que poder hacer se puede hacer**, caso a caso.
    Ahora `tests/test_ficha_interfaz.py` verifica la presencia del botón en
    las tres modalidades y su ausencia en los tres estados bloqueantes.
+
+---
+
+## 2026-08-04 — Reescribir una interfaz "equivalente" no es portarla
+
+**Qué pasó:** entregué la aplicación en Next.js con las reglas de negocio
+comprobadas al céntimo y los datos migrados sin una sola diferencia, y
+Fernando tuvo que decírmelo: la pantalla estaba **visual y operativamente
+lejos** de la que él usa todos los días. Otros colores de acento no; peor:
+otra disposición, otros textos, otro orden de la información y botones que
+no estaban donde su mano ya sabe que están.
+
+**Por qué pasó:** construí la interfaz nueva desde mi descripción de la
+antigua en vez de desde sus archivos. Leí las plantillas para entender qué
+hacía cada pantalla, y luego escribí una pantalla que hacía lo mismo. Eso
+no es portar: es rehacer. Es exactamente la lección del 2026-08-01
+("extraer los colores de un diseño no es portarlo: hay que medir contra el
+archivo original") aplicada a la estructura en vez de al color, y no la
+reconocí porque esta vez el archivo original era una plantilla y no una
+paleta.
+
+**Qué se hace distinto a partir de ahora:**
+
+1. **Portar una pantalla es copiar su marcado, no describirlo.** Se abre la
+   plantilla original al lado y se van trasladando sus clases, su orden y
+   sus textos uno a uno. Si al terminar hay una clase CSS que la original
+   tenía y la nueva no, es una diferencia que hay que justificar, no un
+   detalle.
+2. **La hoja de estilos se copia, no se reinterpreta.** `public/style.css`
+   es literalmente `webapp/static/style.css`. Un sistema de diseño nuevo
+   (Tailwind, en este caso) que produce "lo mismo pero parecido" produce
+   exactamente el problema que Fernando encontró.
+3. **Una comprobación por HTTP real de cada pantalla**, que verifica que
+   salen las mismas clases y los mismos textos que la plantilla original.
+   Las 131 pruebas y el build pasaban con la interfaz equivocada: nada de
+   lo que medía miraba la pantalla.
+4. **Y comprobar también los archivos que la pantalla necesita.** El
+   recorrido inicial pedía el HTML del login y lo daba por bueno; el
+   middleware estaba redirigiendo `/style.css` y las fuentes al login por
+   no llevar cookie, así que la pantalla de entrada habría salido sin un
+   solo estilo. Una pantalla no está bien porque su HTML esté bien.
