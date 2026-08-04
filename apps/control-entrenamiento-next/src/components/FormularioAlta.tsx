@@ -1,134 +1,119 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useState } from "react";
 import { useFormStatus } from "react-dom";
 
-import { accionCrearCliente, type Resultado } from "@/app/actions";
-import { BONO, CUENTA, ETIQUETAS, MENSUALIDAD, MODALIDADES, type Modalidad } from "@/domain/modalidades";
-import { Aviso } from "./Aviso";
+import { accionCrearCliente } from "@/app/actions";
+import { ETIQUETAS } from "@/domain/modalidades";
+import { CamposServicio, detalleServicio, valoresIniciales, type ValoresServicio } from "./CamposServicio";
 
-function Boton() {
-  const { pending } = useFormStatus();
+/**
+ * Alta de cliente y su confirmación, juntas.
+ *
+ * Es la unión de `webapp/templates/nuevo.html` y `confirmar_nuevo.html`. La
+ * diferencia con Flask está en los campos del servicio: allí se elegía un
+ * programa de un catálogo, aquí se describen las condiciones igual que en
+ * «Editar programa» — el catálogo de programas no existe en el modelo nuevo.
+ */
+export function FormularioAlta() {
+  const [nombre, setNombre] = useState("");
+  const [servicio, setServicio] = useState<ValoresServicio>(valoresIniciales());
+  const [revisando, setRevisando] = useState(false);
+
+  if (!revisando) {
+    return (
+      <>
+        <h1>Nuevo cliente</h1>
+
+        <form
+          className="formulario"
+          onSubmit={(evento) => {
+            evento.preventDefault();
+            setRevisando(true);
+          }}
+        >
+          <label className="campo">
+            <span>Nombre</span>
+            <input
+              type="text"
+              name="nombre"
+              required
+              autoFocus
+              value={nombre}
+              onChange={(e) => setNombre(e.target.value)}
+            />
+          </label>
+
+          <CamposServicio valores={servicio} alCambiar={setServicio} />
+
+          <button type="submit" className="boton">
+            Revisar y crear
+          </button>
+        </form>
+      </>
+    );
+  }
+
   return (
-    <button type="submit" className="boton" disabled={pending}>
-      {pending ? "Creando…" : "Crear cliente"}
-    </button>
+    <>
+      <h1>Confirmar cliente nuevo</h1>
+      <p className="subtitulo">Todavía no se ha guardado nada. Revisa:</p>
+
+      <div className="lista comparativa">
+        <div className="fila">
+          <span className="etiqueta">Nombre</span>
+          <span className="despues">{nombre}</span>
+        </div>
+        <div className="fila">
+          <span className="etiqueta">Modalidad</span>
+          <span className="despues">{ETIQUETAS[servicio.modalidad]}</span>
+        </div>
+        <div className="fila">
+          <span className="etiqueta">Servicio</span>
+          <span className="despues">{servicio.servicio || ETIQUETAS[servicio.modalidad]}</span>
+        </div>
+        <div className="fila">
+          <span className="etiqueta">Condiciones</span>
+          <span className="despues">{detalleServicio(servicio)}</span>
+        </div>
+      </div>
+
+      {servicio.modalidad === "mensualidad" && (
+        <p className="aviso-texto">
+          La cuota de este mes se registrará entera en la Economía en cuanto guardes, aunque todavía no se
+          haya entrenado. Quedará pendiente de pago hasta que la marques como pagada.
+        </p>
+      )}
+
+      <form action={accionCrearCliente}>
+        <input type="hidden" name="nombre" value={nombre} />
+        <input type="hidden" name="modalidad" value={servicio.modalidad} />
+        <input type="hidden" name="servicio" value={servicio.servicio} />
+        <input type="hidden" name="sesionesTotales" value={servicio.sesionesTotales} />
+        <input type="hidden" name="precioTotal" value={servicio.precioTotal} />
+        <input type="hidden" name="cuotaMensual" value={servicio.cuotaMensual} />
+        <input type="hidden" name="sesionesReferencia" value={servicio.sesionesReferencia} />
+        <input type="hidden" name="tarifa" value={servicio.tarifa} />
+        <Crear />
+      </form>
+
+      <button
+        type="button"
+        className="boton-secundario"
+        style={{ width: "100%", marginTop: "0.65rem" }}
+        onClick={() => setRevisando(false)}
+      >
+        Cancelar
+      </button>
+    </>
   );
 }
 
-/**
- * Alta de cliente.
- *
- * Solo se piden los campos que SU modalidad necesita: un bono no lleva cuota
- * mensual y una cuenta no lleva tope de sesiones. La validación de verdad está
- * en el servidor (`validarCondiciones`); esto solo evita enseñar campos que no
- * tienen sentido.
- */
-export function FormularioAlta() {
-  const [resultado, accion] = useActionState<Resultado | null, FormData>(accionCrearCliente, null);
-  const [modalidad, setModalidad] = useState<Modalidad>(BONO);
-
+function Crear() {
+  const { pending } = useFormStatus();
   return (
-    <form action={accion} className="tarjeta flex flex-col gap-3">
-      <div>
-        <label className="etiqueta" htmlFor="nombre">
-          Nombre
-        </label>
-        <input id="nombre" name="nombre" required maxLength={80} autoFocus className="campo" />
-      </div>
-
-      <div>
-        <label className="etiqueta" htmlFor="modalidad">
-          Modalidad
-        </label>
-        <select
-          id="modalidad"
-          name="modalidad"
-          value={modalidad}
-          onChange={(e) => setModalidad(e.target.value as Modalidad)}
-          className="campo"
-        >
-          {MODALIDADES.map((valor) => (
-            <option key={valor} value={valor}>
-              {ETIQUETAS[valor]}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div>
-        <label className="etiqueta" htmlFor="servicio">
-          Nombre del servicio
-        </label>
-        <input
-          id="servicio"
-          name="servicio"
-          maxLength={80}
-          placeholder={modalidad === BONO ? "Bono 8 sesiones" : ETIQUETAS[modalidad]}
-          className="campo"
-        />
-      </div>
-
-      {modalidad === BONO && (
-        <>
-          <div>
-            <label className="etiqueta" htmlFor="sesionesTotales">
-              Sesiones del bono
-            </label>
-            <input
-              id="sesionesTotales"
-              name="sesionesTotales"
-              inputMode="numeric"
-              required
-              className="campo"
-            />
-          </div>
-          <div>
-            <label className="etiqueta" htmlFor="precioTotal">
-              Precio total del bono (€)
-            </label>
-            <input id="precioTotal" name="precioTotal" inputMode="decimal" required className="campo" />
-            <p className="mt-1 text-xs text-tinta-suave">
-              El precio por sesión se calcula solo, para que no pueda contradecir al total.
-            </p>
-          </div>
-        </>
-      )}
-
-      {modalidad === MENSUALIDAD && (
-        <>
-          <div>
-            <label className="etiqueta" htmlFor="cuotaMensual">
-              Cuota mensual (€)
-            </label>
-            <input id="cuotaMensual" name="cuotaMensual" inputMode="decimal" required className="campo" />
-          </div>
-          <div>
-            <label className="etiqueta" htmlFor="sesionesReferencia">
-              Sesiones previstas al mes (opcional)
-            </label>
-            <input id="sesionesReferencia" name="sesionesReferencia" inputMode="numeric" className="campo" />
-            <p className="mt-1 text-xs text-tinta-suave">
-              Solo orientativas: la cuota se factura entera aunque se hagan más o menos.
-            </p>
-          </div>
-        </>
-      )}
-
-      {modalidad === CUENTA && (
-        <div>
-          <label className="etiqueta" htmlFor="tarifa">
-            Precio por sesión (€)
-          </label>
-          <input id="tarifa" name="tarifa" inputMode="decimal" required className="campo" />
-          <p className="mt-1 text-xs text-tinta-suave">
-            Sin tope de sesiones: se cobra al final por lo realmente hecho.
-          </p>
-        </div>
-      )}
-
-      <Aviso resultado={resultado} />
-      <Boton />
-    </form>
+    <button type="submit" className="boton" disabled={pending}>
+      {pending ? "Creando…" : "Confirmar y crear"}
+    </button>
   );
 }

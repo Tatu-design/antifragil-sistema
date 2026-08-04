@@ -24,7 +24,7 @@ describe("lo que ve el cliente", () => {
     const perfil = await obtenerPerfilPublico(TOKEN_A);
     expect(perfil!.nombre).toBe("Cliente A");
     expect(perfil!.ficha.sesionesRestantes).toBe(2);
-    expect(perfil!.ultimas.length).toBeGreaterThan(0);
+    expect(perfil!.historial.length).toBeGreaterThan(0);
   });
 
   it("un token no destapa a ningún otro cliente", async () => {
@@ -46,7 +46,7 @@ describe("lo que ve el cliente", () => {
   it("no se le enseña el estado de cobro de otros ni su deuda ajena", async () => {
     const perfil = await obtenerPerfilPublico(TOKEN_A);
     // Solo aparecen sus propias sesiones.
-    for (const sesion of perfil!.ultimas) {
+    for (const sesion of perfil!.historial) {
       expect(sesion.servicio).toBe("Bono 8 sesiones");
     }
   });

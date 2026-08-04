@@ -9,6 +9,7 @@ import { fichaServicio } from "@/domain/ficha";
 import { ErrorDeNegocio, MENSUALIDAD, validarCondiciones } from "@/domain/modalidades";
 import type { Modalidad } from "@/domain/modalidades";
 import type { Ciclo, Cliente, Estado, FichaServicio, Sesion } from "@/domain/tipos";
+import { hoyNegocio } from "@/lib/fechas";
 import { repositorio } from "@/repositories";
 
 export interface ClienteEnLista extends Cliente {
@@ -85,6 +86,24 @@ export async function obtenerPerfil(clienteId: string): Promise<PerfilCliente | 
   }));
 
   return { cliente, ficha, ciclo, servicios };
+}
+
+/**
+ * Cómo va la confirmación del cliente HOY, para el bloque del QR.
+ *
+ * Se consulta aparte y solo cuando la pantalla lo necesita: en Flask el QR
+ * únicamente se pregunta justo después de firmar, que es una consulta menos en
+ * cada visita.
+ */
+export async function confirmacionDeHoy(
+  clienteId: string,
+): Promise<{ hayPendiente: boolean; confirmadas: Array<{ hora: string }> }> {
+  const repo = repositorio();
+  const hoy = hoyNegocio();
+  return {
+    hayPendiente: (await repo.sesionesSinConfirmarHoy(clienteId, hoy)).length > 0,
+    confirmadas: await repo.confirmacionesDeHoy(clienteId, hoy),
+  };
 }
 
 export interface DatosAlta {

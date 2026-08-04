@@ -24,11 +24,13 @@ import { repositorio } from "@/repositories";
 export interface PerfilPublico {
   nombre: string;
   ficha: FichaServicio;
-  /** Sus últimas sesiones, para que vea su propio historial. */
-  ultimas: Sesion[];
+  /** Su historial entero, como en la página pública de Flask. */
+  historial: Sesion[];
   /** Sesiones de hoy que aún puede confirmar. Vacío = nada que confirmar. */
   pendientesHoy: Sesion[];
   confirmadasHoy: Array<{ hora: string }>;
+  /** La fecha de negocio de hoy, para el aviso de «confirmada el …». */
+  hoy: string;
 }
 
 export async function obtenerPerfilPublico(token: string): Promise<PerfilPublico | null> {
@@ -50,9 +52,10 @@ export async function obtenerPerfilPublico(token: string): Promise<PerfilPublico
       estado: cliente.estado,
       pendientePago: cliente.pendientePago,
     }),
-    ultimas: sesiones.slice(0, 10),
+    historial: sesiones,
     pendientesHoy: await repo.sesionesSinConfirmarHoy(cliente.id, hoy),
     confirmadasHoy: await repo.confirmacionesDeHoy(cliente.id, hoy),
+    hoy,
   };
 }
 

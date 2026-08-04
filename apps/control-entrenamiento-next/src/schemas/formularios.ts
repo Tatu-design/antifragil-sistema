@@ -95,9 +95,18 @@ export const esquemaEditarSesion = z.object({
   numeroSesion: z.coerce.number().int().min(1),
 });
 
+/** Datos del cliente: quién es y en qué situación está. El servicio se edita
+ *  aparte, igual que en `editar_datos.html`. */
+export const esquemaDatos = z.object({
+  clienteId: z.string().min(1),
+  nombre: z.string().trim().min(1, "El nombre del cliente no puede estar vacío").max(80),
+  estado: z.enum(ESTADOS),
+});
+
+/** La pantalla de borrado ES la confirmación, como en Flask: no se pide además
+ *  escribir nada. */
 export const esquemaBorrarCliente = z.object({
   clienteId: z.string().min(1),
-  confirmacion: z.literal("BORRAR", { message: "Escribe BORRAR para confirmar" }),
 });
 
 export const esquemaCobro = z.object({

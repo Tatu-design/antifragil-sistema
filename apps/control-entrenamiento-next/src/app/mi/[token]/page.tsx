@@ -1,91 +1,149 @@
+import Image from "next/image";
 import { notFound } from "next/navigation";
 
-import { ConfirmarSesion } from "@/components/ConfirmarSesion";
-import { fechaEs, nombreMes } from "@/lib/fechas";
+import { euros, fechaEs, mesMinuscula } from "@/lib/formato";
 import { obtenerPerfilPublico } from "@/services/publico";
 
 export const dynamic = "force-dynamic";
 
-const euros = (v: number | null) =>
-  v === null ? "—" : new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" }).format(v);
-
 /**
- * El perfil que ve el propio cliente con su enlace.
+ * El perfil que ve el propio cliente con su enlace. Copia de
+ * `webapp/templates/mi_perfil.html`.
  *
- * Es público a propósito: no pide contraseña. Lo que protege es el token, que
- * solo tiene esa persona. Deliberadamente NO se enseña nada de dinero
- * pendiente ni de otros clientes.
+ * Es público a propósito: no pide contraseña, la llave es el token. Solo
+ * lectura — el botón de confirmar se quitó de aquí a propósito (2026-07-29):
+ * confirmar es algo que pasa delante de Fernando, escaneando su QR.
  */
 export default async function PaginaMiPerfil({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
   const perfil = await obtenerPerfilPublico(token);
   if (!perfil) notFound();
 
-  const { nombre, ficha, ultimas, pendientesHoy, confirmadasHoy } = perfil;
+  const { nombre, ficha, historial, confirmadasHoy, hoy } = perfil;
+  const plural = (n: number) => (n === 1 ? "sesión" : "sesiones");
+  const cuandoMes = ficha.mes ? ` en ${mesMinuscula(ficha.mes)}` : " este mes";
 
   return (
-    <main className="flex flex-col gap-4">
-      <header className="text-center">
-        <h1 className="text-2xl font-semibold tracking-tight">{nombre}</h1>
-        <p className="text-sm text-tinta-suave">Antifrágil · Entrenamiento personal</p>
-      </header>
+    <div className="page sin-barra">
+      <div className="perfil-saludo">
+        <Image src="/logo-marca.png" alt="Antifrágil" className="logo-login" width={180} height={48} priority />
+        <h1>Hola, {nombre}</h1>
+        <p className="subtitulo" style={{ margin: 0 }}>
+          {ficha.modalidad === "mensualidad"
+            ? "Así va tu mes"
+            : ficha.modalidad === "cuenta"
+              ? "Así va tu cuenta"
+              : "Así va tu bono ahora mismo"}
+        </p>
+      </div>
 
-      <section className="tarjeta flex flex-col gap-3" aria-label="Tu servicio">
-        <h2 className="font-medium">{ficha.servicio ?? ficha.etiqueta}</h2>
+      <div className="perfil-hero">
+        <div className="programa-nombre">{ficha.servicio ?? "sin servicio asignado"}</div>
 
-        {ficha.muestraBarra && ficha.sesionesTotales !== null ? (
-          <>
-            <div className="flex justify-between text-sm">
-              <span>
-                {ficha.sesionesHechas} de {ficha.sesionesTotales} sesiones
-              </span>
-              <span className="text-tinta-suave">te quedan {ficha.sesionesRestantes}</span>
+        {ficha.modalidad === "bono" && ficha.sesionesTotales ? (
+          <div className="perfil-progreso">
+            <div className="perfil-progreso-numeros">
+              <span className="grande">{ficha.sesionesHechas}</span>
+              <span className="de">de {ficha.sesionesTotales} sesiones</span>
             </div>
-            <div
-              className="h-2 overflow-hidden rounded-full bg-borde"
-              role="progressbar"
-              aria-valuenow={ficha.porcentaje ?? 0}
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-label="Sesiones consumidas"
-            >
-              <div className="h-full rounded-full bg-acento" style={{ width: `${ficha.porcentaje ?? 0}%` }} />
+            <div className="perfil-progreso-barra">
+              <span style={{ width: `${ficha.porcentaje ?? 0}%` }} />
             </div>
-          </>
-        ) : (
-          <p className="text-sm">
-            {ficha.sesionesHechas} {ficha.sesionesHechas === 1 ? "sesión" : "sesiones"}
-            {ficha.mes ? ` en ${nombreMes(ficha.mes)}` : ""}
-          </p>
-        )}
+            <div className="perfil-progreso-restantes">Te quedan {ficha.sesionesRestantes}</div>
+          </div>
+        ) : null}
 
         {ficha.modalidad === "mensualidad" && (
-          <p className="text-sm text-tinta-suave">Cuota del mes: {euros(ficha.cuotaMensual)}</p>
-        )}
-      </section>
-
-      <ConfirmarSesion
-        token={token}
-        pendientes={pendientesHoy.length}
-        confirmadas={confirmadasHoy}
-      />
-
-      {ultimas.length > 0 && (
-        <section className="tarjeta flex flex-col gap-2" aria-label="Tus últimas sesiones">
-          <h2 className="font-medium">Tus últimas sesiones</h2>
-          <ul className="flex flex-col gap-1 text-sm">
-            {ultimas.map((s) => (
-              <li key={s.id} className="flex justify-between border-t border-borde pt-1 first:border-0 first:pt-0">
-                <span>{fechaEs(s.fecha)}</span>
-                <span className="text-tinta-suave tabular-nums">
-                  sesión {s.numeroSesion}
-                  {s.hora ? ` · ${s.hora}` : ""}
+          <>
+            {/* Sin barra ni «te quedan»: no hay nada que agotar. */}
+            <div className="perfil-progreso">
+              <div className="perfil-progreso-numeros">
+                <span className="grande">{ficha.sesionesHechas}</span>
+                <span className="de">
+                  {plural(ficha.sesionesHechas)}
+                  {cuandoMes}
                 </span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-    </main>
+              </div>
+            </div>
+            <dl className="datos-servicio">
+              <div>
+                <dt>Cuota del mes</dt>
+                <dd>{euros(ficha.cuotaMensual)}</dd>
+              </div>
+              {ficha.sesionesReferencia ? (
+                <div>
+                  <dt>Previstas</dt>
+                  <dd>{ficha.sesionesReferencia}</dd>
+                </div>
+              ) : null}
+            </dl>
+          </>
+        )}
+
+        {ficha.modalidad === "cuenta" && (
+          <>
+            <div className="perfil-progreso">
+              <div className="perfil-progreso-numeros">
+                <span className="grande">{ficha.sesionesHechas}</span>
+                <span className="de">
+                  {plural(ficha.sesionesHechas)}
+                  {cuandoMes}
+                </span>
+              </div>
+            </div>
+            <dl className="datos-servicio">
+              <div>
+                <dt>Precio por sesión</dt>
+                <dd>{euros(ficha.tarifa)}</dd>
+              </div>
+              <div>
+                <dt>Total del mes</dt>
+                <dd className="acumulado">{euros(ficha.facturacion)}</dd>
+              </div>
+            </dl>
+          </>
+        )}
+
+        <div className="estado">
+          {ficha.pendientePago ? (
+            <span className="pill pendiente">Pendiente de pago</span>
+          ) : (
+            <span className="pill aldia">Al día</span>
+          )}
+        </div>
+      </div>
+
+      {confirmadasHoy.map((confirmacion, indice) => (
+        <div className="aviso-guardado" key={`${confirmacion.hora}-${indice}`}>
+          Sesión confirmada el {hoy} a las {confirmacion.hora}
+        </div>
+      ))}
+
+      <div className="lista">
+        <div className="cabecera-seccion">
+          <span>Historial de sesiones</span>
+        </div>
+
+        {historial.length === 0 ? (
+          <p className="empty">Todavía no hay sesiones registradas con fecha.</p>
+        ) : (
+          historial.map((sesion) => (
+            <div className="fila" key={sesion.id}>
+              <div className="sesion-fila">
+                <div className="sesion-badge">{sesion.numeroSesion}</div>
+                <div className="sesion-info">
+                  <div className="fecha">{fechaEs(sesion.fecha)}</div>
+                  <div className="tipo">
+                    {sesion.servicio} · sesión {sesion.numeroSesion}
+                    {sesion.sesionesTotales ? ` de ${sesion.sesionesTotales}` : ""}
+                    {sesion.hora ? ` · ${sesion.hora}` : ""}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
   );
 }

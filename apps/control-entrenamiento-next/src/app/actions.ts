@@ -27,14 +27,13 @@ import {
   esquemaAviso,
   esquemaBorrarCliente,
   esquemaCobro,
+  esquemaDatos,
   esquemaEditarSesion,
   esquemaTipoAviso,
   esquemaKids,
-  esquemaEstado,
   esquemaFirma,
   esquemaClaveUnica,
   esquemaLogin,
-  esquemaRenombrar,
   esquemaServicio,
 } from "@/schemas/formularios";
 import {
@@ -110,49 +109,47 @@ export async function accionSalir(): Promise<void> {
   redirect("/login");
 }
 
-export async function accionFirmar(_previo: Resultado | null, datos: FormData): Promise<Resultado> {
+/**
+ * Firmar. Redirige al perfil con el mensaje en la dirección, igual que Flask:
+ * así la pantalla se pinta ya actualizada y recargar no repite la acción.
+ */
+export async function accionFirmar(datos: FormData): Promise<void> {
   await exigirSesion();
   const validado = esquemaFirma.safeParse(desdeFormulario(datos));
-  if (!validado.success) return { ok: false, mensaje: "Petición incompleta.", tono: "error" };
+  if (!validado.success) redirect("/clientes");
 
+  const id = validado.data.clienteId;
+  let mensaje: string;
   try {
-    const resultado = await firmarSesion(validado.data.clienteId, {
-      claveIdempotencia: validado.data.claveIdempotencia,
-    });
-    revalidatePath(`/clientes/${validado.data.clienteId}`);
-    revalidatePath("/clientes");
-
-    if (resultado.duplicado) {
-      return { ok: true, mensaje: "Esa sesión ya estaba firmada. No se ha duplicado.", tono: "aviso" };
+    const r = await firmarSesion(id, { claveIdempotencia: validado.data.claveIdempotencia });
+    if (r.duplicado) {
+      mensaje = "esa sesión ya estaba firmada, no se ha duplicado";
+    } else if (r.renovado) {
+      mensaje = `sesión ${r.numeroSesion} de ${r.sesionesTotales}. El servicio se ha completado y se ha abierto uno nuevo, pendiente de pago`;
+    } else if (r.modalidad === "bono") {
+      mensaje =
+        `sesión ${r.numeroSesion} de ${r.sesionesTotales}` +
+        (r.avisoUltimaSesion ? ". Queda 1 sesión: la próxima toca renovar" : "");
+    } else {
+      mensaje = `sesión ${r.numeroSesion} del mes`;
     }
-    if (resultado.renovado) {
-      return {
-        ok: true,
-        mensaje:
-          `Sesión ${resultado.numeroSesion} de ${resultado.sesionesTotales} firmada. ` +
-          "El servicio se ha completado y se ha abierto uno nuevo, pendiente de pago.",
-        tono: "exito",
-      };
-    }
-    if (resultado.modalidad === "bono") {
-      const aviso = resultado.avisoUltimaSesion ? " Queda 1 sesión: la próxima toca renovar." : "";
-      return {
-        ok: true,
-        mensaje: `Sesión ${resultado.numeroSesion} de ${resultado.sesionesTotales} firmada.${aviso}`,
-        tono: "exito",
-      };
-    }
-    return { ok: true, mensaje: `Sesión ${resultado.numeroSesion} del mes registrada.`, tono: "exito" };
   } catch (error) {
-    return comoMensaje(error);
+    const texto = error instanceof Error ? error.message : "no se ha podido firmar";
+    redirect(`/clientes/${id}?error=${encodeURIComponent(texto)}`);
   }
+
+  revalidatePath(`/clientes/${id}`);
+  revalidatePath("/clientes");
+  redirect(`/clientes/${id}?firmado=${encodeURIComponent(mensaje)}`);
 }
 
-export async function accionCrearCliente(_previo: Resultado | null, datos: FormData): Promise<Resultado> {
+/** «Confirmar y crear». Termina en la ficha del cliente nuevo, como Flask. */
+export async function accionCrearCliente(datos: FormData): Promise<void> {
   await exigirSesion();
   const validado = esquemaAlta.safeParse(desdeFormulario(datos));
   if (!validado.success) {
-    return { ok: false, mensaje: validado.error.issues[0]?.message ?? "Revisa los datos.", tono: "error" };
+    const texto = validado.error.issues[0]?.message ?? "revisa los datos";
+    redirect(`/clientes/nuevo?error=${encodeURIComponent(texto)}`);
   }
 
   let id: string;
@@ -169,24 +166,23 @@ export async function accionCrearCliente(_previo: Resultado | null, datos: FormD
     });
     id = cliente.id;
   } catch (error) {
-    return comoMensaje(error);
+    const texto = error instanceof Error ? error.message : "no se ha podido crear el cliente";
+    redirect(`/clientes/nuevo?error=${encodeURIComponent(texto)}`);
   }
   revalidatePath("/clientes");
   redirect(`/clientes/${id}`);
 }
 
-export async function accionConfigurarServicio(
-  _previo: Resultado | null,
-  datos: FormData,
-): Promise<Resultado> {
+/** «Guardar cambios» de Editar programa. Vuelve al perfil, como Flask. */
+export async function accionConfigurarServicio(datos: FormData): Promise<void> {
   await exigirSesion();
   const validado = esquemaServicio.safeParse(desdeFormulario(datos));
-  if (!validado.success) {
-    return { ok: false, mensaje: validado.error.issues[0]?.message ?? "Revisa los datos.", tono: "error" };
-  }
+  if (!validado.success) redirect("/clientes");
 
+  const id = validado.data.clienteId;
+  let mensaje: string;
   try {
-    const resultado = await configurarServicio(validado.data.clienteId, {
+    const resultado = await configurarServicio(id, {
       modalidad: validado.data.modalidad,
       servicio: validado.data.servicio,
       sesionesTotales: validado.data.sesionesTotales,
@@ -195,123 +191,120 @@ export async function accionConfigurarServicio(
       tarifa: validado.data.tarifa,
       sesionesReferencia: validado.data.sesionesReferencia,
     });
-    revalidatePath(`/clientes/${validado.data.clienteId}`);
-    revalidatePath("/clientes");
-
-    return {
-      ok: true,
-      tono: "exito",
-      mensaje: resultado.cerroCiclo
-        ? "Servicio anterior cerrado y servicio nuevo abierto. Las sesiones ya hechas no se han tocado."
-        : "Condiciones actualizadas. Las sesiones ya firmadas conservan su precio.",
-    };
+    mensaje = resultado.cerroCiclo
+      ? "servicio anterior cerrado y servicio nuevo abierto. Las sesiones ya hechas no se han tocado"
+      : "condiciones actualizadas. Las sesiones ya firmadas conservan su precio";
   } catch (error) {
-    return comoMensaje(error);
+    const texto = error instanceof Error ? error.message : "no se ha podido guardar";
+    redirect(`/clientes/${id}/programa?error=${encodeURIComponent(texto)}`);
   }
+
+  revalidatePath(`/clientes/${id}`);
+  revalidatePath("/clientes");
+  redirect(`/clientes/${id}?guardado=${encodeURIComponent(mensaje)}`);
 }
 
-export async function accionCambiarEstado(_previo: Resultado | null, datos: FormData): Promise<Resultado> {
+/**
+ * «Confirmar y guardar» de Editar datos: nombre y estado a la vez, igual que
+ * la ruta `guardar` de Flask. Son los dos únicos campos de esa pantalla.
+ */
+export async function accionGuardarDatos(datos: FormData): Promise<void> {
   await exigirSesion();
-  const validado = esquemaEstado.safeParse(desdeFormulario(datos));
-  if (!validado.success) return { ok: false, mensaje: "Estado no válido.", tono: "error" };
+  const validado = esquemaDatos.safeParse(desdeFormulario(datos));
+  if (!validado.success) redirect("/clientes");
 
+  const id = validado.data.clienteId;
   try {
-    await cambiarEstado(validado.data.clienteId, validado.data.estado);
-    revalidatePath(`/clientes/${validado.data.clienteId}`);
-    revalidatePath("/clientes");
-    return { ok: true, mensaje: `Cliente marcado como ${validado.data.estado}.`, tono: "exito" };
+    await renombrarCliente(id, validado.data.nombre);
+    await cambiarEstado(id, validado.data.estado);
   } catch (error) {
-    return comoMensaje(error);
+    const texto = error instanceof Error ? error.message : "no se ha podido guardar";
+    redirect(`/clientes/${id}/datos?error=${encodeURIComponent(texto)}`);
   }
+
+  revalidatePath(`/clientes/${id}`);
+  revalidatePath("/clientes");
+  redirect(`/clientes/${id}?guardado=${encodeURIComponent("datos del cliente actualizados")}`);
 }
 
-export async function accionRenombrar(_previo: Resultado | null, datos: FormData): Promise<Resultado> {
-  await exigirSesion();
-  const validado = esquemaRenombrar.safeParse(desdeFormulario(datos));
-  if (!validado.success) {
-    return { ok: false, mensaje: validado.error.issues[0]?.message ?? "Nombre no válido.", tono: "error" };
-  }
-
-  try {
-    await renombrarCliente(validado.data.clienteId, validado.data.nombre);
-    revalidatePath(`/clientes/${validado.data.clienteId}`);
-    revalidatePath("/clientes");
-    return { ok: true, mensaje: "Nombre actualizado. Su historial y su enlace no cambian.", tono: "exito" };
-  } catch (error) {
-    return comoMensaje(error);
-  }
-}
-
-export async function accionMarcarCobro(_previo: Resultado | null, datos: FormData): Promise<Resultado> {
+/** Solo toca el estado de COBRO: no altera sesiones, horas, historial ni
+ *  economía. Vuelve al perfil con el aviso, igual que Flask. */
+export async function accionMarcarCobro(datos: FormData): Promise<void> {
   await exigirSesion();
   const validado = esquemaCobro.safeParse(desdeFormulario(datos));
-  if (!validado.success) return { ok: false, mensaje: "Petición incompleta.", tono: "error" };
+  if (!validado.success) redirect("/clientes");
 
+  const id = validado.data.clienteId;
   try {
-    await marcarCobro(validado.data.clienteId, validado.data.ciclo, validado.data.pagado);
-    revalidatePath(`/clientes/${validado.data.clienteId}`);
-    revalidatePath("/clientes");
-    return {
-      ok: true,
-      mensaje: validado.data.pagado
-        ? "Marcado como cobrado. No se ha movido ninguna cifra de facturación."
-        : "Marcado como pendiente de cobro.",
-      tono: "exito",
-    };
+    await marcarCobro(id, validado.data.ciclo, validado.data.pagado);
   } catch (error) {
-    return comoMensaje(error);
+    const texto = error instanceof Error ? error.message : "no se ha podido guardar";
+    redirect(`/clientes/${id}?error=${encodeURIComponent(texto)}`);
   }
+  revalidatePath(`/clientes/${id}`);
+  revalidatePath("/clientes");
+  redirect(`/clientes/${id}?cobro=1`);
 }
 
-export async function accionBorrarSesion(_previo: Resultado | null, datos: FormData): Promise<Resultado> {
+export async function accionBorrarSesion(datos: FormData): Promise<void> {
   await exigirSesion();
   const validado = esquemaBorrarSesion.safeParse(desdeFormulario(datos));
-  if (!validado.success) return { ok: false, mensaje: "Petición incompleta.", tono: "error" };
+  if (!validado.success) redirect("/clientes");
 
+  const id = validado.data.clienteId;
+  const aviso = "su importe se ha descontado de la semana correspondiente";
   try {
-    await eliminarSesion(validado.data.clienteId, validado.data.sesionId);
-    revalidatePath(`/clientes/${validado.data.clienteId}`);
-    revalidatePath("/clientes");
-    return { ok: true, mensaje: "Sesión borrada y su importe descontado.", tono: "exito" };
+    await eliminarSesion(id, validado.data.sesionId);
   } catch (error) {
-    return comoMensaje(error);
+    const texto = error instanceof Error ? error.message : "no se ha podido borrar";
+    redirect(`/clientes/${id}/sesion/${validado.data.sesionId}?error=${encodeURIComponent(texto)}`);
   }
+
+  revalidatePath(`/clientes/${id}`);
+  revalidatePath("/clientes");
+  revalidatePath("/economia");
+  redirect(`/clientes/${id}?borrado=${encodeURIComponent(aviso)}`);
 }
 
 // ---------------------------------------------------------------------------
 // Economía
 // ---------------------------------------------------------------------------
 
-export async function accionRegistrarClase(_previo: Resultado | null, datos: FormData): Promise<Resultado> {
+/**
+ * Los cuatro botones de CrossFit redirigen con el mensaje en la dirección,
+ * igual que `firmar_clase` y `deshacer_clase` en Flask: la pantalla se pinta ya
+ * actualizada y recargar no vuelve a sumar la clase.
+ */
+export async function accionRegistrarClase(datos: FormData): Promise<void> {
   await exigirSesion();
   const validado = esquemaClase.safeParse(desdeFormulario(datos));
-  if (!validado.success) return { ok: false, mensaje: "Tipo de clase no válido.", tono: "error" };
+  if (!validado.success) redirect("/economia");
 
   try {
     await registrarClase(validado.data.tipo);
-    revalidatePath("/economia");
-    return { ok: true, mensaje: `${etiquetaClase(validado.data.tipo)}: clase de hoy registrada.`, tono: "exito" };
   } catch (error) {
-    return comoMensaje(error);
+    const texto = error instanceof Error ? error.message : "no se ha podido registrar la clase";
+    redirect(`/economia?error=${encodeURIComponent(texto)}`);
   }
+  revalidatePath("/economia");
+  redirect(`/economia?registrada=${encodeURIComponent(etiquetaClase(validado.data.tipo))}`);
 }
 
-export async function accionDeshacerClase(_previo: Resultado | null, datos: FormData): Promise<Resultado> {
+export async function accionDeshacerClase(datos: FormData): Promise<void> {
   await exigirSesion();
   const validado = esquemaClase.safeParse(desdeFormulario(datos));
-  if (!validado.success) return { ok: false, mensaje: "Tipo de clase no válido.", tono: "error" };
+  if (!validado.success) redirect("/economia");
 
+  let cuando: string;
   try {
-    const cuando = await deshacerClase(validado.data.tipo);
-    revalidatePath("/economia");
-    return {
-      ok: true,
-      mensaje: `Deshecha la última clase de ${etiquetaClase(validado.data.tipo)} (${cuando}).`,
-      tono: "exito",
-    };
+    cuando = await deshacerClase(validado.data.tipo);
   } catch (error) {
-    return comoMensaje(error);
+    const texto = error instanceof Error ? error.message : "no se ha podido deshacer";
+    redirect(`/economia?error=${encodeURIComponent(texto)}`);
   }
+  revalidatePath("/economia");
+  const mensaje = `${etiquetaClase(validado.data.tipo)} del ${cuando}`;
+  redirect(`/economia?deshecha=${encodeURIComponent(mensaje)}`);
 }
 
 export async function accionFacturacionKids(_previo: Resultado | null, datos: FormData): Promise<Resultado> {
@@ -344,67 +337,58 @@ export async function accionFacturacionKids(_previo: Resultado | null, datos: Fo
 // Avisos, corrección de sesiones y baja de clientes
 // ---------------------------------------------------------------------------
 
-export async function accionResolverAviso(_previo: Resultado | null, datos: FormData): Promise<Resultado> {
+/** Descartar vuelve a la bandeja, igual que Flask: sin mensaje, la lista ya
+ *  enseña el resultado. */
+export async function accionResolverAviso(datos: FormData): Promise<void> {
   await exigirSesion();
   const validado = esquemaAviso.safeParse(desdeFormulario(datos));
-  if (!validado.success) return { ok: false, mensaje: "Aviso no válido.", tono: "error" };
-
-  try {
-    await resolverAviso(validado.data.id);
-    revalidatePath("/avisos");
-    return { ok: true, mensaje: "Aviso descartado.", tono: "exito" };
-  } catch (error) {
-    return comoMensaje(error);
-  }
+  if (validado.success) await resolverAviso(validado.data.id);
+  revalidatePath("/avisos");
+  redirect("/avisos");
 }
 
-export async function accionResolverTipo(_previo: Resultado | null, datos: FormData): Promise<Resultado> {
+export async function accionResolverTipo(datos: FormData): Promise<void> {
   await exigirSesion();
   const validado = esquemaTipoAviso.safeParse(desdeFormulario(datos));
-  if (!validado.success) return { ok: false, mensaje: "Tipo no válido.", tono: "error" };
-
-  try {
-    const cuantos = await resolverPorTipo(validado.data.tipo);
-    revalidatePath("/avisos");
-    return { ok: true, mensaje: `${cuantos} avisos descartados.`, tono: "exito" };
-  } catch (error) {
-    return comoMensaje(error);
-  }
+  if (validado.success) await resolverPorTipo(validado.data.tipo);
+  revalidatePath("/avisos");
+  redirect("/avisos");
 }
 
-export async function accionEditarSesion(_previo: Resultado | null, datos: FormData): Promise<Resultado> {
+export async function accionEditarSesion(datos: FormData): Promise<void> {
   await exigirSesion();
-  const validado = esquemaEditarSesion.safeParse(desdeFormulario(datos));
+  const entrada = desdeFormulario(datos);
+  const validado = esquemaEditarSesion.safeParse(entrada);
   if (!validado.success) {
-    return { ok: false, mensaje: validado.error.issues[0]?.message ?? "Revisa los datos.", tono: "error" };
+    const texto = validado.error.issues[0]?.message ?? "revisa los datos";
+    redirect(
+      `/clientes/${entrada.clienteId}/sesion/${entrada.sesionId}?error=${encodeURIComponent(texto)}`,
+    );
   }
 
+  const { clienteId, sesionId, fecha, numeroSesion } = validado.data;
   try {
-    await editarSesion(
-      validado.data.clienteId,
-      validado.data.sesionId,
-      validado.data.fecha,
-      validado.data.numeroSesion,
-    );
-    revalidatePath(`/clientes/${validado.data.clienteId}`);
-    revalidatePath("/economia");
-    return { ok: true, mensaje: "Sesión corregida.", tono: "exito" };
+    await editarSesion(clienteId, sesionId, fecha, numeroSesion);
   } catch (error) {
-    return comoMensaje(error);
+    const texto = error instanceof Error ? error.message : "no se ha podido guardar";
+    redirect(`/clientes/${clienteId}/sesion/${sesionId}?error=${encodeURIComponent(texto)}`);
   }
+
+  revalidatePath(`/clientes/${clienteId}`);
+  revalidatePath("/economia");
+  redirect(`/clientes/${clienteId}?guardado=${encodeURIComponent("sesión corregida")}`);
 }
 
-export async function accionBorrarCliente(_previo: Resultado | null, datos: FormData): Promise<Resultado> {
+export async function accionBorrarCliente(datos: FormData): Promise<void> {
   await exigirSesion();
   const validado = esquemaBorrarCliente.safeParse(desdeFormulario(datos));
-  if (!validado.success) {
-    return { ok: false, mensaje: "Escribe BORRAR para confirmar.", tono: "error" };
-  }
+  if (!validado.success) redirect("/clientes");
 
   try {
     await eliminarClienteConHistorial(validado.data.clienteId);
   } catch (error) {
-    return comoMensaje(error);
+    const texto = error instanceof Error ? error.message : "no se ha podido borrar";
+    redirect(`/clientes/${validado.data.clienteId}/eliminar?error=${encodeURIComponent(texto)}`);
   }
   revalidatePath("/clientes");
   revalidatePath("/economia");

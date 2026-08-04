@@ -58,19 +58,3 @@ export function rangoSemana(fechaIso: string): { inicio: string; fin: string } {
   domingo.setUTCDate(lunes.getUTCDate() + 6);
   return { inicio: lunes.toISOString().slice(0, 10), fin: domingo.toISOString().slice(0, 10) };
 }
-
-const MESES = [
-  "enero", "febrero", "marzo", "abril", "mayo", "junio",
-  "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
-];
-
-export function nombreMes(mes: number): string {
-  return MESES[mes - 1] ?? "";
-}
-
-/** 2026-08-03 → 03/08/2026, que es como se lee una fecha en España. */
-export function fechaEs(fechaIso: string): string {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(fechaIso)) return fechaIso;
-  const [a, m, d] = fechaIso.split("-");
-  return `${d}/${m}/${a}`;
-}

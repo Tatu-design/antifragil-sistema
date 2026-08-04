@@ -1,25 +1,29 @@
-import { ChevronLeft } from "lucide-react";
+import { randomUUID } from "node:crypto";
+import { headers } from "next/headers";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-
-import { BotonFirmar } from "@/components/BotonFirmar";
-import { CambiarEstado } from "@/components/CambiarEstado";
-import { EnlaceDelCliente } from "@/components/EnlaceDelCliente";
-import { EditarServicio } from "@/components/EditarServicio";
-import { HistorialServicios } from "@/components/HistorialServicios";
-import { ZonaPeligrosa } from "@/components/ZonaPeligrosa";
-import { TarjetaServicio } from "@/components/TarjetaServicio";
-import { haySesion } from "@/lib/auth";
-import { obtenerPerfil } from "@/services/clientes";
-import { SinConexion } from "@/components/SinConexion";
-import { BaseNoDisponible } from "@/repositories/postgres";
-import { headers } from "next/headers";
 import QRCode from "qrcode";
-import { randomUUID } from "node:crypto";
+
+import { accionFirmar } from "@/app/actions";
+import { BotonFirmar, EnlaceYQr } from "@/components/AccionesPerfil";
+import { HistorialProgramas } from "@/components/HistorialProgramas";
+import { Iconos, Icono } from "@/components/Iconos";
+import { PerfilHero } from "@/components/PerfilHero";
+import { SinConexion } from "@/components/SinConexion";
+import { haySesion } from "@/lib/auth";
+import { BaseNoDisponible } from "@/repositories/postgres";
+import { confirmacionDeHoy, obtenerPerfil } from "@/services/clientes";
 
 export const dynamic = "force-dynamic";
 
-export default async function PaginaPerfil({ params }: { params: Promise<{ id: string }> }) {
+/** Misma estructura que `webapp/templates/perfil_cliente.html`. */
+export default async function PaginaPerfil({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ firmado?: string; borrado?: string; cobro?: string; guardado?: string }>;
+}) {
   if (!(await haySesion())) redirect("/login");
 
   const { id } = await params;
@@ -33,59 +37,102 @@ export default async function PaginaPerfil({ params }: { params: Promise<{ id: s
   if (!perfil) notFound();
 
   const { cliente, ficha, servicios } = perfil;
+  const { firmado, borrado, cobro, guardado } = await searchParams;
+
+  const confirmacion = await confirmacionDeHoy(cliente.id);
 
   // La dirección se calcula desde la petición: así el enlace es correcto tanto
-  // en local como en el despliegue, sin tener que configurarlo en dos sitios.
+  // en local como desplegado, sin configurarlo en dos sitios.
   const cabeceras = await headers();
   const anfitrion = cabeceras.get("x-forwarded-host") ?? cabeceras.get("host") ?? "localhost:3000";
   const protocolo = anfitrion.startsWith("localhost") ? "http" : "https";
   const enlace = `${protocolo}://${anfitrion}/mi/${cliente.token}`;
-  // El QR lleva a confirmar directamente: escanearlo ya confirma.
-  const qr = await QRCode.toDataURL(`${enlace}/confirmar`, { margin: 1, width: 384 });
+  const qr = await QRCode.toDataURL(`${enlace}/confirmar`, {
+    width: 190,
+    margin: 1,
+    color: { dark: "#0f172a", light: "#ffffff" },
+  });
+
+  const estado = cliente.estado[0]!.toUpperCase() + cliente.estado.slice(1);
 
   return (
-    <main className="flex flex-col gap-4">
-      <Link
-        href="/clientes"
-        className="inline-flex items-center gap-1 text-sm text-tinta-suave hover:text-acento"
-      >
-        <ChevronLeft className="h-4 w-4" aria-hidden />
-        Clientes
-      </Link>
+    <>
+      <Iconos />
+      <div className="page sin-barra">
+        <Link className="volver" href="/clientes">
+          <Icono nombre="i-arrow-left" pequeno />
+          Clientes
+        </Link>
 
-      <header className="flex flex-wrap items-baseline justify-between gap-2">
-        <h1 className="text-2xl font-semibold tracking-tight">{cliente.nombre}</h1>
-        <span
-          className={`rounded-full px-2 py-1 text-xs font-medium ${
-            cliente.estado === "activo" ? "bg-acento/10 text-acento-oscuro" : "bg-borde text-tinta-suave"
-          }`}
-        >
-          {cliente.estado[0]!.toUpperCase() + cliente.estado.slice(1)}
-        </span>
-      </header>
+        {/* Nombre y estado en la misma línea: el estado se ve de un vistazo y
+            es un enlace a cambiarlo, así que no hace falta subtítulo. */}
+        <div className="ficha-titulo">
+          <h1>{cliente.nombre}</h1>
+          <Link className={`pill estado-${cliente.estado}`} href={`/clientes/${cliente.id}/datos`}>
+            {estado}
+          </Link>
+        </div>
 
-      <TarjetaServicio ficha={ficha} />
-
-      {/* La firma es la acción principal: va antes que nada editable. */}
-      <BotonFirmar clienteId={cliente.id} ficha={ficha} clave={randomUUID()} />
-
-      <CambiarEstado clienteId={cliente.id} estado={cliente.estado} nombre={cliente.nombre} />
-
-      <EditarServicio clienteId={cliente.id} ficha={ficha} />
-
-      <EnlaceDelCliente enlace={enlace} qr={qr} />
-
-      <HistorialServicios clienteId={cliente.id} servicios={servicios} />
-
-      <ZonaPeligrosa
-        clienteId={cliente.id}
-        nombre={cliente.nombre}
-        sesiones={servicios.reduce((n, s) => n + s.sesiones.length, 0)}
-        importe={servicios.reduce(
-          (suma, s) => suma + s.sesiones.reduce((total, ses) => total + (ses.tarifa ?? 0), 0),
-          0,
+        {firmado && <div className="aviso-guardado">✔ Sesión firmada — {firmado}</div>}
+        {borrado && <div className="aviso-guardado">✔ Sesión borrada — {borrado}</div>}
+        {guardado && <div className="aviso-guardado">✔ Guardado: {guardado}</div>}
+        {cobro && (
+          <div className="aviso-guardado">
+            ✔ Estado de cobro actualizado — no se ha tocado ninguna sesión ni la economía
+          </div>
         )}
-      />
-    </main>
+
+        {cliente.estado !== "activo" ? (
+          <div className="aviso-texto">
+            Este cliente está <strong>{cliente.estado}</strong>:{" "}
+            {cliente.estado === "pausado"
+              ? "no se pueden firmar sesiones mientras lo esté."
+              : "no se pueden firmar sesiones."}{" "}
+            Su servicio y su historial se conservan intactos. Puedes reactivarlo en «Editar datos».
+          </div>
+        ) : (
+          !ficha.completo && (
+            <div className="aviso-texto">
+              No se pueden firmar sesiones todavía: a este servicio le falta{" "}
+              <strong>{ficha.faltan.join(" y ")}</strong>. Rellénalo en «Editar programa».
+            </div>
+          )
+        )}
+
+        <PerfilHero clienteId={cliente.id} ficha={ficha} />
+
+        {/* Acción principal. Depende de `ficha.puedeFirmar`, que mira el estado
+            del cliente y los datos que SU modalidad necesita. */}
+        {ficha.puedeFirmar && (
+          <form action={accionFirmar} className="accion-principal">
+            <input type="hidden" name="clienteId" value={cliente.id} />
+            {/* Un valor distinto en cada carga: dos envíos del mismo formulario
+                cuentan como uno solo. */}
+            <input type="hidden" name="claveIdempotencia" value={randomUUID()} />
+            <BotonFirmar />
+          </form>
+        )}
+
+        {/* Acciones secundarias, del mismo tamaño. */}
+        <div className="acciones-perfil">
+          <Link className="boton-secundario" href={`/clientes/${cliente.id}/datos`}>
+            Editar datos
+          </Link>
+          <Link className="boton-secundario" href={`/clientes/${cliente.id}/programa`}>
+            Editar programa
+          </Link>
+        </div>
+
+        <EnlaceYQr
+          nombre={cliente.nombre}
+          enlace={enlace}
+          qr={qr}
+          mostrarQr={Boolean(firmado) && confirmacion.hayPendiente}
+          confirmadas={confirmacion.confirmadas}
+        />
+
+        <HistorialProgramas clienteId={cliente.id} nombre={cliente.nombre} servicios={servicios} />
+      </div>
+    </>
   );
 }

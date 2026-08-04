@@ -1,21 +1,25 @@
-import { Plus } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { BarraInferior } from "@/components/BarraInferior";
-import { BotonSalir } from "@/components/BotonSalir";
-import { FiltrosClientes } from "@/components/FiltrosClientes";
-import { contarNoLeidos } from "@/services/avisos";
+import { Iconos, Icono } from "@/components/Iconos";
+import { ListaClientes } from "@/components/ListaClientes";
 import { SinConexion } from "@/components/SinConexion";
+import { haySesion } from "@/lib/auth";
 import { BaseNoDisponible } from "@/repositories/postgres";
-import { correoActual, haySesion } from "@/lib/auth";
+import { contarNoLeidos } from "@/services/avisos";
 import { listarClientes } from "@/services/clientes";
 
-// El repositorio de staging escribe en disco, así que esta pantalla se calcula
-// en cada petición: si se cacheara, firmar una sesión no se vería.
 export const dynamic = "force-dynamic";
+export const metadata = { title: "Antifrágil — Clientes" };
 
-export default async function PaginaClientes() {
+/** Misma estructura que `webapp/templates/index.html`. */
+export default async function PaginaClientes({
+  searchParams,
+}: {
+  searchParams: Promise<{ guardado?: string; eliminado?: string }>;
+}) {
   if (!(await haySesion())) redirect("/login");
 
   let clientes;
@@ -28,24 +32,36 @@ export default async function PaginaClientes() {
     throw error;
   }
 
+  const { guardado, eliminado } = await searchParams;
+
   return (
-    <main className="flex flex-col gap-4">
-      <header className="flex items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold tracking-tight">Lista de clientes</h1>
-        <Link
-          href="/clientes/nuevo"
-          aria-label="Nuevo cliente"
-          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-tarjeta bg-acento text-white transition hover:bg-acento-oscuro"
-        >
-          <Plus className="h-5 w-5" aria-hidden />
-        </Link>
-      </header>
+    <>
+      <Iconos />
+      <div className="page-ancha">
+        <header className="cabecera-app">
+          <div className="cabecera-app-marca">
+            <Image src="/logo-marca.png" alt="Antifrágil" className="logo-nav" width={120} height={32} priority />
+            <Link className="chip-cabecera" href="/salir">
+              Salir
+            </Link>
+          </div>
+        </header>
 
-      <FiltrosClientes clientes={clientes} />
+        <div className="cabecera-pagina">
+          <h1>Lista de clientes</h1>
+          <Link className="boton-nuevo" href="/clientes/nuevo">
+            <Icono nombre="i-plus" pequeno />
+            Nuevo
+          </Link>
+        </div>
 
-      <BotonSalir correo={await correoActual()} />
+        {guardado && <div className="aviso-guardado">✔ Guardado: {guardado}</div>}
+        {eliminado && <div className="aviso-guardado">✔ Cliente borrado: {eliminado}</div>}
+
+        <ListaClientes clientes={clientes} />
+      </div>
 
       <BarraInferior activa="clientes" sinLeer={sinLeer} />
-    </main>
+    </>
   );
 }

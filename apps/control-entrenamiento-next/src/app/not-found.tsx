@@ -2,14 +2,14 @@ import Link from "next/link";
 
 export default function NoEncontrado() {
   return (
-    <main className="flex min-h-[70dvh] flex-col items-center justify-center gap-4 text-center">
-      <h1 className="text-xl font-semibold">Eso no existe</h1>
-      <p className="text-sm text-tinta-suave">
-        El cliente o la página que buscas no está aquí. Puede que se haya borrado.
+    <div className="page sin-barra">
+      <h1>Eso no existe</h1>
+      <p className="subtitulo">
+        La página o el cliente que buscas no está aquí.
       </p>
-      <Link href="/clientes" className="boton-suave max-w-xs">
+      <Link className="boton" href="/clientes">
         Volver a clientes
       </Link>
-    </main>
+    </div>
   );
 }

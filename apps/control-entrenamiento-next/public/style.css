@@ -1,0 +1,1228 @@
+/* ==========================================================================
+   Antifrágil — sistema visual «Liquid Glass»
+   ==========================================================================
+
+   Rediseño de Fernando (2026-07-31), llevado desde su maqueta a las
+   plantillas reales. Ideas del sistema:
+
+   - Fondo perla con una «aurora» de luces suaves, fija detrás de todo.
+   - Superficies de cristal: blanco translúcido + desenfoque del fondo,
+     borde claro y sombra baja. Nunca cajas blancas opacas.
+   - Un solo acento (verde azulado) para lo interactivo; el resto del color
+     se reserva para el ESTADO (pendiente, al día, alerta).
+   - Radio generoso: 16px en tarjetas, píldora en controles.
+   - Tipografía Geist (variable) e iconos servidos desde este mismo
+     servidor, no desde Google ni un CDN — misma razón que en julio de
+     2026: velocidad y no depender de terceros.
+
+   Móvil primero: el diseño asume una columna estrecha. En pantalla grande
+   esa columna se centra en vez de estirarse (decisión del 2026-07-31).
+   ========================================================================== */
+
+@font-face {
+  font-family: "Geist";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/fonts/geist-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Geist";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/fonts/geist-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF,
+    U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020,
+    U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+:root {
+  /* Fondo REAL de la app en el diseño (#F5F7F4). No confundir con el gris
+     del lienzo del editor (#e7e5e0), que es donde flota el marco del
+     teléfono — usarlo teñía toda la app de un tono equivocado. */
+  --perla: #f5f7f4;
+  --tinta: #111315;
+  --tinta-media: #3f4644;
+  --tinta-suave: #6e7572;
+
+  --acento: #1fa99a;
+  --acento-claro: #2bc0ae;
+  --acento-oscuro: #146b60;
+  --acento-velo: rgba(31, 169, 154, 0.10);
+
+  --alerta: #b45309;
+  --alerta-velo: rgba(245, 158, 11, 0.12);
+  --bien: #059669;
+  --bien-velo: rgba(16, 185, 129, 0.12);
+  --peligro: #c0283b;
+  --peligro-velo: rgba(192, 40, 59, 0.10);
+
+  /* RENDIMIENTO (2026-07-31): el desenfoque del fondo (`backdrop-filter`)
+     es precioso pero carísimo — el navegador tiene que recalcularlo en cada
+     fotograma mientras se hace scroll, POR CADA elemento que lo lleve. Con
+     13 capas a la vez en la portada, la app iba a tirones en el móvil.
+
+     Ahora el desenfoque se reserva a lo que de verdad tiene contenido
+     deslizándose por debajo: la barra de pestañas y las ventanas
+     superpuestas. Todo lo que hace scroll usa un blanco algo más opaco,
+     que sobre un fondo suave como este se ve prácticamente igual y no
+     cuesta nada. */
+  --cristal: rgba(255, 255, 255, 0.82);
+  --cristal-tenue: rgba(255, 255, 255, 0.58);
+  --cristal-borde: rgba(255, 255, 255, 0.72);
+  --cristal-borde-firme: rgba(16, 24, 32, 0.10);
+  /* Sombra más corta que la del diseño (28px de difuminado): cuanto mayor
+     es el radio, más área tiene que pintar el navegador, y esto se repite
+     en cada tarjeta de la lista. A este tamaño la diferencia no se aprecia
+     y el pintado es bastante más barato. */
+  --cristal-sombra: 0 3px 10px -5px rgba(16, 24, 32, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+  --cristal-desenfoque: blur(20px) saturate(140%);
+
+  --radio: 16px;
+  --radio-grande: 24px;
+  /* Ancho exacto del marco del diseño. */
+  --columna: 430px;
+  /* Hueco que deja la barra de pestañas inferior, para que el contenido no
+     quede escondido debajo. */
+  --alto-barra: 84px;
+}
+
+* { box-sizing: border-box; }
+
+/* Lo marcado como `hidden` se esconde, pase lo que pase.
+   El navegador oculta `[hidden]` con `display: none`, pero CUALQUIER regla
+   propia que fije un `display` gana a esa. Sin esto, las tarjetas de cliente
+   (`display: block`) seguían viéndose al filtrar aunque el JavaScript las
+   marcara como ocultas — los filtros no hacían nada (2026-08-01). */
+[hidden] { display: none !important; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--perla);
+  color: var(--tinta);
+  font-family: "Geist", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-feature-settings: "rlig" 1, "calt" 1, "ss01" 1;
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.5;
+}
+
+/* La aurora: luces suaves detrás de todo.
+   El diseño usa cuatro degradados a pantalla completa; se dejan los DOS que
+   de verdad se ven (el verde de arriba y el lila de la derecha) más un rosa
+   tenue abajo. Cada degradado a pantalla completa es trabajo de pintado, y
+   esta capa cubre toda la ventana.
+
+   `background-attachment` NO se usa a propósito: una capa fija se pinta una
+   vez y el navegador la reutiliza al hacer scroll. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(135% 100% at 6% -10%, rgba(82, 214, 195, 0.30) 0%, rgba(82, 214, 195, 0) 52%),
+    radial-gradient(125% 90% at 100% 2%, rgba(199, 210, 254, 0.34) 0%, rgba(199, 210, 254, 0) 55%),
+    radial-gradient(120% 85% at 96% 98%, rgba(246, 199, 227, 0.22) 0%, rgba(246, 199, 227, 0) 58%);
+}
+
+/* ----- Estructura ----- */
+
+.page,
+.page-ancha {
+  width: 100%;
+  max-width: var(--columna);
+  margin: 0 auto;
+  /* 16px a los lados, como el diseño.
+     Abajo se reserva el hueco de la barra de pestañas MÁS la franja de
+     seguridad del móvil (la del gesto de inicio en iPhone, y equivalentes en
+     Android). Sin ese extra, la última tarjeta quedaba medio tapada por la
+     barra — confirmado en el iPhone de Fernando, 2026-08-01. En escritorio
+     `env()` vale 0, así que no sobra espacio. */
+  padding: 0 16px calc(var(--alto-barra) + 16px + env(safe-area-inset-bottom, 0px));
+}
+
+/* Las pantallas sin barra de pestañas no necesitan reservar ese hueco. */
+.page.sin-barra,
+.page-ancha.sin-barra {
+  padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+}
+
+/* ----- Iconos ----- */
+
+/* El trazo se define AQUÍ, no en el archivo de iconos: cuando el icono se
+   traía de un SVG externo, los atributos de aquel archivo no llegaban al
+   dibujo y salían rellenos de negro (la campana y el euro eran manchas en
+   el móvil de Fernando, 2026-08-01). Puesto en CSS funciona siempre. */
+.icono {
+  width: 1.125rem;
+  height: 1.125rem;
+  flex: none;
+  display: inline-block;
+  vertical-align: -0.2em;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.icono-sm { width: 0.9375rem; height: 0.9375rem; }
+.icono-lg { width: 1.375rem; height: 1.375rem; }
+
+/* ----- Superficie de cristal: la pieza base ----- */
+
+.cristal,
+.lista,
+.perfil-hero,
+.stat-card,
+.formulario {
+  background: var(--cristal);
+  border: 1px solid var(--cristal-borde);
+  border-radius: var(--radio);
+  box-shadow: var(--cristal-sombra);
+}
+
+/* ----- Cabeceras y textos ----- */
+
+h1 {
+  font-size: 1.5rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  margin: 0 0 0.25rem;
+  text-wrap: balance;
+}
+
+.subtitulo { margin: 0 0 1.25rem; color: var(--tinta-suave); font-size: 0.875rem; }
+
+.cabecera-pagina {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.cabecera-seccion,
+.fecha-seccion {
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--tinta-suave);
+}
+
+.cabecera-seccion {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.9rem 1.1rem;
+  border-bottom: 1px solid rgba(16, 24, 32, 0.06);
+}
+
+.meta, .nota { font-size: 0.75rem; color: var(--tinta-suave); margin: 0.35rem 0 0; }
+
+.empty {
+  padding: 1.75rem 1.1rem;
+  text-align: center;
+  color: var(--tinta-suave);
+  font-size: 0.875rem;
+  margin: 0;
+}
+
+.volver {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--tinta-suave);
+  text-decoration: none;
+  margin-bottom: 0.9rem;
+}
+.volver:hover { color: var(--acento); }
+
+/* ----- Listas de tarjetas ----- */
+
+.lista { overflow: hidden; }
+
+.fila { padding: 0.9rem 1.1rem; transition: background-color 0.15s ease; }
+.fila + .fila { border-top: 1px solid rgba(16, 24, 32, 0.06); }
+.lista > .fila:hover { background: rgba(255, 255, 255, 0.45); }
+
+.cabecera { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
+.nombre { font-weight: 700; font-size: 0.9375rem; letter-spacing: -0.01em; }
+.programa { font-size: 0.8125rem; color: var(--tinta-suave); }
+
+.editar {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--acento);
+  text-decoration: none;
+}
+.editar:hover { color: var(--acento-oscuro); }
+
+.acciones-fila { display: flex; align-items: center; gap: 0.75rem; margin-top: 0.5rem; }
+
+/* ----- Etiquetas de estado ----- */
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 0.28rem 0.6rem;
+  border-radius: 9999px;
+  white-space: nowrap;
+}
+.pill.aldia { background: var(--bien-velo); color: var(--bien); border: 1px solid rgba(16, 185, 129, 0.25); }
+.pill.pendiente { background: var(--alerta-velo); color: var(--alerta); border: 1px solid rgba(245, 158, 11, 0.28); }
+/* Pausado y cancelado se distinguen entre sí por color Y por texto, no solo
+   por color. Un cliente pausado o cancelado nunca muestra únicamente
+   «Al día»: sería confuso respecto a su situación real. */
+.pill.pausado { background: rgba(59, 130, 246, 0.10); color: var(--dato, #2563eb); border: 1px solid rgba(59, 130, 246, 0.28); }
+.pill.cancelado { background: rgba(110, 117, 114, 0.12); color: var(--tinta-suave); border: 1px solid rgba(110, 117, 114, 0.28); }
+
+.etiquetas { display: inline-flex; align-items: center; gap: 0.3rem; flex-wrap: wrap; justify-content: flex-end; }
+
+/* ----- Filtros de la lista de clientes ----- */
+
+/* Cuadrícula 2 × 2 en móvil: cuatro controles del mismo tamaño, cómodos
+   para el pulgar. Cada uno es un botón de verdad, así que funciona con
+   teclado sin añadir nada. */
+.filtros {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+  margin-bottom: 1.1rem;
+}
+
+.filtro {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+  width: 100%;
+  padding: 0.7rem 0.85rem;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  border-radius: var(--radio);
+  background: var(--cristal);
+  border: 1px solid var(--cristal-borde);
+  box-shadow: var(--cristal-sombra);
+  color: var(--tinta-suave);
+  transition: border-color 0.15s ease, color 0.15s ease, transform 0.12s ease;
+}
+
+.filtro:active { transform: scale(0.98); }
+
+.filtro-nombre {
+  font-size: 0.5625rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  line-height: 1.3;
+}
+
+.filtro-numero {
+  font-size: 1.375rem;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--tinta);
+  font-variant-numeric: tabular-nums;
+}
+
+.filtro-alerta .filtro-numero { color: var(--alerta); }
+
+/* El seleccionado se distingue por color, por borde y por una marca a la
+   izquierda: no depende solo del color. */
+.filtro.activo {
+  color: var(--acento-oscuro);
+  border-color: rgba(31, 169, 154, 0.55);
+  box-shadow: var(--cristal-sombra), inset 3px 0 0 var(--acento);
+}
+
+.filtro.activo .filtro-numero { color: var(--acento-oscuro); }
+
+/* ----- Botones ----- */
+
+.boton,
+.boton-firmar,
+.boton-nuevo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  border: 0;
+  border-radius: 9999px;
+  padding: 0.7rem 1.2rem;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(180deg, var(--acento-claro), var(--acento));
+  box-shadow: 0 8px 22px -10px rgba(31, 169, 154, 0.75);
+  cursor: pointer;
+  text-decoration: none;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+}
+
+.boton { width: 100%; }
+.boton-firmar { width: 100%; padding: 0.85rem 1.2rem; }
+.boton-nuevo { padding: 0.55rem 1rem; font-size: 0.8125rem; }
+
+.boton:hover, .boton-firmar:hover, .boton-nuevo:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 26px -10px rgba(31, 169, 154, 0.85);
+}
+
+.boton:disabled, .boton-firmar:disabled {
+  opacity: 0.55; cursor: default; transform: none; box-shadow: none;
+}
+
+.boton-secundario,
+.boton-clase,
+.qr-cerrar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  border-radius: 9999px;
+  padding: 0.7rem 1.2rem;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--tinta);
+  text-decoration: none;
+  cursor: pointer;
+  background: var(--cristal-tenue);
+  border: 1px solid var(--cristal-borde);
+  box-shadow: 0 4px 14px -8px rgba(16, 24, 32, 0.28);
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.boton-secundario:hover, .boton-clase:hover, .qr-cerrar:hover {
+  background: rgba(255, 255, 255, 0.62);
+  border-color: rgba(31, 169, 154, 0.45);
+}
+
+.boton-peligro { color: var(--peligro); background: var(--peligro-velo); border-color: rgba(192, 40, 59, 0.25); }
+.boton-peligro:hover { background: rgba(192, 40, 59, 0.16); border-color: rgba(192, 40, 59, 0.45); }
+
+.acciones-perfil { display: flex; gap: 0.65rem; margin-bottom: 1.25rem; }
+.acciones-perfil form { flex: 2; }
+.acciones-perfil .boton-secundario { flex: 1; }
+
+.botones-clase { display: flex; gap: 0.65rem; margin-bottom: 1rem; }
+.boton-clase { width: 100%; }
+
+:where(a, button, input, select, textarea):focus-visible {
+  outline: 2px solid var(--acento);
+  outline-offset: 2px;
+}
+
+/* ----- Formularios ----- */
+
+.formulario { padding: 1.25rem 1.1rem; display: flex; flex-direction: column; gap: 1rem; }
+
+.campo { display: flex; flex-direction: column; gap: 0.4rem; }
+
+.campo > span {
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--tinta-suave);
+}
+
+.campo input, .campo select {
+  font: inherit;
+  font-size: 0.9375rem;
+  color: var(--tinta);
+  padding: 0.7rem 0.85rem;
+  border-radius: 12px;
+  border: 1px solid var(--cristal-borde-firme);
+  background: rgba(255, 255, 255, 0.75);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.campo input:focus, .campo select:focus {
+  outline: none;
+  border-color: var(--acento);
+  box-shadow: 0 0 0 3px rgba(31, 169, 154, 0.15);
+}
+
+.campo-check { display: flex; align-items: center; gap: 0.6rem; font-size: 0.9375rem; }
+.campo-check input { width: 1.1rem; height: 1.1rem; accent-color: var(--acento); }
+
+/* ----- Avisos en pantalla ----- */
+
+.aviso-guardado, .aviso-texto, .aviso-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  border-radius: 12px;
+  padding: 0.75rem 0.9rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+
+.aviso-guardado { background: var(--bien-velo); color: var(--bien); border: 1px solid rgba(16, 185, 129, 0.25); }
+.aviso-texto { background: var(--alerta-velo); color: var(--alerta); border: 1px solid rgba(245, 158, 11, 0.28); }
+.aviso-error { background: var(--peligro-velo); color: var(--peligro); border: 1px solid rgba(192, 40, 59, 0.25); }
+
+/* ----- Cabecera de pantalla (valores exactos del diseño) ----- */
+
+.cabecera-app { padding: 6px 0 12px; }
+
+.cabecera-app-marca {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0 10px;
+}
+
+.logo-nav { height: 30px; width: auto; flex: none; display: block; }
+.logo-login { display: block; height: 34px; width: auto; margin: 0 auto 1rem; }
+
+/* La cápsula de la derecha en la cabecera (en el diseño, «Semana 31»). */
+.chip-cabecera {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 9999px;
+  padding: 3px 9px;
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--acento-oscuro);
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid var(--cristal-borde);
+  text-decoration: none;
+}
+
+.cabecera-app h1 { font-size: 18px; font-weight: 900; line-height: 1.15; margin: 0; }
+.cabecera-app .subtitulo { font-size: 12px; margin: 1px 0 0; }
+
+/* ----- Barra de pestañas inferior ----- */
+
+.barra {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  pointer-events: none;
+}
+
+.barra-interior {
+  position: relative;
+  margin: 0 auto;
+  max-width: var(--columna);
+  /* La franja inferior de seguridad evita que la barra quede pegada al
+     borde en móviles con gesto de inicio. */
+  padding: 4px 12px calc(16px + env(safe-area-inset-bottom, 0px));
+}
+
+/* El halo de color bajo la barra.
+   El diseño lo consigue con `filter: blur(28px)` sobre una franja de color.
+   Aquí se dibuja YA difuminado con degradados radiales de bordes suaves: se
+   ve igual y no obliga al navegador a desenfocar una capa entera en cada
+   fotograma del scroll (la barra es fija y está siempre en pantalla, así
+   que ese coste se pagaba constantemente). */
+.barra-halo {
+  pointer-events: none;
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  top: -6px;
+  bottom: 6px;
+  border-radius: 9999px;
+  opacity: 0.75;
+  z-index: -1;
+  background:
+    radial-gradient(60% 120% at 18% 50%, rgba(82, 214, 195, 0.55) 0%, rgba(82, 214, 195, 0) 70%),
+    radial-gradient(60% 120% at 50% 50%, rgba(120, 190, 255, 0.45) 0%, rgba(120, 190, 255, 0) 70%),
+    radial-gradient(60% 120% at 84% 50%, rgba(246, 199, 227, 0.55) 0%, rgba(246, 199, 227, 0) 70%);
+}
+
+.barra-pestanas {
+  pointer-events: auto;
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  border-radius: 26px;
+  padding: 6px;
+  /* El diseño pide aquí `blur(26px) saturate(210%) brightness(1.04)`: el
+     efecto más caro de toda la hoja, sobre un elemento fijo por el que
+     pasa el contenido al hacer scroll. Se sustituye por un blanco más
+     sólido: sobre este fondo pastel el resultado es casi idéntico y deja
+     de haber trabajo en cada fotograma. */
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.86));
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 16px 40px -14px rgba(16, 24, 32, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    inset 0 -1px 0 rgba(16, 24, 32, 0.04);
+}
+
+.pestana {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border-radius: 20px;
+  padding: 8px 0;
+  min-height: 52px;
+  border: 0;
+  cursor: pointer;
+  background: transparent;
+  color: var(--tinta-suave);
+  text-decoration: none;
+  transition: all 0.15s;
+}
+
+.pestana:active { transform: scale(0.95); }
+.pestana .icono { width: 21px; height: 21px; }
+
+.pestana span {
+  font-size: 9px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.pestana.activa { background: var(--acento-velo); color: var(--acento-oscuro); }
+
+/* Contador de avisos sobre el icono de la pestaña. */
+.pestana-punto {
+  position: absolute;
+  transform: translate(10px, -8px);
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+  border-radius: 9999px;
+  background: var(--alerta);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 900;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ----- Panel deslizante ----- */
+
+.panel-fondo {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.40);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+
+.panel {
+  position: relative;
+  max-height: 92%;
+  width: 100%;
+  max-width: var(--columna);
+  overflow-y: auto;
+  border-top-left-radius: 24px;
+  border-top-right-radius: 24px;
+  border-top: 1px solid rgba(255, 255, 255, 0.70);
+  background: var(--perla);
+  padding: 20px 20px 32px;
+  animation: panel-entra 0.18s ease-out;
+}
+
+@keyframes panel-entra {
+  from { transform: translateY(24px); opacity: 0.6; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* ----- Estadísticas y métricas ----- */
+
+.stats-resumen { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1.25rem; }
+
+.stat-card { padding: 0.9rem 1rem; }
+
+.stat-label {
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--tinta-suave);
+  margin-bottom: 0.3rem;
+}
+
+.stat-valor {
+  font-size: 1.5rem;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-card.stat-alerta .stat-valor { color: var(--alerta); }
+
+.metricas { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; padding: 1rem 1.1rem; }
+.metrica { display: flex; flex-direction: column; gap: 0.25rem; }
+
+.metrica .label {
+  font-size: 0.5625rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--tinta-suave);
+}
+
+.metrica .valor {
+  font-size: 1.0625rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.economia-resumen-grid { display: grid; gap: 1rem; }
+
+/* ----- Perfil: bono y progreso ----- */
+
+.perfil-saludo { text-align: center; margin-bottom: 1.25rem; }
+
+.perfil-hero {
+  padding: 1.4rem 1.25rem;
+  margin-bottom: 1.25rem;
+  background: linear-gradient(135deg, rgba(82, 214, 195, 0.24), rgba(199, 210, 254, 0.22) 52%, rgba(246, 199, 227, 0.20));
+}
+
+.perfil-hero .programa-nombre {
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--acento-oscuro);
+}
+
+.perfil-progreso { margin-top: 1rem; }
+
+.perfil-progreso-numeros {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 0.55rem;
+}
+
+.perfil-progreso-numeros .grande {
+  font-size: 2.25rem;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+
+.perfil-progreso-numeros .de { font-size: 0.875rem; color: var(--tinta-media); }
+
+.perfil-progreso-barra { height: 8px; border-radius: 9999px; background: rgba(16, 24, 32, 0.08); overflow: hidden; }
+.perfil-progreso-barra > span {
+  display: block;
+  height: 100%;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, var(--acento-claro), var(--acento));
+}
+
+.perfil-progreso-restantes { margin-top: 0.55rem; font-size: 0.8125rem; color: var(--tinta-media); }
+
+.estado { margin-top: 0.75rem; }
+
+.progreso-mini { margin-top: 0.5rem; }
+
+.progreso-mini-numeros {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  color: var(--tinta-suave);
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 0.35rem;
+}
+
+.progreso-mini-barra { height: 6px; border-radius: 9999px; background: rgba(16, 24, 32, 0.08); overflow: hidden; }
+.progreso-mini-barra > span {
+  display: block;
+  height: 100%;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, var(--acento-claro), var(--acento));
+}
+
+/* Cada cliente es una tarjeta de cristal propia, no una fila dentro de una
+   caja compartida («listas de tarjetas», como pone tu diseño). */
+.tarjeta-cliente {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  padding: 14px;
+  border-radius: var(--radio);
+  background: var(--cristal);
+  border: 1px solid var(--cristal-borde);
+  box-shadow: var(--cristal-sombra);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.tarjeta-cliente:active { transform: scale(0.98); }
+
+.tarjeta-cliente:hover {
+  box-shadow: 0 12px 32px -14px rgba(16, 24, 32, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+
+/* ----- Historial de sesiones ----- */
+
+.sesion-fila { display: flex; align-items: center; gap: 0.85rem; }
+
+.sesion-badge {
+  flex: none;
+  width: 2.125rem;
+  height: 2.125rem;
+  border-radius: 9999px;
+  background: var(--acento-velo);
+  color: var(--acento-oscuro);
+  border: 1px solid rgba(31, 169, 154, 0.22);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.sesion-info .fecha { font-weight: 700; font-size: 0.875rem; }
+.sesion-info .tipo { font-size: 0.75rem; color: var(--tinta-suave); }
+
+/* ----- Comparativa antes/después (pantallas de confirmación) ----- */
+
+.comparativa .fila { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
+
+.comparativa .etiqueta {
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--tinta-suave);
+}
+
+.comparativa .antes {
+  font-size: 0.9375rem;
+  color: var(--tinta-suave);
+  text-decoration: line-through;
+  text-decoration-color: rgba(192, 40, 59, 0.45);
+}
+
+.comparativa .flecha { color: var(--tinta-suave); font-size: 0.8125rem; }
+.comparativa .despues { font-weight: 700; font-size: 0.9375rem; color: var(--acento-oscuro); }
+
+/* Lista de clientes: SIEMPRE una columna, tarjeta debajo de tarjeta.
+   El diseño no tiene puntos de ruptura por ancho de pantalla — meter dos
+   columnas al ensanchar era invención mía, no suya. */
+.clientes-grid { display: flex; flex-direction: column; gap: 10px; }
+
+/* ----- Ventana del QR de confirmación ----- */
+
+.qr-fondo {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+  background: rgba(16, 24, 32, 0.45);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  animation: qr-fondo-entra 0.18s ease-out;
+}
+
+.qr-dialogo {
+  width: 100%;
+  max-width: 21rem;
+  padding: 1.5rem 1.25rem 1.25rem;
+  text-align: center;
+  border-radius: var(--radio-grande);
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid var(--cristal-borde);
+  box-shadow: 0 0 0 1px rgba(16, 24, 32, 0.05), 0 32px 80px -24px rgba(16, 24, 32, 0.28);
+  animation: qr-dialogo-entra 0.22s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+.qr-dialogo-titulo {
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--acento-oscuro);
+  margin: 0 0 0.3rem;
+}
+
+.qr-dialogo-cliente { font-size: 1.0625rem; font-weight: 900; letter-spacing: -0.02em; margin: 0 0 1.1rem; }
+
+.qr-marco {
+  display: inline-flex;
+  padding: 0.85rem;
+  background: #fff;
+  border-radius: 14px;
+  border: 1px solid var(--cristal-borde-firme);
+}
+.qr-marco img, .qr-marco canvas { display: block; }
+
+.qr-confirmado {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: var(--bien-velo);
+  color: var(--bien);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  border-radius: 12px;
+  padding: 0.8rem 1rem;
+  margin-bottom: 1.25rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+@keyframes qr-fondo-entra { from { opacity: 0; } to { opacity: 1; } }
+@keyframes qr-dialogo-entra {
+  from { opacity: 0; transform: translateY(12px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ----- Señal de carga ----- */
+
+/* Barra fina arriba del todo mientras se espera a la pantalla siguiente.
+   Se anima con `transform`, que resuelve la tarjeta gráfica sin repintar
+   nada: no reintroduce el coste por fotograma que se quitó de la barra
+   inferior y de las tarjetas. */
+/* Una única señal, siempre la misma se toque lo que se toque: una línea
+   fina arriba por la que pasa una luz de lado a lado, sin parar, hasta que
+   llega la pantalla nueva.
+
+   No finge un porcentaje: no sabemos cuánto va a tardar el servidor, y una
+   barra que se llena y luego te deja esperando se nota falsa. El movimiento
+   continuo dice "trabajando" sin prometer nada. */
+/* Arriba del todo. Se probó ponerla encima de la barra de pestañas para
+   que no la tapara la barra de direcciones del móvil, pero en las
+   pantallas SIN barra de pestañas (perfil, formularios) quedaba flotando
+   en mitad del contenido — mal (2026-08-01). Vuelve arriba. */
+.cargando {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  z-index: 100;
+  overflow: hidden;
+  pointer-events: none;
+  display: none;
+  background: rgba(31, 169, 154, 0.14);
+}
+
+.cargando.activa { display: block; }
+
+.cargando::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 42%;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, transparent, var(--acento-claro) 30%, var(--acento) 70%, transparent);
+  box-shadow: 0 0 10px rgba(31, 169, 154, 0.6);
+  animation: cargando-recorre 1.05s ease-in-out infinite;
+}
+
+@keyframes cargando-recorre {
+  from { transform: translateX(-110%); }
+  to { transform: translateX(340%); }
+}
+
+/* Respuesta inmediata al toque: pasa ANTES de que el servidor conteste, así
+   que la app se siente viva aunque la red vaya lenta. */
+.tarjeta-cliente:active,
+.pestana:active,
+.boton:active,
+.boton-firmar:active,
+.boton-secundario:active,
+.boton-clase:active,
+.boton-nuevo:active {
+  transform: scale(0.97);
+}
+
+.tarjeta-cliente,
+.pestana,
+.boton,
+.boton-firmar,
+.boton-secundario,
+.boton-clase,
+.boton-nuevo {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* El fundido entre pantallas (`@view-transition`) se retiró el 2026-08-01:
+   congela la página anterior en cuanto pulsas, así que la señal de carga se
+   quedaba helada justo al aparecer y no se veía en casi ninguna
+   navegación. Bonito sobre el papel, pero tapaba lo que de verdad hacía
+   falta: saber que la app está trabajando. */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+  /* La señal de carga es la excepción: si se congela, deja de informar. */
+  .cargando::before {
+    animation-duration: 1.05s !important;
+  }
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+
+/* ----- Ficha del cliente (2026-08-02) ----- */
+
+/* Nombre y estado en la misma línea: el estado se lee de un vistazo y no
+   hace falta subtítulo. */
+.ficha-titulo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.ficha-titulo h1 { margin: 0; }
+
+.pill.estado-activo { background: var(--bien-velo); color: var(--bien); border: 1px solid rgba(16, 185, 129, 0.25); }
+.pill.estado-pausado { background: var(--alerta-velo); color: var(--alerta); border: 1px solid rgba(245, 158, 11, 0.28); }
+.pill.estado-cancelado { background: rgba(110, 117, 114, 0.12); color: var(--tinta-suave); border: 1px solid rgba(110, 117, 114, 0.28); }
+
+a.pill { text-decoration: none; }
+
+/* El estado de pago del bono se cambia desde la propia ficha. */
+.pill-boton {
+  font: inherit;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.accion-principal { margin-bottom: 0.65rem; }
+
+.boton-copiar { width: 100%; margin-bottom: 1.25rem; }
+.boton-copiar.copiado { color: var(--bien); border-color: rgba(16, 185, 129, 0.45); }
+
+/* ----- Historial plegable ----- */
+
+.historial .cabecera-seccion.plegable,
+.bono-cabecera {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+  font: inherit;
+  text-align: left;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  color: inherit;
+}
+
+.historial .cabecera-seccion.plegable {
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--tinta-suave);
+  padding: 0.9rem 1.1rem;
+}
+
+.bono-cabecera { padding: 0.15rem 0; }
+.bono-info { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
+
+.flecha-plegable { transition: transform 0.15s ease; color: var(--tinta-suave); }
+[aria-expanded="true"] .flecha-plegable { transform: rotate(90deg); }
+
+.bono-sesiones { margin-top: 0.75rem; display: flex; flex-direction: column; gap: 0.75rem; }
+.bono-sesiones .sesion-fila { padding-left: 0.25rem; }
+
+/* ----- Zona peligrosa ----- */
+
+.zona-peligrosa {
+  margin-top: 2rem;
+  padding: 1.1rem;
+  border-radius: var(--radio);
+  border: 1px solid rgba(192, 40, 59, 0.25);
+  background: var(--peligro-velo);
+}
+
+.zona-peligrosa-titulo {
+  margin: 0 0 0.5rem;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--peligro);
+}
+
+.zona-peligrosa .meta { margin-bottom: 0.85rem; }
+.zona-peligrosa .boton-secundario { width: 100%; }
+
+/* ----- Modalidades de servicio (2026-08-03) ----- */
+
+/* Una mensualidad o una cuenta se identifican de un vistazo; el bono no
+   lleva etiqueta porque es lo habitual. */
+.etiqueta-modalidad {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.5625rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  vertical-align: middle;
+  background: rgba(31, 169, 154, 0.14);
+  color: var(--acento);
+}
+
+/* Las condiciones del servicio: pares etiqueta/valor en columnas que se
+   adaptan al ancho, sin tabla. */
+.datos-servicio {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1.5rem;
+  margin: 0.9rem 0 0;
+}
+
+.datos-servicio > div { display: flex; flex-direction: column; gap: 0.1rem; }
+
+.datos-servicio dt {
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--tinta-suave);
+}
+
+.datos-servicio dd {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.datos-servicio dd.acumulado { color: var(--acento); }
+
+/* Los campos de una modalidad que no está elegida no se ven. `[hidden]` ya
+   gana a cualquier `display` propio (regla general de la hoja). */
+.campos-modalidad { display: flex; flex-direction: column; gap: 0.9rem; }
+
+.ayuda-modalidad { margin-top: -0.35rem; }
+
+/* Desglose del mes por modalidad, en Economía. */
+.desglose-modalidad { display: flex; flex-direction: column; gap: 0.1rem; }
+.desglose-modalidad .cifra { font-variant-numeric: tabular-nums; }
+
+/* El cálculo del total de una cuenta de cliente, a la vista: "8 sesiones ×
+   35,00 € = 280,00 €". Así el importe no hay que creérselo. */
+.calculo-total {
+  margin: 0.5rem 0 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ----- Estado de cobro de un servicio del historial (2026-08-04) ----- */
+
+/* Vive dentro del ciclo desplegado, no en su cabecera: esa cabecera ya es
+   un botón y no puede contener otro. */
+.cobro-ciclo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.6rem 0.25rem 0.85rem;
+  border-bottom: 1px solid var(--linea);
+  margin-bottom: 0.35rem;
+}
+
+.cobro-etiqueta {
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--tinta-suave);
+}
+
+.boton-cobro {
+  width: auto;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.8125rem;
+}
+
+/* --------------------------------------------------------------------------
+   Añadidos de la versión Next (2026-08-04)
+
+   Solo lo que la versión Flask no necesitaba: en Flask cada acción era una
+   página propia, y aquí algunas ocurren en el sitio. Se añade al final y sin
+   tocar nada de arriba, para que copiar de nuevo `webapp/static/style.css`
+   siga siendo trivial.
+   -------------------------------------------------------------------------- */
+
+/* Un botón que se lee como texto (desplegar la puerta de pruebas). */
+.boton-texto {
+  background: none;
+  border: 0;
+  padding: 0.5rem;
+  cursor: pointer;
+  text-decoration: underline;
+  font: inherit;
+  color: var(--tinta-suave);
+  text-align: center;
+}
+.boton-texto:hover { color: var(--acento); }

@@ -1,24 +1,35 @@
-import { ChevronLeft } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { FormularioAlta } from "@/components/FormularioAlta";
+import { Iconos } from "@/components/Iconos";
 import { haySesion } from "@/lib/auth";
 
-export default async function PaginaNuevoCliente() {
+export const dynamic = "force-dynamic";
+export const metadata = { title: "Nuevo cliente — Antifrágil" };
+
+/** Misma estructura que `webapp/templates/nuevo.html`. */
+export default async function PaginaNuevoCliente({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
   if (!(await haySesion())) redirect("/login");
 
+  const { error: fallo } = await searchParams;
+
   return (
-    <main className="flex flex-col gap-4">
-      <Link
-        href="/clientes"
-        className="inline-flex items-center gap-1 text-sm text-tinta-suave hover:text-acento"
-      >
-        <ChevronLeft className="h-4 w-4" aria-hidden />
-        Clientes
-      </Link>
-      <h1 className="text-2xl font-semibold tracking-tight">Nuevo cliente</h1>
-      <FormularioAlta />
-    </main>
+    <>
+      <Iconos />
+      <div className="page sin-barra">
+        <Link className="volver" href="/clientes">
+          ← Volver
+        </Link>
+
+        {fallo && <div className="aviso-error">{fallo}</div>}
+
+        <FormularioAlta />
+      </div>
+    </>
   );
 }
