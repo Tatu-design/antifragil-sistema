@@ -7,6 +7,7 @@ import { CambiarEstado } from "@/components/CambiarEstado";
 import { EnlaceDelCliente } from "@/components/EnlaceDelCliente";
 import { EditarServicio } from "@/components/EditarServicio";
 import { HistorialServicios } from "@/components/HistorialServicios";
+import { ZonaPeligrosa } from "@/components/ZonaPeligrosa";
 import { TarjetaServicio } from "@/components/TarjetaServicio";
 import { haySesion } from "@/lib/auth";
 import { obtenerPerfil } from "@/services/clientes";
@@ -66,6 +67,16 @@ export default async function PaginaPerfil({ params }: { params: Promise<{ id: s
       <EnlaceDelCliente enlace={enlace} qr={qr} />
 
       <HistorialServicios clienteId={cliente.id} servicios={servicios} />
+
+      <ZonaPeligrosa
+        clienteId={cliente.id}
+        nombre={cliente.nombre}
+        sesiones={servicios.reduce((n, s) => n + s.sesiones.length, 0)}
+        importe={servicios.reduce(
+          (suma, s) => suma + s.sesiones.reduce((total, ses) => total + (ses.tarifa ?? 0), 0),
+          0,
+        )}
+      />
     </main>
   );
 }

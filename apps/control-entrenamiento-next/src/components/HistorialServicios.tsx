@@ -1,9 +1,14 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 
-import { accionBorrarSesion, accionMarcarCobro, type Resultado } from "@/app/actions";
+import {
+  accionBorrarSesion,
+  accionEditarSesion,
+  accionMarcarCobro,
+  type Resultado,
+} from "@/app/actions";
 import type { Ciclo, Sesion } from "@/domain/tipos";
 import { ETIQUETAS } from "@/domain/modalidades";
 import { fechaEs, nombreMes } from "@/lib/fechas";
@@ -31,12 +36,15 @@ export function HistorialServicios({
     accionBorrarSesion,
     null,
   );
+  const [resEditar, accionEditar] = useActionState<Resultado | null, FormData>(accionEditarSesion, null);
+  const [editando, setEditando] = useState<string | null>(null);
 
   return (
     <section className="flex flex-col gap-2" aria-label="Historial de servicios">
       <h2 className="text-lg font-medium">Historial de servicios</h2>
       <Aviso resultado={resultado} />
       <Aviso resultado={resultadoBorrado} />
+      <Aviso resultado={resEditar} />
 
       {servicios.map((servicio) => (
         <details key={servicio.ciclo} className="tarjeta" open={servicio.esActual}>
@@ -86,7 +94,7 @@ export function HistorialServicios({
                 {servicio.sesiones.map((sesion) => (
                   <li
                     key={sesion.id}
-                    className="flex items-center justify-between gap-2 border-t border-borde pt-2 text-sm"
+                    className="flex flex-wrap items-center justify-between gap-2 border-t border-borde pt-2 text-sm"
                   >
                     <span className="tabular-nums">
                       <strong className="font-medium">#{sesion.numeroSesion}</strong> · {fechaEs(sesion.fecha)}
@@ -96,12 +104,21 @@ export function HistorialServicios({
                       <span className="text-tinta-suave tabular-nums">
                         {sesion.tarifa === null ? "incluida" : euros(sesion.tarifa)}
                       </span>
+                      <button
+                        type="button"
+                        onClick={() => setEditando(editando === sesion.id ? null : sesion.id)}
+                        aria-expanded={editando === sesion.id}
+                        className="rounded px-2 py-1 text-xs text-tinta-suave transition hover:text-acento"
+                      >
+                        Editar
+                      </button>
                       <form action={accionBorrar}>
                         <input type="hidden" name="clienteId" value={clienteId} />
                         <input type="hidden" name="sesionId" value={sesion.id} />
                         <BotonBorrar />
                       </form>
                     </span>
+                    {editando === sesion.id && <CorregirSesion clienteId={clienteId} sesion={sesion} accion={accionEditar} />}
                   </li>
                 ))}
               </ul>
@@ -136,6 +153,72 @@ function BotonBorrar() {
       aria-label="Borrar esta sesión"
     >
       {pending ? "…" : "Borrar"}
+    </button>
+  );
+}
+
+/**
+ * Corregir la fecha o el número de una sesión ya guardada.
+ *
+ * Si la fecha la mueve a otra semana, su importe y su hora se trasladan con
+ * ella — con el precio que tenía entonces, no con el de ahora.
+ */
+function CorregirSesion({
+  clienteId,
+  sesion,
+  accion,
+}: {
+  clienteId: string;
+  sesion: Sesion;
+  accion: (datos: FormData) => void;
+}) {
+  return (
+    <form action={accion} className="mt-2 flex w-full flex-col gap-2 border-t border-borde pt-2">
+      <input type="hidden" name="clienteId" value={clienteId} />
+      <input type="hidden" name="sesionId" value={sesion.id} />
+      <div className="flex gap-2">
+        <span className="flex-1">
+          <label className="etiqueta" htmlFor={`fecha-${sesion.id}`}>
+            Fecha
+          </label>
+          <input
+            id={`fecha-${sesion.id}`}
+            name="fecha"
+            type="date"
+            defaultValue={sesion.fecha}
+            className="campo"
+          />
+        </span>
+        <span className="w-24">
+          <label className="etiqueta" htmlFor={`num-${sesion.id}`}>
+            Número
+          </label>
+          <input
+            id={`num-${sesion.id}`}
+            name="numeroSesion"
+            inputMode="numeric"
+            defaultValue={sesion.numeroSesion}
+            className="campo"
+          />
+        </span>
+      </div>
+      <p className="text-xs text-tinta-suave">
+        Si la mueves a otra semana, su importe y su hora se trasladan con ella.
+      </p>
+      <BotonGuardar />
+    </form>
+  );
+}
+
+function BotonGuardar() {
+  const { pending } = useFormStatus();
+  return (
+    <button
+      type="submit"
+      disabled={pending}
+      className="rounded-tarjeta border border-borde px-3 py-2 text-xs font-medium transition hover:border-acento hover:text-acento disabled:opacity-60"
+    >
+      {pending ? "Guardando…" : "Guardar corrección"}
     </button>
   );
 }

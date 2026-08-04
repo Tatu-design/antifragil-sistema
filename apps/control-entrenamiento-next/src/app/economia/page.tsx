@@ -4,6 +4,7 @@ import { BarraInferior } from "@/components/BarraInferior";
 import { ClasesDeGrupo } from "@/components/ClasesDeGrupo";
 import { ResumenMensual } from "@/components/ResumenMensual";
 import { TarjetaSemana } from "@/components/TarjetaSemana";
+import { contarNoLeidos } from "@/services/avisos";
 import { haySesion } from "@/lib/auth";
 import { obtenerEconomia } from "@/services/economia";
 
@@ -13,6 +14,7 @@ export default async function PaginaEconomia() {
   if (!(await haySesion())) redirect("/login");
 
   const { semana, meses, clasesEstaSemana } = await obtenerEconomia();
+  const sinLeer = await contarNoLeidos();
 
   return (
     <main className="flex flex-col gap-4">
@@ -24,7 +26,7 @@ export default async function PaginaEconomia() {
 
       <ResumenMensual meses={meses} />
 
-      <BarraInferior activa="economia" />
+      <BarraInferior activa="economia" sinLeer={sinLeer} />
     </main>
   );
 }

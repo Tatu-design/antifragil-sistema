@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { BarraInferior } from "@/components/BarraInferior";
 import { BotonSalir } from "@/components/BotonSalir";
 import { FiltrosClientes } from "@/components/FiltrosClientes";
+import { contarNoLeidos } from "@/services/avisos";
 import { haySesion } from "@/lib/auth";
 import { listarClientes } from "@/services/clientes";
 
@@ -16,6 +17,7 @@ export default async function PaginaClientes() {
   if (!(await haySesion())) redirect("/login");
 
   const clientes = await listarClientes();
+  const sinLeer = await contarNoLeidos();
 
   return (
     <main className="flex flex-col gap-4">
@@ -34,7 +36,7 @@ export default async function PaginaClientes() {
 
       <BotonSalir />
 
-      <BarraInferior activa="clientes" />
+      <BarraInferior activa="clientes" sinLeer={sinLeer} />
     </main>
   );
 }

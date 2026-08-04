@@ -52,7 +52,7 @@ import { MENSUALIDAD, type Modalidad } from "@/domain/modalidades";
 import type { CargoMensual, Ciclo, Cliente, Estado, Sesion } from "@/domain/tipos";
 import { TARIFA_LIDOMARE } from "@/domain/economia";
 import { rangoSemana } from "@/lib/fechas";
-import type { Repositorio, SemanaEconomica } from "./tipos";
+import type { Aviso, Repositorio, SemanaEconomica } from "./tipos";
 
 // -----------------------------------------------------------------------------
 // Conexión
@@ -289,6 +289,16 @@ export class RepositorioPostgres implements Repositorio {
     return filas[0] ? aSesion(filas[0]) : null;
   }
 
+  async guardarSesionEditada(sesionId: string, fecha: string, numeroSesion: number): Promise<void> {
+    await consultar("update sesiones set fecha = $2, numero_sesion = $3 where id = $1", [
+      sesionId, fecha, numeroSesion,
+    ]);
+  }
+
+  async eliminarCliente(clienteId: string): Promise<void> {
+    await consultar("delete from clientes where id = $1", [clienteId]);
+  }
+
   async cargoDelMes(clienteId: string, anio: number, mes: number): Promise<CargoMensual | null> {
     const filas = await consultar(
       `select * from cargos_mensuales
@@ -507,6 +517,52 @@ export class RepositorioPostgres implements Repositorio {
        on conflict (sesion_id) do nothing`,
       [clienteId, sesionId, hoy, hora],
     );
+  }
+
+  async registrarAviso(aviso: { fecha: string; tipo: string; detalle: string }): Promise<void> {
+    // El índice único sobre (tipo, detalle) de los no resueltos impide llenar
+    // la bandeja de copias del mismo aviso mientras su causa siga ahí.
+    await consultar(
+      `insert into avisos (fecha, tipo, detalle) values ($1,$2,$3)
+       on conflict do nothing`,
+      [aviso.fecha, aviso.tipo, aviso.detalle],
+    );
+  }
+
+  async listarAvisos(): Promise<Aviso[]> {
+    const filas = await consultar(
+      "select id, fecha, tipo, detalle, leido from avisos where not resuelto order by creado desc",
+    );
+    return filas.map((f) => ({
+      id: f.id as string,
+      fecha: fecha(f.fecha)!,
+      tipo: f.tipo as string,
+      detalle: f.detalle as string,
+      leido: Boolean(f.leido),
+    }));
+  }
+
+  async contarNoLeidos(): Promise<number> {
+    const filas = await consultar<{ n: string }>(
+      "select count(*)::int as n from avisos where not resuelto and not leido",
+    );
+    return Number(filas[0]?.n ?? 0);
+  }
+
+  async marcarTodosLeidos(): Promise<void> {
+    await consultar("update avisos set leido = true where not resuelto and not leido");
+  }
+
+  async resolverAviso(id: string): Promise<void> {
+    await consultar("update avisos set resuelto = true where id = $1", [id]);
+  }
+
+  async resolverPorTipo(tipo: string): Promise<number> {
+    const filas = await consultar(
+      "update avisos set resuelto = true where tipo = $1 and not resuelto returning id",
+      [tipo],
+    );
+    return filas.length;
   }
 
   async registrarIdempotencia(clave: string): Promise<boolean> {

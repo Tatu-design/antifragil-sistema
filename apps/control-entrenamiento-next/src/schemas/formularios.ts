@@ -74,6 +74,26 @@ export const esquemaKids = z.object({
     .refine((v) => Number.isFinite(v) && v > 0, { message: "Tiene que ser un importe positivo" }),
 });
 
+export const esquemaAviso = z.object({
+  id: z.string().min(1),
+});
+
+export const esquemaTipoAviso = z.object({
+  tipo: z.string().min(1),
+});
+
+export const esquemaEditarSesion = z.object({
+  clienteId: z.string().min(1),
+  sesionId: z.string().min(1),
+  fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha no válida"),
+  numeroSesion: z.coerce.number().int().min(1),
+});
+
+export const esquemaBorrarCliente = z.object({
+  clienteId: z.string().min(1),
+  confirmacion: z.literal("BORRAR", { message: "Escribe BORRAR para confirmar" }),
+});
+
 export const esquemaCobro = z.object({
   clienteId: z.string().min(1),
   ciclo: z.coerce.number().int().min(0),

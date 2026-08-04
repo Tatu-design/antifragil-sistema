@@ -65,9 +65,19 @@ cuando("las reglas contra Supabase", () => {
       max: 2,
     });
 
-    const otros = await pool.query("select nombre from clientes where nombre <> all($1::text[])", [
-      FICTICIOS,
-    ]);
+    // El pooler del plan gratuito corta conexiones inactivas, y la primera
+    // consulta tras un rato puede llegar cerrada (ECONNRESET). Se reintenta un
+    // par de veces: es la red, no el código.
+    let otros;
+    for (let intento = 1; ; intento += 1) {
+      try {
+        otros = await pool.query("select nombre from clientes where nombre <> all($1::text[])", [FICTICIOS]);
+        break;
+      } catch (error) {
+        if (intento >= 3) throw error;
+        await new Promise((sigue) => setTimeout(sigue, 1500));
+      }
+    }
     if (otros.rowCount) {
       throw new Error(
         `Esta base tiene clientes que no son de prueba (${otros.rows

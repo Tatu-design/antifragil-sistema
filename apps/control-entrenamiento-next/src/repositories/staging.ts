@@ -21,7 +21,7 @@ import { TARIFA_LIDOMARE, type TipoClase } from "@/domain/economia";
 import { BONO, CUENTA, MENSUALIDAD } from "@/domain/modalidades";
 import type { CargoMensual, Ciclo, Cliente, Sesion } from "@/domain/tipos";
 import { rangoSemana } from "@/lib/fechas";
-import type { Repositorio, SemanaEconomica } from "./tipos";
+import type { Aviso, Repositorio, SemanaEconomica } from "./tipos";
 
 interface Almacen {
   clientes: Cliente[];
@@ -33,6 +33,7 @@ interface Almacen {
   facturacionKids: Array<{ anio: number; mes: number; importe: number }>;
   ajustes: Array<{ anio: number; mes: number; origen: string; importe: number; horas: number; motivo: string }>;
   confirmaciones: Array<{ clienteId: string; sesionId: string; fecha: string; hora: string }>;
+  avisos: Array<{ id: string; fecha: string; tipo: string; detalle: string; leido: boolean; resuelto: boolean }>;
   idempotencia: string[];
   siguienteSesion: number;
 }
@@ -91,7 +92,7 @@ function semilla(): Almacen {
 
   return {
     clientes, ciclos, sesiones, cargos, semanas,
-    clases: [], facturacionKids: [], ajustes: [], confirmaciones: [],
+    clases: [], facturacionKids: [], ajustes: [], confirmaciones: [], avisos: [],
     idempotencia: [], siguienteSesion: n,
   };
 }
@@ -244,6 +245,24 @@ export class RepositorioStaging implements Repositorio {
     const [sesion] = datos.sesiones.splice(indice, 1);
     await volcar();
     return clonar(sesion);
+  }
+
+  async guardarSesionEditada(sesionId: string, fecha: string, numeroSesion: number): Promise<void> {
+    const datos = await cargar();
+    const sesion = datos.sesiones.find((s) => s.id === sesionId);
+    if (!sesion) return;
+    sesion.fecha = fecha;
+    sesion.numeroSesion = numeroSesion;
+    await volcar();
+  }
+
+  async eliminarCliente(clienteId: string): Promise<void> {
+    const datos = await cargar();
+    datos.clientes = datos.clientes.filter((c) => c.id !== clienteId);
+    datos.ciclos = datos.ciclos.filter((c) => c.clienteId !== clienteId);
+    datos.cargos = datos.cargos.filter((c) => c.clienteId !== clienteId);
+    datos.confirmaciones = datos.confirmaciones.filter((c) => c.clienteId !== clienteId);
+    await volcar();
   }
 
   async cargoDelMes(clienteId: string, anio: number, mes: number): Promise<CargoMensual | null> {
@@ -401,6 +420,56 @@ export class RepositorioStaging implements Repositorio {
     if (datos.confirmaciones.some((c) => c.sesionId === sesionId)) return;
     datos.confirmaciones.push({ clienteId, sesionId, fecha: hoy, hora });
     await volcar();
+  }
+
+  async registrarAviso(aviso: { fecha: string; tipo: string; detalle: string }): Promise<void> {
+    const datos = await cargar();
+    // No se repite el mismo aviso mientras siga sin resolver.
+    const repetido = datos.avisos.some(
+      (a) => !a.resuelto && a.tipo === aviso.tipo && a.detalle === aviso.detalle,
+    );
+    if (repetido) return;
+    datos.avisos.unshift({ id: `avi-${Date.now()}-${datos.avisos.length}`, ...aviso, leido: false, resuelto: false });
+    await volcar();
+  }
+
+  async listarAvisos(): Promise<Aviso[]> {
+    const datos = await cargar();
+    // `resuelto` no sale hacia fuera: quien lee la bandeja solo ve los que
+    // siguen pendientes, así que el dato sobra.
+    return clonar(datos.avisos.filter((a) => !a.resuelto)).map((a) => ({
+      id: a.id,
+      fecha: a.fecha,
+      tipo: a.tipo,
+      detalle: a.detalle,
+      leido: a.leido,
+    }));
+  }
+
+  async contarNoLeidos(): Promise<number> {
+    const datos = await cargar();
+    return datos.avisos.filter((a) => !a.resuelto && !a.leido).length;
+  }
+
+  async marcarTodosLeidos(): Promise<void> {
+    const datos = await cargar();
+    for (const a of datos.avisos) if (!a.resuelto) a.leido = true;
+    await volcar();
+  }
+
+  async resolverAviso(id: string): Promise<void> {
+    const datos = await cargar();
+    const aviso = datos.avisos.find((a) => a.id === id);
+    if (aviso) aviso.resuelto = true;
+    await volcar();
+  }
+
+  async resolverPorTipo(tipo: string): Promise<number> {
+    const datos = await cargar();
+    const afectados = datos.avisos.filter((a) => a.tipo === tipo && !a.resuelto);
+    for (const a of afectados) a.resuelto = true;
+    await volcar();
+    return afectados.length;
   }
 
   async registrarIdempotencia(clave: string): Promise<boolean> {

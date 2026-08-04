@@ -24,7 +24,11 @@ import {
   esquemaAlta,
   esquemaBorrarSesion,
   esquemaClase,
+  esquemaAviso,
+  esquemaBorrarCliente,
   esquemaCobro,
+  esquemaEditarSesion,
+  esquemaTipoAviso,
   esquemaKids,
   esquemaEstado,
   esquemaFirma,
@@ -39,7 +43,13 @@ import {
   marcarCobro,
   renombrarCliente,
 } from "@/services/clientes";
-import { eliminarSesion, firmarSesion } from "@/services/sesiones";
+import {
+  editarSesion,
+  eliminarClienteConHistorial,
+  eliminarSesion,
+  firmarSesion,
+} from "@/services/sesiones";
+import { resolverAviso, resolverPorTipo } from "@/services/avisos";
 import {
   deshacerClase,
   etiqueta as etiquetaClase,
@@ -311,4 +321,75 @@ export async function accionFacturacionKids(_previo: Resultado | null, datos: Fo
   } catch (error) {
     return comoMensaje(error);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Avisos, corrección de sesiones y baja de clientes
+// ---------------------------------------------------------------------------
+
+export async function accionResolverAviso(_previo: Resultado | null, datos: FormData): Promise<Resultado> {
+  await exigirSesion();
+  const validado = esquemaAviso.safeParse(desdeFormulario(datos));
+  if (!validado.success) return { ok: false, mensaje: "Aviso no válido.", tono: "error" };
+
+  try {
+    await resolverAviso(validado.data.id);
+    revalidatePath("/avisos");
+    return { ok: true, mensaje: "Aviso descartado.", tono: "exito" };
+  } catch (error) {
+    return comoMensaje(error);
+  }
+}
+
+export async function accionResolverTipo(_previo: Resultado | null, datos: FormData): Promise<Resultado> {
+  await exigirSesion();
+  const validado = esquemaTipoAviso.safeParse(desdeFormulario(datos));
+  if (!validado.success) return { ok: false, mensaje: "Tipo no válido.", tono: "error" };
+
+  try {
+    const cuantos = await resolverPorTipo(validado.data.tipo);
+    revalidatePath("/avisos");
+    return { ok: true, mensaje: `${cuantos} avisos descartados.`, tono: "exito" };
+  } catch (error) {
+    return comoMensaje(error);
+  }
+}
+
+export async function accionEditarSesion(_previo: Resultado | null, datos: FormData): Promise<Resultado> {
+  await exigirSesion();
+  const validado = esquemaEditarSesion.safeParse(desdeFormulario(datos));
+  if (!validado.success) {
+    return { ok: false, mensaje: validado.error.issues[0]?.message ?? "Revisa los datos.", tono: "error" };
+  }
+
+  try {
+    await editarSesion(
+      validado.data.clienteId,
+      validado.data.sesionId,
+      validado.data.fecha,
+      validado.data.numeroSesion,
+    );
+    revalidatePath(`/clientes/${validado.data.clienteId}`);
+    revalidatePath("/economia");
+    return { ok: true, mensaje: "Sesión corregida.", tono: "exito" };
+  } catch (error) {
+    return comoMensaje(error);
+  }
+}
+
+export async function accionBorrarCliente(_previo: Resultado | null, datos: FormData): Promise<Resultado> {
+  await exigirSesion();
+  const validado = esquemaBorrarCliente.safeParse(desdeFormulario(datos));
+  if (!validado.success) {
+    return { ok: false, mensaje: "Escribe BORRAR para confirmar.", tono: "error" };
+  }
+
+  try {
+    await eliminarClienteConHistorial(validado.data.clienteId);
+  } catch (error) {
+    return comoMensaje(error);
+  }
+  revalidatePath("/clientes");
+  revalidatePath("/economia");
+  redirect("/clientes");
 }

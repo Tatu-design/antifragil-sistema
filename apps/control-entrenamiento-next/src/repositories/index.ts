@@ -29,4 +29,4 @@ export function origenDeDatos(): "supabase" | "staging" {
   return process.env.DATABASE_URL ? "supabase" : "staging";
 }
 
-export type { Repositorio, SemanaEconomica } from "./tipos";
+export type { Aviso, Repositorio, SemanaEconomica } from "./tipos";

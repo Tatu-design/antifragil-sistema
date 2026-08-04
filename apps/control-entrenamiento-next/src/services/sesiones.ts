@@ -16,7 +16,7 @@ import { ErrorDeNegocio, MENSUALIDAD, consumeSesiones, tarifaDeLaSesion } from "
 import { datosQueFaltan, puedeFirmarse } from "@/domain/ficha";
 import { procesarUnaSesion } from "@/domain/programas";
 import type { Ciclo, ResultadoFirma, Sesion } from "@/domain/tipos";
-import { anioDe, hoyNegocio, horaNegocio, mesDe } from "@/lib/fechas";
+import { anioDe, hoyNegocio, horaNegocio, mesDe, rangoSemana } from "@/lib/fechas";
 import { repositorio } from "@/repositories";
 
 export interface OpcionesFirma {
@@ -134,6 +134,21 @@ export async function firmarSesion(clienteId: string, opciones: OpcionesFirma = 
 
     await repo.actualizarCliente(cliente);
 
+    // Avisos, para que Fernando se entere sin tener que estar mirando la lista.
+    if (renovado) {
+      await repo.registrarAviso({
+        fecha,
+        tipo: "servicio_terminado",
+        detalle: `«${cliente.nombre}» ha terminado su servicio y el nuevo queda pendiente de pago`,
+      });
+    } else if (avisoUltimaSesion) {
+      await repo.registrarAviso({
+        fecha,
+        tipo: "ultima_sesion",
+        detalle: `A «${cliente.nombre}» le queda 1 sesión: la próxima toca renovar`,
+      });
+    }
+
     return {
       numeroSesion,
       sesionesTotales: ciclo.sesionesTotales,
@@ -196,6 +211,97 @@ export async function eliminarSesion(clienteId: string, sesionId: string): Promi
     cliente.sesionesCompletadas = quedan.length ? Math.max(...quedan.map((s) => s.numeroSesion)) : 0;
 
     await repo.actualizarCliente(cliente);
+  });
+}
+
+/**
+ * Corrige la fecha o el número de una sesión ya guardada.
+ *
+ * Si el cambio de fecha la mueve a otra semana, su dinero **y su hora** se
+ * trasladan de una a la otra — con la tarifa HISTÓRICA de esa sesión, nunca la
+ * actual del cliente.
+ */
+export async function editarSesion(
+  clienteId: string,
+  sesionId: string,
+  nuevaFecha: string,
+  nuevoNumero: number,
+): Promise<void> {
+  const repo = repositorio();
+
+  await repo.transaccion(async () => {
+    const cliente = await repo.obtenerCliente(clienteId);
+    if (!cliente) throw new ErrorDeNegocio("Ese cliente ya no existe");
+
+    const sesiones = await repo.listarSesiones(clienteId);
+    const sesion = sesiones.find((s) => s.id === sesionId);
+    if (!sesion) throw new ErrorDeNegocio("Esa sesión ya no existe");
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(nuevaFecha)) {
+      throw new ErrorDeNegocio(`Fecha no válida: «${nuevaFecha}»`);
+    }
+    // `sesionesTotales = 0` significa SIN LÍMITE, no cero: con una mensualidad
+    // o una cuenta no hay tope contra el que comparar.
+    if (nuevoNumero < 1 || (sesion.sesionesTotales > 0 && nuevoNumero > sesion.sesionesTotales)) {
+      const limite = sesion.sesionesTotales > 0 ? `1 y ${sesion.sesionesTotales}` : "1 en adelante";
+      throw new ErrorDeNegocio(`El número de sesión debe estar entre ${limite}`);
+    }
+
+    // Igual que al borrar: no se toca una sesión de un servicio ya cerrado si
+    // después hay sesiones de otros. Renumerarlo todo en silencio sería peor.
+    const posteriores = sesiones.filter((s) => s.ciclo > sesion.ciclo).length;
+    if (posteriores > 0) {
+      throw new ErrorDeNegocio(
+        `No se puede corregir la sesión ${sesion.numeroSesion}: pertenece a un servicio ya cerrado y ` +
+          `después hay ${posteriores} sesiones que dependen de ella.`,
+      );
+    }
+
+    const cambiaDeSemana = rangoSemana(sesion.fecha).inicio !== rangoSemana(nuevaFecha).inicio;
+    if (cambiaDeSemana) {
+      await repo.sumarASemana(sesion.fecha, sesion.tarifa, -1);
+      await repo.sumarASemana(nuevaFecha, sesion.tarifa, 1);
+    }
+
+    await repo.guardarSesionEditada(sesionId, nuevaFecha, nuevoNumero);
+
+    // El contador se recalcula desde lo que queda, no se toca a mano.
+    const quedan = (await repo.listarSesiones(clienteId)).filter((s) => s.ciclo === cliente.cicloActual);
+    await repo.actualizarCliente({
+      ...cliente,
+      sesionesCompletadas: quedan.length ? Math.max(...quedan.map((s) => s.numeroSesion)) : 0,
+    });
+  });
+}
+
+/**
+ * Borra un cliente entero, retirando también su facturación.
+ *
+ * Se hace **sesión a sesión**, de la más reciente a la más antigua, en vez de
+ * un borrado directo: así su dinero no se queda contado para siempre en la
+ * economía sin ninguna sesión detrás. Ese descuadre silencioso es justo lo que
+ * el sistema Python se dedicó a eliminar.
+ */
+export async function eliminarClienteConHistorial(
+  clienteId: string,
+): Promise<{ sesionesBorradas: number; importeDescontado: number }> {
+  const repo = repositorio();
+
+  return repo.transaccion(async () => {
+    const cliente = await repo.obtenerCliente(clienteId);
+    if (!cliente) throw new ErrorDeNegocio("Ese cliente ya no existe");
+
+    const sesiones = await repo.listarSesiones(clienteId);
+    const importe = sesiones.reduce((suma, s) => suma + (s.tarifa ?? 0), 0);
+
+    // De la más reciente a la más antigua, que es como ya vienen ordenadas.
+    for (const sesion of sesiones) {
+      await repo.eliminarSesion(sesion.id);
+      await repo.sumarASemana(sesion.fecha, sesion.tarifa, -1);
+    }
+
+    await repo.eliminarCliente(clienteId);
+    return { sesionesBorradas: sesiones.length, importeDescontado: Math.round(importe * 100) / 100 };
   });
 }
 

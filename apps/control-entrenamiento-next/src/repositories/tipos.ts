@@ -26,6 +26,14 @@ export interface SemanaEconomica {
   facturacionKids: number | null;
 }
 
+export interface Aviso {
+  id: string;
+  fecha: string;
+  tipo: string;
+  detalle: string;
+  leido: boolean;
+}
+
 export interface ClaseGrupo {
   id: string;
   fecha: string;
@@ -55,6 +63,8 @@ export interface Repositorio {
   obtenerClientePorToken(token: string): Promise<Cliente | null>;
   crearCliente(cliente: Cliente, cicloInicial: Ciclo): Promise<void>;
   actualizarCliente(cliente: Cliente): Promise<void>;
+  /** Solo la ficha. Sus sesiones se borran antes, una a una. */
+  eliminarCliente(clienteId: string): Promise<void>;
 
   cicloActual(clienteId: string): Promise<Ciclo | null>;
   listarCiclos(clienteId: string): Promise<Ciclo[]>;
@@ -64,6 +74,7 @@ export interface Repositorio {
   contarSesionesDelCiclo(clienteId: string, ciclo: number): Promise<number>;
   guardarSesion(sesion: Sesion): Promise<void>;
   eliminarSesion(sesionId: string): Promise<Sesion | null>;
+  guardarSesionEditada(sesionId: string, fecha: string, numeroSesion: number): Promise<void>;
 
   cargoDelMes(clienteId: string, anio: number, mes: number): Promise<CargoMensual | null>;
   guardarCargo(cargo: CargoMensual): Promise<void>;
@@ -90,6 +101,14 @@ export interface Repositorio {
   confirmacionesDeHoy(clienteId: string, hoy: string): Promise<Array<{ hora: string }>>;
   /** Confirma la sesión más antigua de hoy sin confirmar. */
   confirmarSesion(clienteId: string, sesionId: string, hoy: string, hora: string): Promise<void>;
+
+  /** Avisos: lo que Fernando debería mirar. */
+  registrarAviso(aviso: { fecha: string; tipo: string; detalle: string }): Promise<void>;
+  listarAvisos(): Promise<Aviso[]>;
+  contarNoLeidos(): Promise<number>;
+  marcarTodosLeidos(): Promise<void>;
+  resolverAviso(id: string): Promise<void>;
+  resolverPorTipo(tipo: string): Promise<number>;
 
   /** ¿Ya se procesó esta petición? Cuarta capa contra duplicados. */
   registrarIdempotencia(clave: string): Promise<boolean>;
