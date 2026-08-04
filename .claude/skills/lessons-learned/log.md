@@ -473,3 +473,35 @@ paleta.
    middleware estaba redirigiendo `/style.css` y las fuentes al login por
    no llevar cookie, así que la pantalla de entrada habría salido sin un
    solo estilo. Una pantalla no está bien porque su HTML esté bien.
+
+---
+
+## 2026-08-04 (bis) — Un GET que cambia algo no sobrevive a un navegador listo
+
+**Qué pasó:** Fernando entró en la app y le pedía la contraseña **en cada
+pantalla**. No era un fallo de la sesión ni de la cookie: era el chip
+«Salir» de la cabecera.
+
+**Por qué pasó:** copié el `/logout` de Flask tal cual —un enlace normal a
+una dirección que cierra la sesión— y lo puse en un `<Link>` de Next. Next
+**precarga** los enlaces que están a la vista para que la navegación sea
+instantánea, y «Salir» está en la cabecera de todas las pantallas. Así que
+abrir cualquier página disparaba sola una petición a `/salir` y le cerraba
+la sesión antes de que pudiera hacer nada. En Flask el mismo diseño
+funciona porque un `<a>` de HTML no se adelanta.
+
+**Qué se hace distinto a partir de ahora:**
+
+1. **Al portar una ruta, portar también sus supuestos.** «Un enlace solo se
+   pide si alguien lo pulsa» era cierto en Flask y dejó de serlo en Next.
+   Copiar el marcado no basta: hay que preguntarse qué daba por hecho el
+   original y si sigue siendo verdad en el sitio nuevo.
+2. **Nada que cambie el estado se cuelga de un GET que otro pueda pedir por
+   su cuenta.** Si tiene que ser un GET por parecerse al original, la ruta
+   distingue una visita de verdad de una precarga y solo actúa en la
+   primera.
+3. **El comprobador de pantallas vive en el repositorio**
+   (`npm run comprobar:pantallas`) y ahora también verifica esto: que
+   precargar «Salir» no cierre la sesión y que pulsarlo sí. Los dos fallos
+   de hoy —este y la hoja de estilos bloqueada por el middleware— eran
+   invisibles para las 131 pruebas, para los tipos y para el build.
