@@ -226,8 +226,14 @@ class TestElEnlacePublicoSoloEnsenaSuCliente(BaseWeb):
         super().setUp()
         self.alta("Cliente A")
         self.alta("Cliente B")
-        ra.registrar_sesion_pt("Cliente A", fecha=date(2026, 8, 3), ruta=self.ruta)
-        ra.registrar_sesion_pt("Cliente B", fecha=date(2026, 8, 3), ruta=self.ruta)
+        # HOY, no una fecha fija: confirmar solo mira las sesiones del día en
+        # curso, así que con una fecha escrita a mano la prueba pasaba el día
+        # que se escribió y fallaba al siguiente.
+        from zona_horaria import hoy_negocio
+
+        hoy = hoy_negocio()
+        ra.registrar_sesion_pt("Cliente A", fecha=hoy, ruta=self.ruta)
+        ra.registrar_sesion_pt("Cliente B", fecha=hoy, ruta=self.ruta)
 
     def test_la_pagina_de_uno_no_nombra_al_otro(self):
         pagina = self.cliente_http.get(f"/mi/{self.token('Cliente A')}").get_data(as_text=True)
