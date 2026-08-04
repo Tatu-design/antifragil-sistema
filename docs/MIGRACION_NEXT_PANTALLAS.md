@@ -94,3 +94,46 @@ externas.
 `npm run test`, `npm run type-check`, `npm run lint` y `npm run build`, más un
 recorrido por HTTP real de las diez pantallas que comprueba que salen con las
 mismas clases y los mismos textos que las plantillas de Flask.
+
+---
+
+## Recarga de datos del 2026-08-04
+
+La primera migración se hizo desde la copia **local** de SQLite, que estaba
+parada en el 17/07. Fernando trabaja en el servidor (`tatu17.pythonanywhere.com`),
+así que la app nueva enseñaba una foto de tres semanas antes.
+
+Se ha vuelto a cargar desde una copia consistente bajada del servidor con
+`/admin/backup`. Resultado: 8 clientes, 10 servicios, 63 sesiones, 1 cuota
+mensual, 2.580,00 € y 63 horas — sin una sola diferencia en la comparación
+campo a campo (clientes, servicios, sesiones, importes, cobros y tokens).
+
+**Que la copia local esté vieja no es un detalle:** cualquier migración futura
+tiene que partir de una descarga del servidor, nunca de `datos/antifragil.db`.
+
+### La economía semanal NO se copia, se recalcula
+
+El script rehace las semanas desde las sesiones en vez de copiar la tabla
+`semanas` del origen, y por eso las cifras semanales **no coinciden** con las
+que enseña Flask hoy:
+
+| Semana | Flask | App nueva |
+|---|---|---|
+| 2026-06-29 | −40,00 € | 337,50 € |
+| 2026-07-01 (no es lunes) | 340,00 € | — |
+| 2026-07-20 | 752,50 € | 677,50 € |
+| 2026-07-27 | 0,00 € | — |
+
+El agregado semanal del origen suma 2.337,50 €, pero sus propias sesiones suman
+2.580,00 €. Es decir: **la tabla de Flask está descuadrada respecto a sus
+sesiones**, con una semana en negativo y otra que empieza un miércoles. La app
+nueva suma exactamente lo que hay firmado.
+
+No es una corrección silenciosa: queda escrita aquí y hay que decidir si en
+Flask se arregla también o si se deja como está hasta el cambio definitivo.
+
+### Lo que la migración no trae
+
+- **Avisos** (51 en el servidor). Son recordatorios de cosas ya pasadas y se
+  regeneran solos; los de la app nueva son los suyos.
+- **Confirmaciones públicas** (1 en el servidor).
