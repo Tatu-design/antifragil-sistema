@@ -8,7 +8,7 @@ import { FiltrosClientes } from "@/components/FiltrosClientes";
 import { contarNoLeidos } from "@/services/avisos";
 import { SinConexion } from "@/components/SinConexion";
 import { BaseNoDisponible } from "@/repositories/postgres";
-import { haySesion } from "@/lib/auth";
+import { correoActual, haySesion } from "@/lib/auth";
 import { listarClientes } from "@/services/clientes";
 
 // El repositorio de staging escribe en disco, así que esta pantalla se calcula
@@ -43,7 +43,7 @@ export default async function PaginaClientes() {
 
       <FiltrosClientes clientes={clientes} />
 
-      <BotonSalir />
+      <BotonSalir correo={await correoActual()} />
 
       <BarraInferior activa="clientes" sinLeer={sinLeer} />
     </main>

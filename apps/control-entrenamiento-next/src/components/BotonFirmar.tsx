@@ -1,7 +1,7 @@
 "use client";
 
 import { Check } from "lucide-react";
-import { useActionState, useId } from "react";
+import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 
 import { accionFirmar, type Resultado } from "@/app/actions";
@@ -20,13 +20,20 @@ function Boton() {
   );
 }
 
-export function BotonFirmar({ clienteId, ficha }: { clienteId: string; ficha: FichaServicio }) {
+export function BotonFirmar({
+  clienteId,
+  ficha,
+  clave,
+}: {
+  clienteId: string;
+  ficha: FichaServicio;
+  /** Valor de un solo uso, distinto en CADA carga de la página. Lo genera el
+   *  servidor: `useId()` parecía servir pero devuelve siempre lo mismo, así
+   *  que la segunda sesión de un cliente se tomaba por un duplicado y no se
+   *  guardaba nunca. Encontrado probando el recorrido de punta a punta. */
+  clave: string;
+}) {
   const [resultado, accion] = useActionState<Resultado | null, FormData>(accionFirmar, null);
-  // Segunda capa: un valor de un solo uso por carga de página. Si la red
-  // reintenta, o hay dos pestañas abiertas, la misma petición no se guarda dos
-  // veces. Recargar genera otro, así que una segunda sesión real sí se puede
-  // firmar.
-  const clave = useId();
 
   if (!ficha.puedeFirmar) {
     return (
@@ -53,7 +60,7 @@ export function BotonFirmar({ clienteId, ficha }: { clienteId: string; ficha: Fi
     <section className="flex flex-col gap-2" aria-label="Firmar sesión">
       <form action={accion}>
         <input type="hidden" name="clienteId" value={clienteId} />
-        <input type="hidden" name="claveIdempotencia" value={`${clienteId}:${clave}`} />
+        <input type="hidden" name="claveIdempotencia" value={clave} />
         <Boton />
       </form>
       <Aviso resultado={resultado} />

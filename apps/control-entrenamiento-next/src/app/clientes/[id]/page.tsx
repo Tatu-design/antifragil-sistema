@@ -15,6 +15,7 @@ import { SinConexion } from "@/components/SinConexion";
 import { BaseNoDisponible } from "@/repositories/postgres";
 import { headers } from "next/headers";
 import QRCode from "qrcode";
+import { randomUUID } from "node:crypto";
 
 export const dynamic = "force-dynamic";
 
@@ -66,7 +67,7 @@ export default async function PaginaPerfil({ params }: { params: Promise<{ id: s
       <TarjetaServicio ficha={ficha} />
 
       {/* La firma es la acción principal: va antes que nada editable. */}
-      <BotonFirmar clienteId={cliente.id} ficha={ficha} />
+      <BotonFirmar clienteId={cliente.id} ficha={ficha} clave={randomUUID()} />
 
       <CambiarEstado clienteId={cliente.id} estado={cliente.estado} nombre={cliente.nombre} />
 

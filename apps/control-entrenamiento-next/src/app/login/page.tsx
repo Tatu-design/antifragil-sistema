@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { FormularioLogin } from "@/components/FormularioLogin";
-import { haySesion } from "@/lib/auth";
+import { claveUnicaDisponible, haySesion } from "@/lib/auth";
 
 export default async function PaginaLogin() {
   if (await haySesion()) redirect("/clientes");
@@ -12,9 +12,9 @@ export default async function PaginaLogin() {
         <h1 className="text-2xl font-semibold tracking-tight">Antifrágil</h1>
         <p className="mt-1 text-sm text-tinta-suave">Control de entrenamiento personal</p>
       </header>
-      <FormularioLogin />
+      <FormularioLogin conClaveUnica={claveUnicaDisponible()} />
       <p className="text-center text-xs text-tinta-suave">
-        Entorno de pruebas con datos ficticios. No contiene información de clientes reales.
+        Acceso restringido. Si has perdido la contraseña, pídele a Claude que la restablezca.
       </p>
     </main>
   );

@@ -19,6 +19,12 @@ const numeroOpcional = z
   .refine((v) => v === null || Number.isFinite(v), { message: "Tiene que ser un número" });
 
 export const esquemaLogin = z.object({
+  correo: z.string().trim().email("Escribe un correo válido"),
+  password: z.string().min(1, "Escribe la contraseña"),
+});
+
+/** Puerta de emergencia: solo contraseña, sin correo. */
+export const esquemaClaveUnica = z.object({
   password: z.string().min(1, "Escribe la contraseña"),
 });
 

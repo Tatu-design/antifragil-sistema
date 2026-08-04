@@ -18,7 +18,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { ErrorDeNegocio } from "@/domain/modalidades";
-import { abrirSesion, cerrarSesion, contrasenaCorrecta, haySesion } from "@/lib/auth";
+import { cerrarSesion, entrar, entrarConClaveUnica, haySesion } from "@/lib/auth";
 import {
   desdeFormulario,
   esquemaAlta,
@@ -32,6 +32,7 @@ import {
   esquemaKids,
   esquemaEstado,
   esquemaFirma,
+  esquemaClaveUnica,
   esquemaLogin,
   esquemaRenombrar,
   esquemaServicio,
@@ -79,12 +80,28 @@ function comoMensaje(error: unknown): Resultado {
 export async function accionEntrar(_previo: Resultado | null, datos: FormData): Promise<Resultado> {
   const validado = esquemaLogin.safeParse(desdeFormulario(datos));
   if (!validado.success) {
-    return { ok: false, mensaje: "Escribe la contraseña.", tono: "error" };
+    return { ok: false, mensaje: validado.error.issues[0]?.message ?? "Revisa los datos.", tono: "error" };
   }
-  if (!contrasenaCorrecta(validado.data.password)) {
-    return { ok: false, mensaje: "Contraseña incorrecta.", tono: "error" };
+
+  const resultado = await entrar(validado.data.correo, validado.data.password);
+  if (!resultado.ok) {
+    return { ok: false, mensaje: resultado.mensaje ?? "No se ha podido entrar.", tono: "error" };
   }
-  await abrirSesion();
+  redirect("/clientes");
+}
+
+/** Puerta de emergencia de staging. Apagada salvo que se encienda a propósito. */
+export async function accionEntrarClaveUnica(
+  _previo: Resultado | null,
+  datos: FormData,
+): Promise<Resultado> {
+  const validado = esquemaClaveUnica.safeParse(desdeFormulario(datos));
+  if (!validado.success) return { ok: false, mensaje: "Escribe la contraseña.", tono: "error" };
+
+  const resultado = await entrarConClaveUnica(validado.data.password);
+  if (!resultado.ok) {
+    return { ok: false, mensaje: resultado.mensaje ?? "No se ha podido entrar.", tono: "error" };
+  }
   redirect("/clientes");
 }
 

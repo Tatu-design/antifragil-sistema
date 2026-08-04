@@ -30,6 +30,10 @@ pg.types.setTypeParser(1082, (v) => v);
 
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
 const APLICAR = process.argv.includes("--aplicar");
+/** Borra lo que haya en el destino que NO venga de una migración anterior
+ *  (los datos de demostración). Sin esto, mezclar los dos daría cifras que no
+ *  cuadran con el origen — y el script se negaría, con razón. */
+const LIMPIAR = process.argv.includes("--limpiar");
 const ORIGEN = process.argv[2];
 
 function abortar(mensaje, ayuda) {
@@ -149,6 +153,31 @@ await conectar();
 const idDe = {};
 try {
   await destino.query("begin");
+
+  // Antes de nada: ¿hay en el destino clientes que no vengan de una migración?
+  const ajenos = await destino.query(
+    `select nombre from clientes
+      where id not in (select cliente_id from migracion_clientes)`,
+  );
+  if (ajenos.rowCount && !LIMPIAR) {
+    await destino.query("rollback");
+    console.error("\n  ✗ El destino tiene clientes que no vienen del origen:");
+    for (const f of ajenos.rows) console.error(`    · ${f.nombre}`);
+    console.error("\n    Mezclarlos daría cifras que no cuadran. Para retirarlos antes de migrar:");
+    console.error(`    node scripts/migrar-datos.mjs ${ORIGEN} --aplicar --limpiar\n`);
+    sqlite.close();
+    await destino.end();
+    process.exit(1);
+  }
+  if (ajenos.rowCount) {
+    console.log(`\n  Se retiran ${ajenos.rowCount} cliente(s) de demostración del destino.`);
+    await destino.query(
+      "delete from clientes where id not in (select cliente_id from migracion_clientes)",
+    );
+    await destino.query("delete from clases_grupo");
+    await destino.query("delete from facturacion_kids_mensual");
+    await destino.query("delete from ajustes_mensuales");
+  }
 
   for (const c of clientes) {
     // La correspondencia por nombre de origen es lo que permite repetirlo sin

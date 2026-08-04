@@ -53,6 +53,7 @@ cuando("las reglas contra Supabase", () => {
   let Cliente: { Pool: typeof import("pg").Pool };
   let pool: import("pg").Pool;
   let ids: Record<string, string> = {};
+  let hayDatosReales = false;
 
   beforeAll(async () => {
     ({ repositorio: repo } = await import("@/repositories"));
@@ -78,16 +79,24 @@ cuando("las reglas contra Supabase", () => {
         await new Promise((sigue) => setTimeout(sigue, 1500));
       }
     }
+    // Con datos reales delante, estas pruebas NO se ejecutan: borran y
+    // rehacen clientes en cada caso. Se saltan en silencio en vez de fallar,
+    // porque no es un error del código — es la salvaguarda funcionando.
     if (otros.rowCount) {
-      throw new Error(
-        `Esta base tiene clientes que no son de prueba (${otros.rows
-          .map((f) => f.nombre)
-          .join(", ")}). No ejecuto nada.`,
+      hayDatosReales = true;
+      console.warn(
+        `
+  ⚠ Saltadas: la base tiene ${otros.rowCount} cliente(s) que no son de prueba.
+`,
       );
     }
   });
 
   afterAll(async () => {
+    if (hayDatosReales) {
+      await pool?.end();
+      return;
+    }
     // Deja la base como estaba para que la aplicación desplegada siga
     // teniendo sus datos de demostración: si no, tras cada tanda de pruebas
     // el enlace público de los clientes dejaba de funcionar.
@@ -103,7 +112,8 @@ cuando("las reglas contra Supabase", () => {
    *  Sin `begin`/`commit`: con un pool, esas dos sentencias pueden acabar en
    *  conexiones distintas y entonces no hay transacción ninguna. Aquí cada
    *  sentencia se confirma sola, que es justo lo que hace falta. */
-  beforeEach(async () => {
+  beforeEach(async (contexto) => {
+    if (hayDatosReales) return contexto.skip();
     await pool.query("delete from clientes");
     await pool.query("delete from semanas");
     await pool.query("delete from idempotencia");
