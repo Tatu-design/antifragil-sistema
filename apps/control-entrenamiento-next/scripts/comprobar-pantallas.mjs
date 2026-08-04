@@ -62,13 +62,32 @@ comprobar("login", r.html, [
 ]);
 
 // 1b. Los archivos que la pantalla de entrada necesita, SIN sesión ---------
-for (const archivo of ["/style.css", "/logo-marca.png", "/carga.js", "/fonts/geist-latin.woff2"]) {
+for (const archivo of [
+  "/style.css",
+  "/logo-marca.png",
+  "/carga.js",
+  "/fonts/geist-latin.woff2",
+  // Sin el manifiesto, el iPhone no sabe hasta dónde llega la app y abre
+  // Economía y Avisos con la barra del navegador encima.
+  "/manifest.webmanifest",
+]) {
   const respuesta = await fetch(`${BASE}${archivo}`, { redirect: "manual" });
   if (respuesta.status !== 200) {
     fallos.push(archivo);
     console.log(`  x ${archivo} -- responde ${respuesta.status}, deberia ser 200`);
   } else {
     console.log(`  ok ${archivo}`);
+  }
+}
+
+// 1c. El manifiesto tiene que abarcar TODA la app -------------------------
+{
+  const manifiesto = await (await fetch(`${BASE}/manifest.webmanifest`)).json();
+  if (manifiesto.scope !== "/" || manifiesto.display !== "standalone") {
+    fallos.push("manifiesto");
+    console.log(`  x el manifiesto dice scope=${manifiesto.scope} display=${manifiesto.display}`);
+  } else {
+    console.log("  ok el manifiesto abarca toda la app");
   }
 }
 

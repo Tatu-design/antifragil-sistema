@@ -5,6 +5,8 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Antifrágil — Clientes",
   icons: { icon: "/favicon.png", apple: "/favicon.png" },
+  manifest: "/manifest.webmanifest",
+  appleWebApp: { capable: true, title: "Antifrágil", statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = {
@@ -32,8 +34,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             empaquetador la reescribiría y dejaría de ser la misma. */}
         {/* eslint-disable-next-line @next/next/no-css-tags */}
         <link rel="stylesheet" href="/style.css" />
+        {/* Next ya emite `mobile-web-app-capable`, que es el nombre moderno.
+            Este es el de siempre y lo entienden también los iPhone con iOS
+            antiguo: sin él, la app añadida a la pantalla de inicio se abre
+            con la barra del navegador encima. */}
         <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-title" content="Antifrágil" />
       </head>
       <body>{children}</body>
     </html>
