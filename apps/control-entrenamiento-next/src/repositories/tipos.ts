@@ -85,6 +85,12 @@ export interface Repositorio {
   mesesConDatos(): Promise<Array<{ anio: number; mes: number }>>;
   datosDelMes(anio: number, mes: number): Promise<DatosMes>;
 
+  /** Sesiones de hoy de ese cliente que aún no ha confirmado. */
+  sesionesSinConfirmarHoy(clienteId: string, hoy: string): Promise<Sesion[]>;
+  confirmacionesDeHoy(clienteId: string, hoy: string): Promise<Array<{ hora: string }>>;
+  /** Confirma la sesión más antigua de hoy sin confirmar. */
+  confirmarSesion(clienteId: string, sesionId: string, hoy: string, hora: string): Promise<void>;
+
   /** ¿Ya se procesó esta petición? Cuarta capa contra duplicados. */
   registrarIdempotencia(clave: string): Promise<boolean>;
 

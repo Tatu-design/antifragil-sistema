@@ -4,11 +4,14 @@ import { notFound, redirect } from "next/navigation";
 
 import { BotonFirmar } from "@/components/BotonFirmar";
 import { CambiarEstado } from "@/components/CambiarEstado";
+import { EnlaceDelCliente } from "@/components/EnlaceDelCliente";
 import { EditarServicio } from "@/components/EditarServicio";
 import { HistorialServicios } from "@/components/HistorialServicios";
 import { TarjetaServicio } from "@/components/TarjetaServicio";
 import { haySesion } from "@/lib/auth";
 import { obtenerPerfil } from "@/services/clientes";
+import { headers } from "next/headers";
+import QRCode from "qrcode";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +23,15 @@ export default async function PaginaPerfil({ params }: { params: Promise<{ id: s
   if (!perfil) notFound();
 
   const { cliente, ficha, servicios } = perfil;
+
+  // La dirección se calcula desde la petición: así el enlace es correcto tanto
+  // en local como en el despliegue, sin tener que configurarlo en dos sitios.
+  const cabeceras = await headers();
+  const anfitrion = cabeceras.get("x-forwarded-host") ?? cabeceras.get("host") ?? "localhost:3000";
+  const protocolo = anfitrion.startsWith("localhost") ? "http" : "https";
+  const enlace = `${protocolo}://${anfitrion}/mi/${cliente.token}`;
+  // El QR lleva a confirmar directamente: escanearlo ya confirma.
+  const qr = await QRCode.toDataURL(`${enlace}/confirmar`, { margin: 1, width: 384 });
 
   return (
     <main className="flex flex-col gap-4">
@@ -50,6 +62,8 @@ export default async function PaginaPerfil({ params }: { params: Promise<{ id: s
       <CambiarEstado clienteId={cliente.id} estado={cliente.estado} nombre={cliente.nombre} />
 
       <EditarServicio clienteId={cliente.id} ficha={ficha} />
+
+      <EnlaceDelCliente enlace={enlace} qr={qr} />
 
       <HistorialServicios clienteId={cliente.id} servicios={servicios} />
     </main>

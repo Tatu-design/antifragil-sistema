@@ -15,7 +15,9 @@ import { NextResponse, type NextRequest } from "next/server";
  * y se estrella contra el siguiente — que es el orden correcto: rápido primero,
  * riguroso después.
  */
-const PUBLICAS = ["/login"];
+//: `/mi/...` es el enlace personal del cliente: entra sin cuenta, y lo que
+//: protege es su token, no una contraseña.
+const PUBLICAS = ["/login", "/mi/"];
 
 export function middleware(peticion: NextRequest) {
   const { pathname } = peticion.nextUrl;

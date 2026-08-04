@@ -32,6 +32,7 @@ interface Almacen {
   clases: Array<{ id: string; fecha: string; tipo: TipoClase }>;
   facturacionKids: Array<{ anio: number; mes: number; importe: number }>;
   ajustes: Array<{ anio: number; mes: number; origen: string; importe: number; horas: number; motivo: string }>;
+  confirmaciones: Array<{ clienteId: string; sesionId: string; fecha: string; hora: string }>;
   idempotencia: string[];
   siguienteSesion: number;
 }
@@ -90,7 +91,7 @@ function semilla(): Almacen {
 
   return {
     clientes, ciclos, sesiones, cargos, semanas,
-    clases: [], facturacionKids: [], ajustes: [],
+    clases: [], facturacionKids: [], ajustes: [], confirmaciones: [],
     idempotencia: [], siguienteSesion: n,
   };
 }
@@ -377,6 +378,29 @@ export class RepositorioStaging implements Repositorio {
         .filter((a) => a.anio === anio && a.mes === mes)
         .map((a) => ({ origen: a.origen, importe: a.importe, horas: a.horas, motivo: a.motivo })),
     };
+  }
+
+  async sesionesSinConfirmarHoy(clienteId: string, hoy: string): Promise<Sesion[]> {
+    const datos = await cargar();
+    const confirmadas = new Set(datos.confirmaciones.map((c) => c.sesionId));
+    return clonar(
+      datos.sesiones.filter((s) => s.clienteId === clienteId && s.fecha === hoy && !confirmadas.has(s.id)),
+    );
+  }
+
+  async confirmacionesDeHoy(clienteId: string, hoy: string): Promise<Array<{ hora: string }>> {
+    const datos = await cargar();
+    return datos.confirmaciones
+      .filter((c) => c.clienteId === clienteId && c.fecha === hoy)
+      .map((c) => ({ hora: c.hora }));
+  }
+
+  async confirmarSesion(clienteId: string, sesionId: string, hoy: string, hora: string): Promise<void> {
+    const datos = await cargar();
+    // Escanear el QR dos veces no puede crear dos confirmaciones.
+    if (datos.confirmaciones.some((c) => c.sesionId === sesionId)) return;
+    datos.confirmaciones.push({ clienteId, sesionId, fecha: hoy, hora });
+    await volcar();
   }
 
   async registrarIdempotencia(clave: string): Promise<boolean> {

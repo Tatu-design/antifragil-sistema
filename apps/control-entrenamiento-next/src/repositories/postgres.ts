@@ -480,6 +480,35 @@ export class RepositorioPostgres implements Repositorio {
     };
   }
 
+  async sesionesSinConfirmarHoy(clienteId: string, hoy: string): Promise<Sesion[]> {
+    const filas = await consultar(
+      `select s.* from sesiones s
+        where s.cliente_id = $1 and s.fecha = $2
+          and not exists (select 1 from confirmaciones c where c.sesion_id = s.id)
+        order by s.creado`,
+      [clienteId, hoy],
+    );
+    return filas.map(aSesion);
+  }
+
+  async confirmacionesDeHoy(clienteId: string, hoy: string): Promise<Array<{ hora: string }>> {
+    const filas = await consultar(
+      "select hora from confirmaciones where cliente_id = $1 and fecha = $2 order by hora",
+      [clienteId, hoy],
+    );
+    return filas.map((f) => ({ hora: String(f.hora).slice(0, 5) }));
+  }
+
+  async confirmarSesion(clienteId: string, sesionId: string, hoy: string, hora: string): Promise<void> {
+    // `do nothing` sobre la clave única de la sesión: escanear el QR dos veces
+    // no puede crear dos confirmaciones.
+    await consultar(
+      `insert into confirmaciones (cliente_id, sesion_id, fecha, hora) values ($1,$2,$3,$4)
+       on conflict (sesion_id) do nothing`,
+      [clienteId, sesionId, hoy, hora],
+    );
+  }
+
   async registrarIdempotencia(clave: string): Promise<boolean> {
     // `do nothing` + `returning`: si ya estaba, no devuelve fila. Lo decide la
     // clave primaria, no el código.
