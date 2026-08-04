@@ -78,6 +78,13 @@ cuando("las reglas contra Supabase", () => {
   });
 
   afterAll(async () => {
+    // Deja la base como estaba para que la aplicación desplegada siga
+    // teniendo sus datos de demostración: si no, tras cada tanda de pruebas
+    // el enlace público de los clientes dejaba de funcionar.
+    const { execFile } = await import("node:child_process");
+    await new Promise<void>((listo) => {
+      execFile(process.execPath, ["scripts/sembrar.mjs"], { cwd: process.cwd() }, () => listo());
+    });
     await pool?.end();
   });
 
