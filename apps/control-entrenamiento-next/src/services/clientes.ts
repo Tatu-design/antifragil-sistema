@@ -21,34 +21,35 @@ export interface ClienteEnLista extends Cliente {
   debe: boolean;
 }
 
-async function componerFicha(cliente: Cliente): Promise<{ ficha: FichaServicio; ciclo: Ciclo | null }> {
-  const repo = repositorio();
-  const ciclo = await repo.cicloActual(cliente.id);
-  const sesionesDelCiclo = ciclo ? await repo.contarSesionesDelCiclo(cliente.id, ciclo.ciclo) : 0;
-  // El estado de cobro sale del CICLO, que es donde vive (2026-08-05). En una
-  // mensualidad el repositorio ya ha resuelto que mande el cargo del mes
-  // (H-02). Solo si el cliente no tuviera ciclo se recurre a su ficha.
-  const pendiente = ciclo ? !ciclo.pagado : cliente.pendientePago;
-  return {
-    ciclo,
-    ficha: fichaServicio({
-      ciclo,
-      sesionesDelCiclo,
-      sesionesCompletadas: cliente.sesionesCompletadas,
-      estado: cliente.estado,
-      pendientePago: pendiente,
-    }),
-  };
-}
+// `componerFicha` desapareció el 2026-08-05: hacía una consulta por cliente
+// para su ciclo y otra para contar sus sesiones. Ahora la lista y el perfil
+// componen la ficha con datos que ya tienen en memoria.
 
 export async function listarClientes(): Promise<ClienteEnLista[]> {
   const repo = repositorio();
-  const clientes = await repo.listarClientes();
+  // Dos lecturas en total, no cinco por cliente (2026-08-05). Contra Supabase
+  // cada consulta es un viaje de red de ~180 ms: ir cliente a cliente hacía
+  // que la pantalla más usada tardara varios segundos en abrirse.
+  const [clientes, datos] = await Promise.all([repo.listarClientes(), repo.cargarTodoParaLaLista()]);
+
+  const ciclosPorCliente = new Map<string, Ciclo[]>();
+  for (const ciclo of datos.ciclos) {
+    const lista = ciclosPorCliente.get(ciclo.clienteId) ?? [];
+    lista.push(ciclo);
+    ciclosPorCliente.set(ciclo.clienteId, lista);
+  }
 
   return Promise.all(
     clientes.map(async (cliente) => {
-      const { ficha } = await componerFicha(cliente);
-      const ciclos = await repo.listarCiclos(cliente.id);
+      const ciclos = ciclosPorCliente.get(cliente.id) ?? [];
+      const enCurso = ciclos.find((c) => c.ciclo === cliente.cicloActual) ?? null;
+      const ficha = fichaServicio({
+        ciclo: enCurso,
+        sesionesDelCiclo: datos.sesionesPorCiclo.get(`${cliente.id}:${cliente.cicloActual}`) ?? 0,
+        sesionesCompletadas: cliente.sesionesCompletadas,
+        estado: cliente.estado,
+        pendientePago: enCurso ? !enCurso.pagado : cliente.pendientePago,
+      });
       // Solo los distintos del actual: el actual ya lo describe la ficha, así
       // que las dos fuentes no pueden contradecirse.
       //
@@ -77,9 +78,22 @@ export async function obtenerPerfil(clienteId: string): Promise<PerfilCliente | 
   const cliente = await repo.obtenerCliente(clienteId);
   if (!cliente) return null;
 
-  const { ficha, ciclo } = await componerFicha(cliente);
-  const ciclos = await repo.listarCiclos(clienteId);
-  const sesiones = await repo.listarSesiones(clienteId);
+  // Los ciclos y las sesiones se piden A LA VEZ, y el ciclo en curso sale de
+  // los que ya tenemos en vez de en otra consulta (2026-08-05). Antes eran
+  // seis viajes de red encadenados; ahora son tres, y dos van en paralelo.
+  const [ciclos, sesiones] = await Promise.all([
+    repo.listarCiclos(clienteId),
+    repo.listarSesiones(clienteId),
+  ]);
+
+  const ciclo = ciclos.find((c) => c.ciclo === cliente.cicloActual) ?? null;
+  const ficha = fichaServicio({
+    ciclo,
+    sesionesDelCiclo: sesiones.filter((s) => s.ciclo === cliente.cicloActual).length,
+    sesionesCompletadas: cliente.sesionesCompletadas,
+    estado: cliente.estado,
+    pendientePago: ciclo ? !ciclo.pagado : cliente.pendientePago,
+  });
 
   const servicios = ciclos.map((c) => ({
     ...c,

@@ -39,22 +39,33 @@ export async function obtenerPerfilPublico(token: string): Promise<PerfilPublico
   if (!cliente) return null;
 
   const hoy = hoyNegocio();
-  const ciclo = await repo.cicloActual(cliente.id);
-  const sesionesDelCiclo = ciclo ? await repo.contarSesionesDelCiclo(cliente.id, ciclo.ciclo) : 0;
-  const sesiones = await repo.listarSesiones(cliente.id);
+
+  // Las cuatro lecturas van a la vez, y las sesiones del ciclo se cuentan de
+  // las que ya tenemos en vez de pedirlas aparte (2026-08-05). Antes eran
+  // siete viajes de red encadenados para una pantalla que el cliente abre
+  // desde el móvil, muchas veces con mala cobertura.
+  const [ciclos, sesiones, pendientesHoy, confirmadasHoy] = await Promise.all([
+    repo.listarCiclos(cliente.id),
+    repo.listarSesiones(cliente.id),
+    repo.sesionesSinConfirmarHoy(cliente.id, hoy),
+    repo.confirmacionesDeHoy(cliente.id, hoy),
+  ]);
+
+  const ciclo = ciclos.find((c) => c.ciclo === cliente.cicloActual) ?? null;
 
   return {
     nombre: cliente.nombre,
     ficha: fichaServicio({
       ciclo,
-      sesionesDelCiclo,
+      sesionesDelCiclo: sesiones.filter((s) => s.ciclo === cliente.cicloActual).length,
       sesionesCompletadas: cliente.sesionesCompletadas,
       estado: cliente.estado,
-      pendientePago: cliente.pendientePago,
+      // El estado de cobro sale del ciclo, igual que en la ficha de Fernando.
+      pendientePago: ciclo ? !ciclo.pagado : cliente.pendientePago,
     }),
     historial: sesiones,
-    pendientesHoy: await repo.sesionesSinConfirmarHoy(cliente.id, hoy),
-    confirmadasHoy: await repo.confirmacionesDeHoy(cliente.id, hoy),
+    pendientesHoy,
+    confirmadasHoy,
     hoy,
   };
 }

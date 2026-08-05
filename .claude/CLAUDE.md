@@ -127,6 +127,23 @@ Nació porque el 2026-08-04 reparé la numeración de tres clientes reales en
 producción sin enseñárselo antes. Hice copia y comprobé que la economía no se
 movía, pero eso no sustituye a su aprobación.
 
+### ⚠️ «LA APP» ES SIEMPRE LA DE VERCEL (Fernando, 2026-08-05)
+
+**Cuando Fernando dice «la app», habla SIEMPRE de la de Next.js en Vercel**
+(`apps/control-entrenamiento-next`). Nunca de la de Flask/PythonAnywhere.
+
+Ya no hace consultas sobre la de Python. Da igual que un síntoma parezca de
+Flask: si Fernando reporta algo —lentitud, un fallo, un texto raro— **se mira
+primero en Vercel**, y solo se toca Flask si él lo pide explícitamente por su
+nombre.
+
+Nació porque el 2026-08-05 dijo «va muy lenta la app» y me pasé un buen rato
+midiendo y optimizando Flask, que no era donde le dolía.
+
+**Antes de investigar cualquier síntoma, comprobar en qué aplicación se
+reproduce.** Y si hay duda de a cuál se refiere, preguntarlo en una línea
+antes de empezar — no elegir por costumbre.
+
 ### Next.js sustituye a Flask (decisión de Fernando, 2026-08-05)
 
 La aplicación de `apps/control-entrenamiento-next` (Next.js + Supabase, en

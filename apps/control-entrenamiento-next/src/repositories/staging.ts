@@ -21,7 +21,7 @@ import { TARIFA_LIDOMARE, type TipoClase } from "@/domain/economia";
 import { BONO, CUENTA, MENSUALIDAD } from "@/domain/modalidades";
 import type { CargoMensual, Ciclo, Cliente, Sesion } from "@/domain/tipos";
 import { rangoSemana } from "@/lib/fechas";
-import type { Aviso, Repositorio, SemanaEconomica } from "./tipos";
+import type { Aviso, DatosDeLaLista, Repositorio, SemanaEconomica } from "./tipos";
 
 interface Almacen {
   clientes: Cliente[];
@@ -188,6 +188,32 @@ export class RepositorioStaging implements Repositorio {
     if (!cliente) return null;
     const ciclo = datos.ciclos.find((c) => c.clienteId === clienteId && c.ciclo === cliente.cicloActual);
     return ciclo ? this.conCobroReal(datos, clonar(ciclo)) : null;
+  }
+
+  /** Ver `cargarTodoParaLaLista` en el repositorio de Postgres. */
+  async cargarTodoParaLaLista(): Promise<DatosDeLaLista> {
+    const datos = await cargar();
+    const cargos = clonar(datos.cargos);
+    const porCliente = new Map<string, CargoMensual[]>();
+    for (const cargo of cargos) {
+      const lista = porCliente.get(cargo.clienteId) ?? [];
+      lista.push(cargo);
+      porCliente.set(cargo.clienteId, lista);
+    }
+
+    const ciclos = clonar(datos.ciclos)
+      .sort((a, b) => (a.clienteId === b.clienteId ? b.ciclo - a.ciclo : a.clienteId.localeCompare(b.clienteId)))
+      // `conCobroReal` de este repositorio recibe el almacén entero, no una
+      // lista de cuotas: ya lo tenemos leído aquí, así que se le pasa tal cual.
+      .map((c) => this.conCobroReal(datos, c));
+
+    const sesionesPorCiclo = new Map<string, number>();
+    for (const sesion of datos.sesiones) {
+      const clave = `${sesion.clienteId}:${sesion.ciclo}`;
+      sesionesPorCiclo.set(clave, (sesionesPorCiclo.get(clave) ?? 0) + 1);
+    }
+
+    return { ciclos, cargos, sesionesPorCiclo };
   }
 
   async listarCiclos(clienteId: string): Promise<Ciclo[]> {
@@ -411,7 +437,10 @@ export class RepositorioStaging implements Repositorio {
       cuotas: datos.cargos.filter((c) => c.anio === anio && c.mes === mes).map((c) => c.importe),
       clasesLidomare: datos.clases.filter((c) => c.tipo === "lidomare" && c.fecha.startsWith(prefijo)).length,
       clasesKids: datos.clases.filter((c) => c.tipo === "kids" && c.fecha.startsWith(prefijo)).length,
-      facturacionKids: await this.facturacionKids(anio, mes),
+      // Se lee del almacén ya cargado, no con otra consulta: en el
+      // repositorio real eso era un viaje de red más por cada mes.
+      facturacionKids:
+        datos.facturacionKids.find((f) => f.anio === anio && f.mes === mes)?.importe ?? null,
       ajustes: datos.ajustes
         .filter((a) => a.anio === anio && a.mes === mes)
         .map((a) => ({ origen: a.origen, importe: a.importe, horas: a.horas, motivo: a.motivo })),

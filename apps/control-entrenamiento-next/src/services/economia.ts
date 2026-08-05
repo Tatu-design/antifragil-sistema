@@ -35,15 +35,25 @@ export interface VistaEconomia {
 export async function obtenerEconomia(): Promise<VistaEconomia> {
   const repo = repositorio();
 
-  const semanas = (await repo.listarSemanas()).map(resumirSemana);
-  const meses: ResumenMes[] = [];
-  for (const { anio, mes } of await repo.mesesConDatos()) {
-    meses.push(resumirMes({ anio, mes, ...(await repo.datosDelMes(anio, mes)) }));
-  }
-
   const hoy = hoyNegocio();
   const { inicio, fin } = rangoSemana(hoy);
-  const clasesEstaSemana = await repo.contarClases(inicio, fin);
+
+  // Las tres lecturas de arranque no dependen entre sí, así que van a la vez
+  // (2026-08-05). Contra Supabase cada consulta es un viaje de red de ~180 ms:
+  // encadenarlas era esperar tres veces para nada.
+  const [filasSemanas, mesesConDatos, clasesEstaSemana] = await Promise.all([
+    repo.listarSemanas(),
+    repo.mesesConDatos(),
+    repo.contarClases(inicio, fin),
+  ]);
+  const semanas = filasSemanas.map(resumirSemana);
+
+  // Y cada mes se calcula en paralelo con los demás, no uno detrás de otro.
+  const meses: ResumenMes[] = await Promise.all(
+    mesesConDatos.map(async ({ anio, mes }) =>
+      resumirMes({ anio, mes, ...(await repo.datosDelMes(anio, mes)) }),
+    ),
+  );
 
   const anio = Number(hoy.slice(0, 4));
   const mes = Number(hoy.slice(5, 7));

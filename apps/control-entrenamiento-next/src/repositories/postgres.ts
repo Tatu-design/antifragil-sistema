@@ -52,7 +52,7 @@ import { MENSUALIDAD, type Modalidad } from "@/domain/modalidades";
 import type { CargoMensual, Ciclo, Cliente, Estado, Sesion } from "@/domain/tipos";
 import { TARIFA_LIDOMARE } from "@/domain/economia";
 import { rangoSemana } from "@/lib/fechas";
-import type { Aviso, Repositorio, SemanaEconomica } from "./tipos";
+import type { Aviso, DatosDeLaLista, Repositorio, SemanaEconomica } from "./tipos";
 
 // -----------------------------------------------------------------------------
 // Conexión
@@ -254,20 +254,58 @@ export class RepositorioPostgres implements Repositorio {
           and c.ciclo = (select ciclo_actual from clientes where id = $1)`,
       [clienteId],
     );
-    return filas[0] ? this.conCobroReal(await this.cargosDe(clienteId), aCiclo(filas[0])) : null;
+    if (!filas[0]) return null;
+    return this.conCobroReal(await this.cargosDe(clienteId), aCiclo(filas[0]));
   }
 
   async listarCiclos(clienteId: string): Promise<Ciclo[]> {
-    const filas = await consultar(
-      `select ${CAMPOS_CICLO} from ciclos where cliente_id = $1 order by ciclo desc`,
-      [clienteId],
-    );
-    const cargos = await this.cargosDe(clienteId);
+    const [filas, cargos] = await Promise.all([
+      consultar(`select ${CAMPOS_CICLO} from ciclos where cliente_id = $1 order by ciclo desc`, [clienteId]),
+      this.cargosDe(clienteId),
+    ]);
     return filas.map((f) => this.conCobroReal(cargos, aCiclo(f)));
   }
 
   private async cargosDe(clienteId: string): Promise<CargoMensual[]> {
     return this.listarCargos(clienteId);
+  }
+
+  /**
+   * Los datos de TODOS los clientes en tres consultas (2026-08-05).
+   *
+   * Antes la lista pedía, por cada cliente, su ciclo en curso, sus cuotas,
+   * sus ciclos y el recuento de sesiones: cinco viajes de red por cliente.
+   * Contra Supabase cada viaje cuesta ~180 ms, así que ocho clientes eran
+   * más de siete segundos de espera. Estas tres consultas no crecen con el
+   * número de clientes.
+   */
+  async cargarTodoParaLaLista(): Promise<DatosDeLaLista> {
+    const [filasCiclos, filasCargos, filasConteo] = await Promise.all([
+      consultar(`select ${CAMPOS_CICLO} from ciclos order by cliente_id, ciclo desc`),
+      consultar("select * from cargos_mensuales"),
+      consultar<{ cliente_id: string; ciclo: number; n: string }>(
+        "select cliente_id, ciclo, count(*)::int as n from sesiones group by cliente_id, ciclo",
+      ),
+    ]);
+
+    const cargos = filasCargos.map((f) => this.aCargo(f));
+    const porCliente = new Map<string, CargoMensual[]>();
+    for (const cargo of cargos) {
+      const lista = porCliente.get(cargo.clienteId) ?? [];
+      lista.push(cargo);
+      porCliente.set(cargo.clienteId, lista);
+    }
+
+    const ciclos = filasCiclos
+      .map((f) => aCiclo(f))
+      .map((c) => this.conCobroReal(porCliente.get(c.clienteId) ?? [], c));
+
+    const sesionesPorCiclo = new Map<string, number>();
+    for (const fila of filasConteo) {
+      sesionesPorCiclo.set(`${fila.cliente_id}:${fila.ciclo}`, Number(fila.n));
+    }
+
+    return { ciclos, cargos, sesionesPorCiclo };
   }
 
   /**
@@ -506,26 +544,29 @@ export class RepositorioPostgres implements Repositorio {
 
   async datosDelMes(anio: number, mes: number) {
     const desde = `${anio}-${String(mes).padStart(2, "0")}-01`;
-    const sesiones = await consultar(
+    // Las cuatro consultas no dependen entre sí, así que van a la vez: contra
+    // Supabase lo caro no es la consulta, es esperar una detrás de otra
+    // (2026-08-05).
+    const [sesiones, cuotas, clases, ajustes, importeKids] = await Promise.all([
+      consultar(
       `select s.fecha, s.tarifa, coalesce(c.modalidad::text, 'bono') as modalidad
          from sesiones s
          left join ciclos c on c.cliente_id = s.cliente_id and c.ciclo = s.ciclo
         where s.fecha >= $1::date and s.fecha < ($1::date + interval '1 month')`,
       [desde],
-    );
-    const cuotas = await consultar(
-      "select importe from cargos_mensuales where anio = $1 and mes = $2",
-      [anio, mes],
-    );
-    const clases = await consultar<{ tipo: TipoClase; n: number }>(
-      `select tipo, count(*)::int as n from clases_grupo
-        where fecha >= $1::date and fecha < ($1::date + interval '1 month') group by tipo`,
-      [desde],
-    );
-    const ajustes = await consultar(
-      "select origen, importe, horas, motivo from ajustes_mensuales where anio = $1 and mes = $2 order by origen",
-      [anio, mes],
-    );
+      ),
+      consultar("select importe from cargos_mensuales where anio = $1 and mes = $2", [anio, mes]),
+      consultar<{ tipo: TipoClase; n: number }>(
+        `select tipo, count(*)::int as n from clases_grupo
+          where fecha >= $1::date and fecha < ($1::date + interval '1 month') group by tipo`,
+        [desde],
+      ),
+      consultar(
+        "select origen, importe, horas, motivo from ajustes_mensuales where anio = $1 and mes = $2 order by origen",
+        [anio, mes],
+      ),
+      this.facturacionKids(anio, mes),
+    ]);
 
     const porTipo: Record<string, number> = {};
     for (const c of clases) porTipo[c.tipo] = Number(c.n);
@@ -539,7 +580,7 @@ export class RepositorioPostgres implements Repositorio {
       cuotas: cuotas.map((c) => Number(c.importe)),
       clasesLidomare: porTipo.lidomare ?? 0,
       clasesKids: porTipo.kids ?? 0,
-      facturacionKids: await this.facturacionKids(anio, mes),
+      facturacionKids: importeKids,
       ajustes: ajustes.map((a) => ({
         origen: a.origen as string,
         importe: Number(a.importe),

@@ -57,6 +57,14 @@ export interface DatosMes {
   ajustes: AjusteMensual[];
 }
 
+/** Los datos de todos los clientes a la vez, para componer la lista. */
+export interface DatosDeLaLista {
+  ciclos: Ciclo[];
+  cargos: CargoMensual[];
+  /** Sesiones por cliente y ciclo. Clave: `${clienteId}:${ciclo}`. */
+  sesionesPorCiclo: Map<string, number>;
+}
+
 export interface Repositorio {
   listarClientes(): Promise<Cliente[]>;
   obtenerCliente(id: string): Promise<Cliente | null>;
@@ -67,6 +75,16 @@ export interface Repositorio {
   eliminarCliente(clienteId: string): Promise<void>;
 
   cicloActual(clienteId: string): Promise<Ciclo | null>;
+  /**
+   * Todo lo que la LISTA de clientes necesita, de una vez (2026-08-05).
+   *
+   * En Vercel cada consulta es un viaje de red a Supabase (~180 ms). Pedir
+   * los ciclos, las cuotas y el recuento de sesiones cliente a cliente eran
+   * 5 consultas por cliente: con 8 clientes, más de 40 viajes y varios
+   * segundos de espera. Esto lo deja en tres, sea cual sea el número de
+   * clientes.
+   */
+  cargarTodoParaLaLista(): Promise<DatosDeLaLista>;
   listarCiclos(clienteId: string): Promise<Ciclo[]>;
   guardarCiclo(ciclo: Ciclo): Promise<void>;
 

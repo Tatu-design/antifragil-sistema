@@ -584,3 +584,47 @@ texto en vez de por significado.
 debe cambiar y lo que debe quedarse igual— antes de tocar el código. La cara
 que se queda igual es la que se olvida, y es la que rompe cosas que
 funcionaban.
+
+---
+
+## 2026-08-05 (2) — Diagnostiqué la aplicación equivocada
+
+**Qué pasó:** Fernando dijo «va muy muy lenta la app». Me puse a medir y
+optimizar la de Flask. No era esa: hablaba de la de Vercel, la única que usa
+ya. Perdí un buen rato midiendo donde no dolía, y tuvo que pararme él.
+
+**Por qué pasó:** el síntoma encajaba en las dos aplicaciones y elegí por
+costumbre, no por comprobación. Llevo semanas trabajando en Flask y el dedo
+fue solo.
+
+**Qué se hace distinto:** queda escrito en `.claude/CLAUDE.md` y en la memoria
+del proyecto: **cuando Fernando dice «la app», es siempre la de Vercel.** Ante
+cualquier síntoma, reproducirlo primero ahí. Si de verdad hay duda, se
+pregunta en una línea antes de investigar — cuesta menos que media hora
+midiendo lo que no era.
+
+---
+
+## 2026-08-05 (3) — Lo caro no es la consulta, es el viaje
+
+**Qué pasó:** la lista de clientes tardaba más de 7 segundos en Vercel. Cada
+consulta suelta era rapidísima; el problema es que hacía **41**.
+
+**Por qué pasó:** el código venía portado de Flask, donde la base es SQLite en
+el mismo disco: una consulta cuesta microsegundos y pedir datos cliente a
+cliente no se nota. En Vercel la base está en Supabase, al otro lado de la
+red: **cada consulta cuesta ~180 ms**. El mismo bucle que en Flask era
+gratis, aquí eran siete segundos.
+
+Es el error de portar una arquitectura sin portar sus supuestos de coste.
+
+**Qué se hace distinto:**
+
+1. **Cargar en bloque, no por elemento.** La lista pasó de «una consulta por
+   cliente» a tres consultas fijas que no crecen con el número de clientes.
+2. **Lo que no depende de otra cosa, va en paralelo** (`Promise.all`). Cuatro
+   consultas encadenadas son cuatro esperas; a la vez, una.
+3. **Puerta de rendimiento** (`tests/rendimiento.test.ts`): cuenta los viajes
+   a la base por pantalla y falla si alguna se pasa del presupuesto. Incluye
+   una prueba que duplica los clientes y comprueba que el número NO sube —
+   así, si alguien vuelve a meter una consulta por cliente, salta.
