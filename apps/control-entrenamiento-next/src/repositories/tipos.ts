@@ -75,6 +75,13 @@ export interface Repositorio {
   guardarSesion(sesion: Sesion): Promise<void>;
   eliminarSesion(sesionId: string): Promise<Sesion | null>;
   guardarSesionEditada(sesionId: string, fecha: string, numeroSesion: number): Promise<void>;
+  /**
+   * Baja un número las sesiones de un ciclo que van por encima de `desde`.
+   * Se usa al borrar: si se borra la 3 de 7, las que eran 4..7 pasan a 3..6.
+   */
+  renumerarPosteriores(clienteId: string, ciclo: number, desde: number): Promise<void>;
+  /** Mueve una sesión a otro ciclo con otro número (reparación de datos). */
+  reubicarSesion(sesionId: string, ciclo: number, numeroSesion: number): Promise<void>;
 
   cargoDelMes(clienteId: string, anio: number, mes: number): Promise<CargoMensual | null>;
   guardarCargo(cargo: CargoMensual): Promise<void>;

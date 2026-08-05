@@ -339,6 +339,20 @@ export class RepositorioPostgres implements Repositorio {
     ]);
   }
 
+  async renumerarPosteriores(clienteId: string, ciclo: number, desde: number): Promise<void> {
+    await consultar(
+      "update sesiones set numero_sesion = numero_sesion - 1 " +
+        "where cliente_id = $1 and ciclo = $2 and numero_sesion > $3",
+      [clienteId, ciclo, desde],
+    );
+  }
+
+  async reubicarSesion(sesionId: string, ciclo: number, numeroSesion: number): Promise<void> {
+    await consultar("update sesiones set ciclo = $2, numero_sesion = $3 where id = $1", [
+      sesionId, ciclo, numeroSesion,
+    ]);
+  }
+
   async eliminarCliente(clienteId: string): Promise<void> {
     await consultar("delete from clientes where id = $1", [clienteId]);
   }

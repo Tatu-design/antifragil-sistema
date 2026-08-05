@@ -208,6 +208,21 @@ export async function eliminarSesion(clienteId: string, sesionId: string): Promi
     await repo.eliminarSesion(sesionId);
     await repo.sumarASemana(sesion.fecha, sesion.tarifa, -1);
 
+    // Las sesiones posteriores del MISMO ciclo bajan un número: si se borra
+    // la 3 de 7, las que eran 4..7 pasan a ser 3..6. El servicio ha
+    // consumido 6 sesiones, no 7.
+    //
+    // Sin esto, el contador —que se calcula con el número de la última que
+    // queda— se quedaba clavado en 7 aunque solo hubiera 6 sesiones, y la
+    // ficha se contradecía con su propio historial (lo detectó Fernando con
+    // Paquito en la versión Flask, 2026-08-04; el mismo fallo estaba
+    // portado aquí).
+    //
+    // Se baja el número en vez de contar filas a secas para respetar a un
+    // cliente que empezó a media, con sesiones hechas antes de entrar en la
+    // app: sus números arrancan más arriba y siguen bajando de uno en uno.
+    await repo.renumerarPosteriores(clienteId, sesion.ciclo, sesion.numeroSesion);
+
     if (eraLaMasReciente && completabaElCiclo && cliente.cicloActual === sesion.ciclo + 1) {
       // Se deshace la renovación que disparó esta sesión.
       cliente.cicloActual = sesion.ciclo;

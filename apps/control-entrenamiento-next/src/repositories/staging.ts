@@ -256,6 +256,25 @@ export class RepositorioStaging implements Repositorio {
     await volcar();
   }
 
+  async renumerarPosteriores(clienteId: string, ciclo: number, desde: number): Promise<void> {
+    const datos = await cargar();
+    for (const sesion of datos.sesiones) {
+      if (sesion.clienteId === clienteId && sesion.ciclo === ciclo && sesion.numeroSesion > desde) {
+        sesion.numeroSesion -= 1;
+      }
+    }
+    await volcar();
+  }
+
+  async reubicarSesion(sesionId: string, ciclo: number, numeroSesion: number): Promise<void> {
+    const datos = await cargar();
+    const sesion = datos.sesiones.find((s) => s.id === sesionId);
+    if (!sesion) return;
+    sesion.ciclo = ciclo;
+    sesion.numeroSesion = numeroSesion;
+    await volcar();
+  }
+
   async eliminarCliente(clienteId: string): Promise<void> {
     const datos = await cargar();
     datos.clientes = datos.clientes.filter((c) => c.id !== clienteId);
