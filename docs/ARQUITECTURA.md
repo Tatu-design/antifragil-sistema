@@ -60,6 +60,52 @@ al hacer scroll, 3-4 conexiones por pantalla.
   cuenta en sesiones pero su importe se reparte hacia atrás sobre las
   semanas del mes en cuanto Fernando indica la facturación mensual total.
 
+### Borrar una sesión deja la cuenta cuadrada (2026-08-04)
+
+Fernando borró una sesión de Paquito y el marcador principal no se movió: la
+ficha decía «7 de 8» mientras su propio historial enseñaba 6 sesiones.
+
+**La causa.** El contador del cliente se calculaba con el NÚMERO de la última
+sesión que quedaba, no con cuántas sesiones había. Al borrar la nº 1 de 7, la
+última seguía siendo la nº 7 → contador 7 con 6 sesiones, y un hueco en la
+numeración.
+
+**La corrección.** Al borrar una sesión, las posteriores del MISMO ciclo bajan
+un número: si se borra la 3 de 7, las que eran 4..7 pasan a ser 3..6. El
+contador baja con ellas. Se hace así, y no contando las filas a secas, para
+respetar a un cliente que empezó a media —con sesiones hechas antes de entrar
+en la app—: sus números arrancan más arriba y siguen bajando de uno en uno.
+
+**La economía ya era correcta** y sigue siéndolo: borrar quita la hora y el
+importe de esa sesión del mes al que pertenecía, y el precio medio se
+recalcula solo. El número de sesión es una etiqueta y no entra en ningún
+cálculo económico.
+
+**`reparar_numeracion.py`** arregla lo que quedó descuadrado antes de esta
+corrección. Corre al arrancar la web, es idempotente y solo toca la
+numeración y el contador. Encontró tres casos en los datos reales:
+
+| Cliente | Estaba | Queda |
+|---|---|---|
+| Paquito | números 2..7, contador 7 | 1..6, contador 6 |
+| Nikki | 1..9 y 12,13,14 (huecos), contador 0 | 1..12, contador 12 |
+| Rocío | 9 sesiones en un bono de 8, contador 1 | bono 1 cerrado con 8, bono 2 con 1 |
+
+El caso de Rocío no era numeración: le faltó una renovación. Se reparte
+aplicando la MISMA regla que usa la app al firmar (las sesiones que pasan del
+tamaño del bono empiezan uno nuevo), no una invención del script. El bono que
+se llena queda cerrado con la fecha de su última sesión; el cobro de los que
+se cierran queda **sin marcar** — nunca se registró y no se supone si el
+cliente pagó.
+
+Verificado sobre una copia descargada del servidor: facturación, horas y
+precio medio **idénticos** en los tres meses (agosto 755,00 €, julio
+2.230,00 € / 53 h, junio 315,00 € / 9 h), mismas fechas y mismas tarifas
+sesión a sesión, `integrity_check` correcto, 0 claves rotas y 0 sesiones
+huérfanas. `tests/test_numeracion_sesiones.py` (20 pruebas) cubre borrar la
+primera, una del medio, la última, varias seguidas, firmar después, y el
+ajuste económico en las tres modalidades.
+
 ### Cobrar servicios ya cerrados y deudas en la lista (2026-08-04)
 
 Dos huecos que encontró Fernando con el caso real de Samanta, que tenía una

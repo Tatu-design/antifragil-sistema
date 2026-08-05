@@ -505,3 +505,37 @@ funciona porque un `<a>` de HTML no se adelanta.
    precargar «Salir» no cierre la sesión y que pulsarlo sí. Los dos fallos
    de hoy —este y la hoja de estilos bloqueada por el middleware— eran
    invisibles para las 131 pruebas, para los tipos y para el build.
+
+---
+
+## 2026-08-04 (2) — Un contador que medía la etiqueta, no la cantidad
+
+**Qué pasó:** Fernando borró una sesión del historial de un cliente y el
+marcador principal siguió igual. La ficha decía «7 de 8» y su propio
+historial, dos centímetros más abajo, enseñaba 6 sesiones.
+
+**Por qué pasó:** el contador de sesiones consumidas se calculaba como *el
+número de la última sesión que queda*, no como *cuántas sesiones hay*.
+Mientras solo se borrara la última, las dos cosas coincidían y nadie lo
+notaba. Al borrar una del medio o la primera, dejaban de coincidir. Es un
+error de modelo, no de código: se estaba midiendo la **etiqueta** de un
+elemento en vez de la **cantidad** del conjunto.
+
+**Lo que lo hizo peor:** al buscar el descuadre en los datos reales del
+servidor aparecieron otros dos que llevaban semanas ahí (un cliente con
+huecos y contador 0, otro con 9 sesiones en un bono de 8). Nadie los había
+visto porque **ninguna pantalla comparaba las dos cifras entre sí**.
+
+**Qué se hace distinto a partir de ahora:**
+
+1. **Cuando dos sitios de la pantalla muestran la misma realidad, hay que
+   probar que coinciden**, no solo que cada uno es correcto por su lado. La
+   prueba `test_la_ficha_y_su_historial_nunca_se_contradicen` borra sesiones
+   en bucle y comprueba en cada paso que el marcador y el historial dicen lo
+   mismo. Ese tipo de prueba habría cazado esto el primer día.
+2. **Desconfiar de un valor derivado que se calcula de una forma distinta a
+   como se lee.** Si la pantalla cuenta filas y el modelo guarda un número
+   máximo, van a divergir tarde o temprano.
+3. Antes de arreglar datos reales, **descargar una copia del servidor y
+   auditarla**: el fallo que Fernando reportó era uno de tres, y los otros
+   dos no se habrían encontrado mirando solo el caso descrito.
