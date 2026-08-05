@@ -106,6 +106,40 @@ escribir nada en un archivo versionado**:
 - El historial de Git **no se reescribe** sin aprobación explícita de
   Fernando.
 
+### Datos reales de clientes (regla de Fernando, 2026-08-04)
+
+Claude puede corregir código y trabajar con datos ficticios o con copias de
+forma autónoma. **No puede modificar, reconstruir, renumerar, repartir entre
+ciclos ni reinterpretar datos reales de clientes en producción** sin enseñar
+antes:
+
+1. Qué filas cambiarían.
+2. El estado antes y después.
+3. El impacto económico.
+4. El motivo.
+5. La forma de volver atrás.
+
+Única excepción: una incidencia urgente que impida usar la aplicación. Aun
+así hay que crear antes una copia restaurable y explicar inmediatamente lo
+aplicado.
+
+Nació porque el 2026-08-04 reparé la numeración de tres clientes reales en
+producción sin enseñárselo antes. Hice copia y comprobé que la economía no se
+movía, pero eso no sustituye a su aprobación.
+
+### Next.js sustituye a Flask (decisión de Fernando, 2026-08-05)
+
+La aplicación de `apps/control-entrenamiento-next` (Next.js + Supabase, en
+Vercel) **sustituye definitivamente** a la de Flask en PythonAnywhere. A
+partir de ahora:
+
+- La rama principal de desarrollo es `feat/migracion-next-vercel`.
+- Flask se mantiene solo como producción temporal y respaldo hasta el
+  cambio definitivo.
+- **No se añaden funcionalidades nuevas a Flask.** Solo se corrigen allí
+  errores críticos que impidan el uso diario.
+- Nada de duplicar desarrollo entre las dos aplicaciones.
+
 ### Reglas de código
 - Cambios pequeños y reversibles sobre grandes y arriesgados.
 - Siempre comprobar que algo funciona antes de decir que está listo.
