@@ -192,9 +192,12 @@ def _repartir_en_bonos(conexion, arreglo: dict) -> None:
                 plantilla["tarifa"], plantilla["sesiones_totales"], plantilla["precio_total"],
                 plantilla["cuota_mensual"], plantilla["sesiones_referencia"],
                 plantilla["anio"], plantilla["mes"], parte["desde"], parte["hasta"],
-                # Los cerrados quedan sin marcar; el que sigue abierto conserva
-                # el estado de cobro que el cliente ya tenía.
-                plantilla["pagado"] if es_el_ultimo else None,
+                # Un ciclo que se ABRE aquí nace pendiente de pago, nunca
+                # heredando el cobro del anterior (2026-08-05): eso fue lo que
+                # dejó el bono 2 de Rocío marcado como pagado sin que nadie lo
+                # hubiera cobrado. Los que se cierran conservan lo que ya
+                # tuvieran registrado.
+                0 if es_el_ultimo else plantilla["pagado"],
             ),
         )
 

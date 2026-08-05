@@ -62,9 +62,9 @@ export function HistorialProgramas({
               <span className="bono-info">
                 <span className="nombre">
                   {servicio.esActual ? "Servicio actual" : servicio.servicio}{" "}
-                  {servicio.pagado === false && <span className="pill pendiente">Pendiente de cobro</span>}
-                  {servicio.pagado === true && <span className="pill aldia">Cobrado</span>}
-                  {servicio.pagado === null && <span className="pill">Sin marcar</span>}
+                  {servicio.pagado
+                    ? <span className="pill aldia">Pagado</span>
+                    : <span className="pill pendiente">Pendiente de pago</span>}
                 </span>
                 <span className="programa">
                   {servicio.esActual ? `${servicio.servicio} · ` : ""}
@@ -90,23 +90,16 @@ export function HistorialProgramas({
                 action={accionMarcarCobro}
                 className="cobro-ciclo"
                 onSubmit={(evento) => {
-                  const pregunta =
-                    servicio.pagado === true
-                      ? `¿Volver a dejar este servicio de ${nombre} como pendiente de cobro?`
-                      : `¿Marcar como cobrado este servicio de ${nombre}?`;
+                  const pregunta = servicio.pagado
+                    ? `¿Volver a dejar este servicio de ${nombre} como pendiente de pago?`
+                    : `¿Marcar como pagado este servicio de ${nombre}?`;
                   if (!confirm(pregunta)) evento.preventDefault();
                 }}
               >
                 <input type="hidden" name="clienteId" value={clienteId} />
                 <input type="hidden" name="ciclo" value={servicio.ciclo} />
-                <input type="hidden" name="pagado" value={servicio.pagado === true ? "no" : "si"} />
-                <span className="cobro-etiqueta">
-                  {servicio.pagado === true
-                    ? "Cobrado"
-                    : servicio.pagado === false
-                      ? "Pendiente de cobro"
-                      : "Sin marcar"}
-                </span>
+                <input type="hidden" name="pagado" value={servicio.pagado ? "no" : "si"} />
+                <span className="cobro-etiqueta">{servicio.pagado ? "Pagado" : "Pendiente de pago"}</span>
                 <BotonCobro pagado={servicio.pagado} />
               </form>
 
@@ -156,11 +149,11 @@ function condiciones(servicio: Servicio): string {
   return `${n} de ${servicio.sesionesTotales} sesiones${precio}${porSesion}`;
 }
 
-function BotonCobro({ pagado }: { pagado: boolean | null }) {
+function BotonCobro({ pagado }: { pagado: boolean }) {
   const { pending } = useFormStatus();
   return (
     <button type="submit" className="boton-secundario boton-cobro" disabled={pending}>
-      {pending ? "Guardando…" : pagado === true ? "Marcar pendiente" : "Marcar cobrado"}
+      {pending ? "Guardando…" : pagado ? "Marcar pendiente" : "Marcar pagado"}
     </button>
   );
 }

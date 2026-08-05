@@ -178,8 +178,9 @@ function aCiclo(f: Record<string, unknown>): Ciclo {
     mes: f.mes === null ? null : Number(f.mes),
     fechaInicio: fecha(f.fecha_inicio),
     fechaFin: fecha(f.fecha_fin),
-    // Se conserva el tri-estado: `null` es «no se sabe», no «sin pagar».
-    pagado: f.pagado === null ? null : Boolean(f.pagado),
+    // Dos estados y solo dos (2026-08-05). Un servicio del que no consta el
+    // cobro está PENDIENTE: nadie ha dicho que se pagara.
+    pagado: Boolean(f.pagado),
   };
 }
 
@@ -272,7 +273,7 @@ export class RepositorioPostgres implements Repositorio {
   /**
    * En una MENSUALIDAD manda el cargo del mes, no la columna del ciclo
    * (corrección H-02). Si no hay cargo se conserva lo guardado, `null`
-   * incluido: `null` significa «no se sabe», nunca «no pagado».
+   * incluido.
    */
   private conCobroReal(cargos: CargoMensual[], ciclo: Ciclo): Ciclo {
     if (ciclo.modalidad !== MENSUALIDAD || ciclo.anio === null || ciclo.mes === null) return ciclo;

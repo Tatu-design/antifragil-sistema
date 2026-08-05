@@ -293,15 +293,41 @@ class TestTarjetaPorModalidad(BaseFichaWeb):
         self.assertNotIn("Quedan", texto)
         self.assertNotIn("perfil-progreso-barra", self.html("Sami"))
 
+    def test_un_servicio_nuevo_nace_pendiente_de_pago(self):
+        """Nadie ha confirmado que se pagara: nace debiendo (2026-08-05).
+
+        «Nuevo» es un servicio que se ABRE: un alta, un cambio de modalidad o
+        una renovación. Aquí los clientes parten de un bono al día, así que
+        cambiarles la modalidad abre uno nuevo y ese sí nace pendiente."""
+        self.mensualidad("Pareja")   # el cliente venía de un bono: se abre una mensualidad
+        self.cuenta("Sami")          # idem, se abre una cuenta
+
+        self.assertIn("Pago pendiente", self.texto("Pareja"))
+        self.assertIn("Pendiente de pago", self.texto("Sami"))
+
+    def test_corregir_las_condiciones_no_reabre_la_deuda(self):
+        """Cambiar el precio de un bono NO es un servicio nuevo: es la misma
+        contratación con los números bien puestos. Si estaba cobrado, sigue
+        cobrado — reabrir la deuda ahí sería inventar un impago."""
+        self.bono("Ana", sesiones=5, precio=225)
+        self.assertIn("Bono pagado", self.texto("Ana"))
+
+        cr.configurar_servicio("Ana", BONO, nombre_servicio="Bono",
+                               sesiones_totales=5, precio_total=250,
+                               hoy=date(2026, 8, 10), ruta=self.ruta)
+
+        self.assertIn("Bono pagado", self.texto("Ana"))
+
     def test_el_texto_del_pago_cambia_con_la_modalidad(self):
         self.bono("Ana")
         self.mensualidad("Pareja")
         self.cuenta("Sami")
-        # La mensualidad se marca cobrada explícitamente: desde la corrección
-        # H-02 (2026-08-03) una mensualidad recién configurada nace PENDIENTE,
-        # porque su cargo del mes aún no está cobrado. Antes salía como
-        # «pagada» sin estarlo, que era justamente el defecto.
-        cr.marcar_pago_del_ciclo("Pareja", True, ruta=self.ruta)
+        # Los tres nacen pendientes, así que hay que cobrarlos a mano: es
+        # justamente la regla — un servicio solo pasa a pagado con una acción
+        # explícita, nunca por nacer ni por heredarlo (2026-08-05).
+        for quien in ("Ana", "Pareja", "Sami"):
+            cr.marcar_pago_del_ciclo(quien, True, ruta=self.ruta)
+
         self.assertIn("Bono pagado", self.texto("Ana"))
         self.assertIn("Mensualidad pagada", self.texto("Pareja"))
         self.assertIn("Cuenta pagada", self.texto("Sami"))

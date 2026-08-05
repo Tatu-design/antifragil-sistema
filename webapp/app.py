@@ -536,12 +536,16 @@ def perfil_cliente(nombre):
     # CURSO (2026-08-04). Antes la plantilla mezclaba el ciclo con los campos
     # heredados de `clientes` y podían contradecirse — el formulario guardaba
     # bien y la pantalla seguía enseñando lo viejo.
+    # El estado de COBRO sale del ciclo, que es donde vive (2026-08-05). La
+    # ficha del cliente es solo su reflejo, y si alguna vez discreparan mandaría
+    # el ciclo. Son dos ejes independientes: un pausado o un cancelado pueden
+    # deber dinero, y eso no se deduce de su estado.
     ficha = ficha_servicio(
         actual,
         sesiones_del_ciclo=len(actual["sesiones"]) if actual else 0,
         sesiones_completadas=cliente.get("sesiones_completadas"),
         estado=cliente["estado"],
-        pendiente_pago=cliente["pendiente_pago"],
+        pendiente_pago=(not actual["pagado"]) if actual else cliente["pendiente_pago"],
     )
 
     return render_template(

@@ -117,10 +117,11 @@ export async function firmarSesion(clienteId: string, opciones: OpcionesFirma = 
     }
 
     if (renovado) {
-      // Esta sesión ha cerrado el ciclo: se anota cuándo terminó y si quedó
-      // cobrado (es el único momento en que se sabe), y se abre el siguiente
-      // con las MISMAS condiciones, que nace pendiente de pago.
-      await repo.guardarCiclo({ ...ciclo, fechaFin: fecha, pagado: !ciclo.pagado ? false : true });
+      // Esta sesión ha cerrado el ciclo. El que se cierra CONSERVA su propio
+      // estado de cobro —pagado si lo estaba, pendiente si lo estaba— y el
+      // siguiente nace pendiente con las mismas condiciones. Un servicio
+      // nuevo NUNCA hereda el cobro del anterior (2026-08-05).
+      await repo.guardarCiclo({ ...ciclo, fechaFin: fecha, pagado: ciclo.pagado });
       const siguiente: Ciclo = {
         ...ciclo,
         ciclo: ciclo.ciclo + 1,

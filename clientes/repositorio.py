@@ -1308,13 +1308,18 @@ def configurar_servicio(
                         condiciones["sesiones_referencia"],
                         hoy.year if es_mensual(modalidad) else None,
                         hoy.month if es_mensual(modalidad) else None,
-                        int(not debe),
+                        # Todo servicio nuevo nace PENDIENTE DE PAGO
+                        # (2026-08-05). Antes heredaba el estado de cobro del
+                        # cliente, así que al cambiar de modalidad un cliente
+                        # al día estrenaba servicio dado por cobrado — un
+                        # ingreso que nadie había confirmado.
+                        0,
                     ),
                 )
                 conexion.execute(
                     "UPDATE clientes SET ciclo_bono = ?, tipo_programa = COALESCE(?, tipo_programa), "
-                    "sesiones_completadas = 0, pendiente_pago = ? WHERE nombre = ?",
-                    (ciclo_nuevo, _puntero_de_programa_valido(etiqueta, conexion), int(debe), cliente),
+                    "sesiones_completadas = 0, pendiente_pago = 1 WHERE nombre = ?",
+                    (ciclo_nuevo, _puntero_de_programa_valido(etiqueta, conexion), cliente),
                 )
                 _cobrar_mes_si_procede(cliente, ciclo_nuevo, hoy.year, hoy.month, conexion)
                 resultado = {"ciclo_anterior": actual["ciclo_bono"], "ciclo": ciclo_nuevo, "cerrado": True}
@@ -1342,6 +1347,12 @@ def configurar_servicio(
                         condiciones["sesiones_referencia"],
                         hoy.year if es_mensual(modalidad) else None,
                         hoy.month if es_mensual(modalidad) else None,
+                        # Aquí NO se abre un servicio nuevo: es el mismo, con
+                        # las condiciones corregidas. Su estado de cobro se
+                        # conserva — `ON CONFLICT` no lo toca, y este valor
+                        # solo se usa si la ficha del ciclo aún no existía.
+                        # Reabrir la deuda al cambiar un precio sería inventar
+                        # un impago.
                         int(not debe),
                     ),
                 )

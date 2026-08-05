@@ -46,8 +46,19 @@ export interface Ciclo {
   mes: number | null;
   fechaInicio: string | null;
   fechaFin: string | null;
-  /** `null` = nunca se registró. **No es lo mismo que «sin pagar».** */
-  pagado: boolean | null;
+  /**
+   * Estado de COBRO de este servicio. Solo dos valores, nunca nulo
+   * (decisión de Fernando, 2026-08-05): `false` = pendiente de pago,
+   * `true` = pagado.
+   *
+   * No existe «no se sabe». Un servicio del que no consta el cobro está
+   * pendiente, que es lo que significa: nadie ha dicho que se pagara.
+   *
+   * Es un eje INDEPENDIENTE del estado del cliente. Un pausado o un
+   * cancelado pueden deber dinero, y su deuda no desaparece por dejar de
+   * entrenar.
+   */
+  pagado: boolean;
 }
 
 export interface Sesion {

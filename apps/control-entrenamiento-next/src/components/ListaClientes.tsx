@@ -76,6 +76,10 @@ export function ListaClientes({ clientes }: { clientes: ClienteEnLista[] }) {
             data-pendiente={cliente.debe ? "si" : "no"}
             hidden={!visible(cliente)}
           >
+            {/* Dos etiquetas para dos cosas distintas (2026-08-05): la
+                continuidad del cliente y su deuda. Nunca se mezclan en una
+                sola, y la de pago se ve SIEMPRE — un pausado o un cancelado
+                que deba dinero tiene que notarse. */}
             <div className="cabecera">
               <span className="nombre">{cliente.nombre}</span>
               <span className="etiquetas">
@@ -84,7 +88,7 @@ export function ListaClientes({ clientes }: { clientes: ClienteEnLista[] }) {
                 {cliente.debe ? (
                   <span className="pill pendiente">{etiquetaDeuda(cliente)}</span>
                 ) : (
-                  cliente.estado === "activo" && <span className="pill aldia">Al día</span>
+                  <span className="pill aldia">Pagado</span>
                 )}
               </span>
             </div>
@@ -115,12 +119,17 @@ export function ListaClientes({ clientes }: { clientes: ClienteEnLista[] }) {
   );
 }
 
-/** Dice CUÁL es el caso, no solo que debe algo. */
+/**
+ * Dice CUÁL es el caso de deuda, no solo que debe algo.
+ *
+ * Habla únicamente de dinero: no menciona si el cliente está activo, pausado
+ * o cancelado — eso es el otro eje y tiene su propia etiqueta.
+ */
 function etiquetaDeuda(cliente: ClienteEnLista): string {
   const actual = cliente.ficha.pendientePago;
-  if (cliente.ciclosPendientes && !actual) return `${cliente.ciclosPendientes} sin cobrar`;
+  if (cliente.ciclosPendientes && !actual) return `${cliente.ciclosPendientes} sin pagar`;
   if (cliente.ciclosPendientes) return `Pendiente +${cliente.ciclosPendientes}`;
-  return cliente.estado !== "activo" ? "Pendiente de pago" : "Pendiente";
+  return "Pendiente de pago";
 }
 
 /**

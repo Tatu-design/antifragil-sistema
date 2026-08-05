@@ -2606,7 +2606,7 @@
           "fecha_inicio": "2026-08-03",
           "mes": 8,
           "modalidad": "cuenta",
-          "pagado": true,
+          "pagado": false,
           "precio_total": null,
           "servicio": "Cuenta",
           "sesiones_referencia": null,
@@ -2620,7 +2620,7 @@
           "ciclo": 2,
           "cliente": "Cliente D",
           "estado": "activo",
-          "pendiente_pago": false,
+          "pendiente_pago": true,
           "programa": "Base",
           "sesiones_completadas": 0
         }

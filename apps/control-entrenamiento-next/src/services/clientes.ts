@@ -25,11 +25,10 @@ async function componerFicha(cliente: Cliente): Promise<{ ficha: FichaServicio; 
   const repo = repositorio();
   const ciclo = await repo.cicloActual(cliente.id);
   const sesionesDelCiclo = ciclo ? await repo.contarSesionesDelCiclo(cliente.id, ciclo.ciclo) : 0;
-  // En una mensualidad manda el cargo del mes (H-02): el repositorio ya lo ha
-  // resuelto al devolver el ciclo, así que aquí no se decide otra vez.
-  const pendiente = ciclo?.modalidad === MENSUALIDAD && ciclo.pagado !== null
-    ? !ciclo.pagado
-    : cliente.pendientePago;
+  // El estado de cobro sale del CICLO, que es donde vive (2026-08-05). En una
+  // mensualidad el repositorio ya ha resuelto que mande el cargo del mes
+  // (H-02). Solo si el cliente no tuviera ciclo se recurre a su ficha.
+  const pendiente = ciclo ? !ciclo.pagado : cliente.pendientePago;
   return {
     ciclo,
     ficha: fichaServicio({
@@ -51,10 +50,13 @@ export async function listarClientes(): Promise<ClienteEnLista[]> {
       const { ficha } = await componerFicha(cliente);
       const ciclos = await repo.listarCiclos(cliente.id);
       // Solo los distintos del actual: el actual ya lo describe la ficha, así
-      // que las dos fuentes no pueden contradecirse. `pagado === null` no
-      // cuenta como deuda: significa «no se sabe».
+      // que las dos fuentes no pueden contradecirse.
+      //
+      // NO se filtra por estado del cliente a propósito: un pausado o un
+      // cancelado que deba dinero tiene que salir como pendiente de pago. La
+      // deuda no se borra por dejar de entrenar.
       const ciclosPendientes = ciclos.filter(
-        (c) => c.ciclo !== cliente.cicloActual && c.pagado === false,
+        (c) => c.ciclo !== cliente.cicloActual && !c.pagado,
       ).length;
       return { ...cliente, ficha, ciclosPendientes, debe: ficha.pendientePago || ciclosPendientes > 0 };
     }),
@@ -132,7 +134,8 @@ export async function crearCliente(datos: DatosAlta): Promise<Cliente> {
     // El token se genera una vez y no se regenera nunca: es el enlace que el
     // cliente guarda y el QR que ya lleva impreso.
     token: randomUUID().replace(/-/g, ""),
-    pendientePago: false,
+    // Nace debiendo: nadie ha confirmado todavía que haya pagado.
+    pendientePago: true,
     sesionesCompletadas: 0,
     cicloActual: 1,
   };
@@ -151,7 +154,10 @@ export async function crearCliente(datos: DatosAlta): Promise<Cliente> {
     mes: condiciones.modalidad === "bono" ? null : hoy.getMonth() + 1,
     fechaInicio: null,
     fechaFin: null,
-    pagado: condiciones.modalidad === MENSUALIDAD ? false : true,
+    // Todo servicio nuevo nace PENDIENTE DE PAGO (2026-08-05), sea bono,
+    // mensualidad o cuenta. Dar por cobrado lo que nadie ha confirmado era
+    // inventar un ingreso.
+    pagado: false,
   };
 
   await repo.transaccion(async () => {
@@ -167,8 +173,6 @@ export async function crearCliente(datos: DatosAlta): Promise<Cliente> {
         importe: condiciones.cuotaMensual,
         pagado: false,
       });
-      cliente.pendientePago = true;
-      await repo.actualizarCliente(cliente);
     }
   });
 
@@ -259,7 +263,12 @@ export async function configurarServicio(
       mes,
       fechaInicio: null,
       fechaFin: null,
-      pagado: condiciones.modalidad === MENSUALIDAD ? false : true,
+      // TODO servicio nuevo nace PENDIENTE DE PAGO, sea de la modalidad que
+      // sea (2026-08-05). Antes solo la mensualidad nacía pendiente y el
+      // resto se daba por cobrado de salida: eso inventaba un cobro que
+      // nadie había confirmado. Solo pasa a pagado con una acción explícita
+      // de Fernando.
+      pagado: false,
     });
 
     // El contador vuelve a cero: el servicio nuevo empieza limpio. Las sesiones
@@ -268,7 +277,8 @@ export async function configurarServicio(
       ...cliente,
       cicloActual: nuevo,
       sesionesCompletadas: 0,
-      pendientePago: condiciones.modalidad === MENSUALIDAD,
+      // Espejo del ciclo nuevo, que nace pendiente.
+      pendientePago: true,
     });
     await cobrarMesSiProcede(clienteId, nuevo, anio, mes, condiciones.cuotaMensual);
 

@@ -539,3 +539,48 @@ visto porque **ninguna pantalla comparaba las dos cifras entre sí**.
 3. Antes de arreglar datos reales, **descargar una copia del servidor y
    auditarla**: el fallo que Fernando reportó era uno de tres, y los otros
    dos no se habrían encontrado mirando solo el caso descrito.
+
+---
+
+## 2026-08-05 — Subir un SQLite en modo WAL sin volcar el registro
+
+**Qué pasó:** corregí una fila en una copia de la base de producción, la subí
+al servidor, recargué… y el cambio no estaba. La base seguía como antes.
+
+**Por qué pasó:** la base va en modo WAL. El `UPDATE` no se escribe en
+`antifragil.db`, sino en `antifragil.db-wal`, y solo pasa al archivo principal
+cuando SQLite hace un "checkpoint". Subí el `.db` **antes** de que eso
+ocurriera, así que subí el archivo con el valor viejo. Curiosamente, al abrir
+después la copia en local el checkpoint sí se hizo y el archivo mostraba el
+valor nuevo — lo que hacía parecer que la subida había funcionado.
+
+Es doblemente irónico porque el propio `basedatos.py` documenta esta trampa:
+por eso pone `wal_autocheckpoint = 1`. Pero ese ajuste vive **dentro de la
+base**, y una copia manipulada con una conexión suelta puede quedarse con
+cambios pendientes igualmente.
+
+**Qué se hace distinto a partir de ahora:** antes de subir cualquier archivo
+SQLite manipulado, **cerrar la conexión y forzar
+`PRAGMA wal_checkpoint(TRUNCATE)`**, y comprobar que no quedan `-wal` ni
+`-shm` al lado. Y después de subir, **volver a descargar y verificar el valor**
+— no dar por bueno un `200` de la subida.
+
+---
+
+## 2026-08-05 — «Nuevo» no es lo mismo que «modificado»
+
+**Qué pasó:** al aplicar la regla «todo servicio nuevo nace pendiente de pago»
+puse el `0` en la rama equivocada: la que **corrige** las condiciones de un
+servicio existente, no la que **abre** uno nuevo. Resultado: cambiar el precio
+de un bono ya cobrado lo reabría como deuda. Lo cazó una prueba que yo mismo
+acababa de escribir.
+
+**Por qué pasó:** las dos ramas hacen un `INSERT INTO programas_cliente` casi
+idéntico y se parecen mucho leyéndolas por encima. Edité por coincidencia de
+texto en vez de por significado.
+
+**Qué se hace distinto a partir de ahora:** cuando una regla distingue entre
+«crear» y «modificar», escribir primero la prueba de las DOS caras —lo que
+debe cambiar y lo que debe quedarse igual— antes de tocar el código. La cara
+que se queda igual es la que se olvida, y es la que rompe cosas que
+funcionaban.

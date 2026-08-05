@@ -201,7 +201,7 @@ export class RepositorioStaging implements Repositorio {
   /**
    * En una MENSUALIDAD manda el cargo del mes, no la columna del ciclo
    * (corrección H-02). Si no hay cargo se conserva lo guardado, `null`
-   * incluido: `null` significa «no se sabe», nunca «no pagado».
+   * incluido.
    */
   private conCobroReal(datos: Almacen, ciclo: Ciclo): Ciclo {
     if (ciclo.modalidad !== MENSUALIDAD || ciclo.anio === null || ciclo.mes === null) return ciclo;
