@@ -594,7 +594,8 @@ def eliminar_historial(
 
     def _hacer(conexion: sqlite3.Connection) -> dict:
         fila = conexion.execute(
-            "SELECT cliente, fecha, numero_sesion, sesiones_totales, tipo_programa, tarifa FROM historial_sesiones "
+            "SELECT cliente, fecha, numero_sesion, sesiones_totales, tipo_programa, tarifa, ciclo_bono "
+            "FROM historial_sesiones "
             "WHERE id = ?",
             (entrada_id,),
         ).fetchone()
@@ -606,6 +607,26 @@ def eliminar_historial(
 
         conexion.execute("DELETE FROM firmas_publicas WHERE sesion_id = ?", (entrada_id,))
         conexion.execute("DELETE FROM historial_sesiones WHERE id = ?", (entrada_id,))
+
+        # Las sesiones posteriores del MISMO ciclo bajan un número
+        # (2026-08-04). Si se borra la 3 de 7, las que eran 4..7 pasan a ser
+        # 3..6: el bono ha consumido 6 sesiones, no 7.
+        #
+        # Sin esto, el contador del cliente —que se calcula desde el número
+        # de la última sesión que queda— se quedaba clavado en 7 aunque solo
+        # hubiera 6 sesiones, y la ficha se contradecía con su propio
+        # historial (lo detectó Fernando con Paquito).
+        #
+        # Se corrige bajando los números y no contando las filas a secas
+        # porque así se respeta un cliente que empezó a media, con sesiones
+        # ya hechas antes de entrar en la app: sus números arrancan más
+        # arriba y siguen bajando de uno en uno, como debe ser.
+        conexion.execute(
+            "UPDATE historial_sesiones SET numero_sesion = numero_sesion - 1 "
+            "WHERE cliente = ? AND ciclo_bono = ? AND numero_sesion > ?",
+            (cliente, entrada["ciclo_bono"], entrada["numero_sesion"]),
+        )
+
         _sincronizar_completadas_con_ultima(conexion, cliente)
         return entrada
 

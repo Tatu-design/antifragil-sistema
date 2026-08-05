@@ -432,3 +432,110 @@ así que podían contradecirse en silencio.
    también **que lo que hay que poder hacer se puede hacer**, caso a caso.
    Ahora `tests/test_ficha_interfaz.py` verifica la presencia del botón en
    las tres modalidades y su ausencia en los tres estados bloqueantes.
+
+---
+
+## 2026-08-04 — Reescribir una interfaz "equivalente" no es portarla
+
+**Qué pasó:** entregué la aplicación en Next.js con las reglas de negocio
+comprobadas al céntimo y los datos migrados sin una sola diferencia, y
+Fernando tuvo que decírmelo: la pantalla estaba **visual y operativamente
+lejos** de la que él usa todos los días. Otros colores de acento no; peor:
+otra disposición, otros textos, otro orden de la información y botones que
+no estaban donde su mano ya sabe que están.
+
+**Por qué pasó:** construí la interfaz nueva desde mi descripción de la
+antigua en vez de desde sus archivos. Leí las plantillas para entender qué
+hacía cada pantalla, y luego escribí una pantalla que hacía lo mismo. Eso
+no es portar: es rehacer. Es exactamente la lección del 2026-08-01
+("extraer los colores de un diseño no es portarlo: hay que medir contra el
+archivo original") aplicada a la estructura en vez de al color, y no la
+reconocí porque esta vez el archivo original era una plantilla y no una
+paleta.
+
+**Qué se hace distinto a partir de ahora:**
+
+1. **Portar una pantalla es copiar su marcado, no describirlo.** Se abre la
+   plantilla original al lado y se van trasladando sus clases, su orden y
+   sus textos uno a uno. Si al terminar hay una clase CSS que la original
+   tenía y la nueva no, es una diferencia que hay que justificar, no un
+   detalle.
+2. **La hoja de estilos se copia, no se reinterpreta.** `public/style.css`
+   es literalmente `webapp/static/style.css`. Un sistema de diseño nuevo
+   (Tailwind, en este caso) que produce "lo mismo pero parecido" produce
+   exactamente el problema que Fernando encontró.
+3. **Una comprobación por HTTP real de cada pantalla**, que verifica que
+   salen las mismas clases y los mismos textos que la plantilla original.
+   Las 131 pruebas y el build pasaban con la interfaz equivocada: nada de
+   lo que medía miraba la pantalla.
+4. **Y comprobar también los archivos que la pantalla necesita.** El
+   recorrido inicial pedía el HTML del login y lo daba por bueno; el
+   middleware estaba redirigiendo `/style.css` y las fuentes al login por
+   no llevar cookie, así que la pantalla de entrada habría salido sin un
+   solo estilo. Una pantalla no está bien porque su HTML esté bien.
+
+---
+
+## 2026-08-04 (bis) — Un GET que cambia algo no sobrevive a un navegador listo
+
+**Qué pasó:** Fernando entró en la app y le pedía la contraseña **en cada
+pantalla**. No era un fallo de la sesión ni de la cookie: era el chip
+«Salir» de la cabecera.
+
+**Por qué pasó:** copié el `/logout` de Flask tal cual —un enlace normal a
+una dirección que cierra la sesión— y lo puse en un `<Link>` de Next. Next
+**precarga** los enlaces que están a la vista para que la navegación sea
+instantánea, y «Salir» está en la cabecera de todas las pantallas. Así que
+abrir cualquier página disparaba sola una petición a `/salir` y le cerraba
+la sesión antes de que pudiera hacer nada. En Flask el mismo diseño
+funciona porque un `<a>` de HTML no se adelanta.
+
+**Qué se hace distinto a partir de ahora:**
+
+1. **Al portar una ruta, portar también sus supuestos.** «Un enlace solo se
+   pide si alguien lo pulsa» era cierto en Flask y dejó de serlo en Next.
+   Copiar el marcado no basta: hay que preguntarse qué daba por hecho el
+   original y si sigue siendo verdad en el sitio nuevo.
+2. **Nada que cambie el estado se cuelga de un GET que otro pueda pedir por
+   su cuenta.** Si tiene que ser un GET por parecerse al original, la ruta
+   distingue una visita de verdad de una precarga y solo actúa en la
+   primera.
+3. **El comprobador de pantallas vive en el repositorio**
+   (`npm run comprobar:pantallas`) y ahora también verifica esto: que
+   precargar «Salir» no cierre la sesión y que pulsarlo sí. Los dos fallos
+   de hoy —este y la hoja de estilos bloqueada por el middleware— eran
+   invisibles para las 131 pruebas, para los tipos y para el build.
+
+---
+
+## 2026-08-04 (2) — Un contador que medía la etiqueta, no la cantidad
+
+**Qué pasó:** Fernando borró una sesión del historial de un cliente y el
+marcador principal siguió igual. La ficha decía «7 de 8» y su propio
+historial, dos centímetros más abajo, enseñaba 6 sesiones.
+
+**Por qué pasó:** el contador de sesiones consumidas se calculaba como *el
+número de la última sesión que queda*, no como *cuántas sesiones hay*.
+Mientras solo se borrara la última, las dos cosas coincidían y nadie lo
+notaba. Al borrar una del medio o la primera, dejaban de coincidir. Es un
+error de modelo, no de código: se estaba midiendo la **etiqueta** de un
+elemento en vez de la **cantidad** del conjunto.
+
+**Lo que lo hizo peor:** al buscar el descuadre en los datos reales del
+servidor aparecieron otros dos que llevaban semanas ahí (un cliente con
+huecos y contador 0, otro con 9 sesiones en un bono de 8). Nadie los había
+visto porque **ninguna pantalla comparaba las dos cifras entre sí**.
+
+**Qué se hace distinto a partir de ahora:**
+
+1. **Cuando dos sitios de la pantalla muestran la misma realidad, hay que
+   probar que coinciden**, no solo que cada uno es correcto por su lado. La
+   prueba `test_la_ficha_y_su_historial_nunca_se_contradicen` borra sesiones
+   en bucle y comprueba en cada paso que el marcador y el historial dicen lo
+   mismo. Ese tipo de prueba habría cazado esto el primer día.
+2. **Desconfiar de un valor derivado que se calcula de una forma distinta a
+   como se lee.** Si la pantalla cuenta filas y el modelo guarda un número
+   máximo, van a divergir tarde o temprano.
+3. Antes de arreglar datos reales, **descargar una copia del servidor y
+   auditarla**: el fallo que Fernando reportó era uno de tres, y los otros
+   dos no se habrían encontrado mirando solo el caso descrito.

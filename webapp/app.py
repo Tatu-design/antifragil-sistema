@@ -41,6 +41,7 @@ from avisos import (
 from basedatos import RUTA_POR_DEFECTO, crear_esquema
 from migrar_programas_cliente import rellenar_si_falta
 from migrar_modalidades import rellenar_si_falta as rellenar_modalidades
+from reparar_numeracion import reparar_si_hace_falta
 from clientes.repositorio import (
     ESTADO_POR_DEFECTO,
     ESTADOS_VALIDOS,
@@ -99,6 +100,9 @@ crear_esquema()  # crea las tablas si es la primera vez que arranca en esta máq
 asegurar_tokens()  # da un enlace personal a clientes dados de alta antes del milestone 4
 rellenar_si_falta()  # reconstruye los bonos pasados la primera vez que arranca esta versión (2026-08-02)
 rellenar_modalidades()  # completa el precio total de los bonos ya existentes (2026-08-03)
+# Cuadra la numeración que quedó descolocada por borrados anteriores a la
+# corrección del 2026-08-04. No toca la economía y es segura de repetir.
+reparar_numeracion_pendiente = reparar_si_hace_falta()
 # Abre el ciclo del mes en curso a los clientes de mensualidad y cuenta. Es
 # idempotente, así que arrancar la web mil veces no duplica ninguna cuota.
 # (se hace en `_abrir_mes_si_toca`, la primera vez que se abre la lista)
