@@ -52,7 +52,7 @@ import { MENSUALIDAD, type Modalidad } from "@/domain/modalidades";
 import type { CargoMensual, Ciclo, Cliente, Estado, Sesion } from "@/domain/tipos";
 import { TARIFA_LIDOMARE } from "@/domain/economia";
 import { rangoSemana } from "@/lib/fechas";
-import type { Aviso, DatosDeLaLista, Repositorio, SemanaEconomica } from "./tipos";
+import type { Aviso, ClaseGrupo, DatosDeLaLista, Repositorio, SemanaEconomica } from "./tipos";
 
 // -----------------------------------------------------------------------------
 // Conexión
@@ -509,6 +509,17 @@ export class RepositorioPostgres implements Repositorio {
     const cuenta: Record<TipoClase, number> = { lidomare: 0, kids: 0 };
     for (const f of filas) cuenta[f.tipo] = Number(f.n);
     return cuenta;
+  }
+
+  async clasesDelMes(tipo: TipoClase, anio: number, mes: number): Promise<ClaseGrupo[]> {
+    const desde = `${anio}-${String(mes).padStart(2, "0")}-01`;
+    const filas = await consultar(
+      `select id, to_char(fecha,'YYYY-MM-DD') as fecha, tipo from clases_grupo
+        where tipo = $1 and fecha >= $2::date and fecha < ($2::date + interval '1 month')
+        order by fecha desc, id desc`,
+      [tipo, desde],
+    );
+    return filas.map((f) => ({ id: String(f.id), fecha: String(f.fecha), tipo: f.tipo as TipoClase }));
   }
 
   async facturacionKids(anio: number, mes: number): Promise<number | null> {

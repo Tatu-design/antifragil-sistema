@@ -60,6 +60,71 @@ al hacer scroll, 3-4 conexiones por pantalla.
   cuenta en sesiones pero su importe se reparte hacia atrás sobre las
   semanas del mes en cuanto Fernando indica la facturación mensual total.
 
+### CrossFit Lidomare y Kids, en la lista de clientes (2026-08-08)
+
+Fernando quería registrar TODO su trabajo desde la pantalla principal. Hasta
+ahora las clases de CrossFit se firmaban en Economía, que es una pantalla de
+consulta, y las sesiones de PT en la ficha de cada cliente. Dos sitios para lo
+mismo.
+
+**Por fuera son dos cuentas más de la lista. Por dentro no son clientes.**
+Siguen viviendo en `clases_grupo`, que era y sigue siendo su única fuente de
+verdad. No se han metido en `clientes`, no tienen bono, ni pendiente de pago,
+ni estado, ni enlace público — meterlas ahí solo para que se vieran igual
+habría sido crear un cliente falso con seis campos que no significan nada.
+
+Aparecen únicamente en **Activos**: «pendiente de pago», «pausado» y
+«cancelado» son estados de clientes de verdad. El contador de Activos las
+suma, para que el número coincida con las tarjetas que se ven, y por eso el
+filtro se llama «Activos» y no «Clientes activos».
+
+**CrossFit Lidomare** es una cuenta de actividad pura: cada clase son 15 € y
+una hora. Sin tope, sin renovación, sin deuda. Un mes 4 clases y otro 6.
+
+**CrossFit Kids** se factura al final. Las 8 clases al mes son una
+REFERENCIA, no un límite: si un mes salen 9, se firman las 9 y la ficha
+enseña «9 de 8». El importe lo introduce Fernando cuando lo sabe, y el
+sistema calcula a cuánto salió la hora dividiéndolo entre las clases reales.
+Antes de guardar se enseña ese resultado, porque es el número que acabará en
+Economía. Sin ninguna clase ese mes, se niega y explica por qué: no habría
+entre qué repartir el dinero.
+
+**No hay contador guardado en ninguna parte.** Las clases del mes se cuentan
+filtrando `clases_grupo` por fecha, así que el 1 de septiembre empieza solo en
+0 sin que nadie reinicie nada y agosto se queda intacto en su sitio.
+
+**Nada se ha duplicado.** Firmar y deshacer llaman a `registrarClase` y
+`deshacerClase`, que ya existían y ya dejaban la economía de la semana
+cuadrada; guardar el importe llama a `guardarFacturacionKids`, que también
+existía. Lo único nuevo es cómo se miran: el mes en curso, su historial y la
+validación de que no se puede facturar un mes sin clases. Los botones se han
+quitado de Economía: firmar en dos sitios distintos era pedir que un día se
+contara dos veces.
+
+**Cambio de criterio: las horas de Kids cuentan siempre.** Antes no entraban
+en las horas del mes hasta conocer su facturación, para que el precio medio no
+saliera hundido. El problema es que eso escondía trabajo real: una clase de
+Kids es una hora trabajada, se sepa o no lo que se va a cobrar por ella.
+
+La solución al precio medio no es esconder horas, es decir la verdad. Mientras
+falte el importe, el mes queda marcado y `precioMedioFiable` es `false`:
+Economía enseña un guion en lugar del número y explica que quedan clases de
+Kids sin facturar. Priorizar el dato exacto sobre la apariencia, que es lo que
+pedía el encargo.
+
+Archivos: `domain/clases.ts` (reglas puras), `services/clases.ts` (lecturas y
+validación), `app/clases/[tipo]/page.tsx` (una ficha para las dos),
+`app/clases/kids/facturacion/page.tsx`, `components/AccionesClase.tsx`,
+`components/FormularioFacturacionKids.tsx`, más los retoques en
+`domain/economia.ts`, `components/ListaClientes.tsx`, `app/clientes/page.tsx`,
+`app/economia/page.tsx` y los dos repositorios.
+
+**Pruebas:** 220 en verde, 31 nuevas en `tests/clases.test.ts`. Incluyen el mes
+sin clases, 8 de 8, 9 de 8 sin bloquear, deshacer, el cambio de mes, facturar
+con 7, 8 y 9 clases, el intento de facturar sin ninguna, y la comprobación de
+que horas y facturación totales son la suma de PT + Lidomare + Kids. La puerta
+de rendimiento vigila también estas pantallas.
+
 ### Borrar una sesión deja la cuenta cuadrada (2026-08-04)
 
 Fernando borró una sesión de Paquito y el marcador principal no se movió: la

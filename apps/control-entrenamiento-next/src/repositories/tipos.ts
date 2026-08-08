@@ -113,6 +113,11 @@ export interface Repositorio {
   /** Deshace la última de ese tipo. Devuelve su fecha, o null si no había. */
   deshacerUltimaClase(tipo: TipoClase): Promise<string | null>;
   contarClases(desde: string, hasta: string): Promise<Record<TipoClase, number>>;
+  /**
+   * Las clases de un tipo dadas en un mes natural, de la más reciente a la
+   * más antigua. Es el historial que enseña la ficha de cada cuenta.
+   */
+  clasesDelMes(tipo: TipoClase, anio: number, mes: number): Promise<ClaseGrupo[]>;
 
   facturacionKids(anio: number, mes: number): Promise<number | null>;
   guardarFacturacionKids(anio: number, mes: number, importe: number): Promise<void>;

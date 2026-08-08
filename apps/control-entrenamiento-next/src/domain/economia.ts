@@ -15,10 +15,18 @@
  *
  * CROSSFIT KIDS
  *
- * Se factura por mensualidad: el importe lo introduce Fernando al acabar el
- * mes. Hasta entonces las clases se cuentan pero **ni su dinero ni sus horas**
- * entran en el total, y el mes se marca provisional. Si sus horas contaran
- * antes de saber el importe, el precio medio por hora saldría hundido.
+ * Se factura al final: el importe lo introduce Fernando cuando acaba el mes y
+ * ya sabe cuánto ha cobrado.
+ *
+ * **Sus horas cuentan siempre** (decisión de Fernando, 2026-08-08). Una clase
+ * de Kids es una hora de trabajo, se sepa o no lo que se va a cobrar por ella.
+ * Antes no contaban hasta conocer el importe, para que el precio medio no
+ * saliera hundido; el problema es que eso escondía trabajo real.
+ *
+ * La solución al precio medio no es esconder horas, es **decir la verdad**:
+ * mientras falte el importe de Kids, el mes queda marcado como provisional y
+ * `precioMedioFiable` es `false`. La pantalla enseña entonces por qué está
+ * incompleto en vez de un número que no se sostiene.
  */
 
 import { redondear } from "./modalidades";
@@ -55,6 +63,9 @@ export interface ResumenMes {
   facturacionTotal: number;
   horasTotales: number;
   precioMedioHora: number;
+  /** `false` cuando falta el importe de Kids: sus horas ya cuentan y su
+   *  dinero no, así que el medio saldría a la baja. */
+  precioMedioFiable: boolean;
   /** Dinero de las cuotas fijas. No sale de contar sesiones. */
   facturacionCuotas: number;
   numeroCuotas: number;
@@ -81,14 +92,17 @@ export function resumirMes(entrada: EntradaMes): ResumenMes {
 
   const facturacionLidomare = entrada.clasesLidomare * TARIFA_LIDOMARE;
 
+  // Hay clases de Kids pero todavía no se sabe lo que se cobró por ellas: el
+  // mes está incompleto en dinero, aunque sus horas ya sean reales.
   const provisional = entrada.clasesKids > 0 && entrada.facturacionKids === null;
-  const kidsCuenta = entrada.facturacionKids !== null;
 
   const ajusteImporte = entrada.ajustes.reduce((suma, a) => suma + a.importe, 0);
   const ajusteHoras = entrada.ajustes.reduce((suma, a) => suma + a.horas, 0);
 
+  // Las horas de Kids cuentan SIEMPRE (2026-08-08): una clase es una hora
+  // trabajada, se sepa o no lo que se va a cobrar por ella.
   const horasTotales =
-    horasSesiones + entrada.clasesLidomare + (kidsCuenta ? entrada.clasesKids : 0) + ajusteHoras;
+    horasSesiones + entrada.clasesLidomare + entrada.clasesKids + ajusteHoras;
 
   const facturacionTotal = redondear(
     facturacionSesiones +
@@ -112,6 +126,13 @@ export function resumirMes(entrada: EntradaMes): ResumenMes {
     const mensual = (porModalidad.mensualidad ??= { horas: 0, facturacion: 0 });
     mensual.facturacion = redondear(mensual.facturacion + facturacionCuotas);
   }
+  // Las dos cuentas de actividad, con sus horas y su dinero.
+  if (entrada.clasesLidomare) {
+    porModalidad.lidomare = { horas: entrada.clasesLidomare, facturacion: facturacionLidomare };
+  }
+  if (entrada.clasesKids) {
+    porModalidad.kids = { horas: entrada.clasesKids, facturacion: entrada.facturacionKids ?? 0 };
+  }
 
   return {
     anio: entrada.anio,
@@ -119,6 +140,10 @@ export function resumirMes(entrada: EntradaMes): ResumenMes {
     facturacionTotal,
     horasTotales,
     precioMedioHora: horasTotales ? redondear(facturacionTotal / horasTotales) : 0,
+    // Con Kids sin facturar, ese precio medio sale a la baja: las horas ya
+    // están contadas y su dinero todavía no. No se maquilla el número — se
+    // avisa de que aún no es el definitivo y la pantalla lo dice.
+    precioMedioFiable: !provisional,
     facturacionCuotas: redondear(facturacionCuotas),
     numeroCuotas: entrada.cuotas.length,
     sesionesKids: entrada.clasesKids,
@@ -150,6 +175,9 @@ export interface ResumenSemana {
   facturacionTotal: number;
   horasTotales: number;
   precioMedioHora: number;
+  /** `false` cuando falta el importe de Kids: sus horas ya cuentan y su
+   *  dinero no, así que el medio saldría a la baja. */
+  precioMedioFiable: boolean;
   sesionesKids: number;
   facturacionKids: number | null;
   provisional: boolean;
@@ -183,6 +211,10 @@ export function resumirSemana(datos: {
     facturacionTotal,
     horasTotales,
     precioMedioHora: horasTotales ? redondear(facturacionTotal / horasTotales) : 0,
+    // Con Kids sin facturar, ese precio medio sale a la baja: las horas ya
+    // están contadas y su dinero todavía no. No se maquilla el número — se
+    // avisa de que aún no es el definitivo y la pantalla lo dice.
+    precioMedioFiable: !provisional,
     sesionesKids: datos.sesionesKids,
     facturacionKids: datos.facturacionKids,
     provisional,

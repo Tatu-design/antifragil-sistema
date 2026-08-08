@@ -21,7 +21,7 @@ import { TARIFA_LIDOMARE, type TipoClase } from "@/domain/economia";
 import { BONO, CUENTA, MENSUALIDAD } from "@/domain/modalidades";
 import type { CargoMensual, Ciclo, Cliente, Sesion } from "@/domain/tipos";
 import { rangoSemana } from "@/lib/fechas";
-import type { Aviso, DatosDeLaLista, Repositorio, SemanaEconomica } from "./tipos";
+import type { Aviso, ClaseGrupo, DatosDeLaLista, Repositorio, SemanaEconomica } from "./tipos";
 
 interface Almacen {
   clientes: Cliente[];
@@ -397,6 +397,14 @@ export class RepositorioStaging implements Repositorio {
     const cuenta: Record<TipoClase, number> = { lidomare: 0, kids: 0 };
     for (const c of datos.clases) if (c.fecha >= desde && c.fecha <= hasta) cuenta[c.tipo] += 1;
     return cuenta;
+  }
+
+  async clasesDelMes(tipo: TipoClase, anio: number, mes: number): Promise<ClaseGrupo[]> {
+    const datos = await cargar();
+    const prefijo = `${anio}-${String(mes).padStart(2, "0")}`;
+    return clonar(datos.clases)
+      .filter((c) => c.tipo === tipo && c.fecha.startsWith(prefijo))
+      .sort((a, b) => (a.fecha === b.fecha ? b.id.localeCompare(a.id) : b.fecha.localeCompare(a.fecha)));
   }
 
   async facturacionKids(anio: number, mes: number): Promise<number | null> {

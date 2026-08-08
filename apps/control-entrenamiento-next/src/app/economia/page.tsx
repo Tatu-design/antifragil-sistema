@@ -2,7 +2,6 @@ import Image from "next/image";
 import { redirect } from "next/navigation";
 
 import { BarraInferior } from "@/components/BarraInferior";
-import { BotonesClase } from "@/components/BotonesClase";
 import { Iconos } from "@/components/Iconos";
 import { Metricas } from "@/components/Metricas";
 import { SinConexion } from "@/components/SinConexion";
@@ -26,7 +25,7 @@ const ETIQUETAS_MODALIDAD: Array<[string, string]> = [
 export default async function PaginaEconomia({
   searchParams,
 }: {
-  searchParams: Promise<{ registrada?: string; deshecha?: string; error?: string }>;
+  searchParams: Promise<{ error?: string }>;
 }) {
   if (!(await haySesion())) redirect("/login");
 
@@ -40,7 +39,7 @@ export default async function PaginaEconomia({
     throw error;
   }
 
-  const { registrada, deshecha, error: fallo } = await searchParams;
+  const { error: fallo } = await searchParams;
   const { semana, meses } = vista;
 
   const hoy = hoyNegocio();
@@ -65,13 +64,17 @@ export default async function PaginaEconomia({
         </header>
 
         <h1>Economía</h1>
-        <p className="subtitulo">Facturación por sesiones hechas (no por pagos recibidos)</p>
+        <p className="subtitulo">
+          Facturación por sesiones hechas (no por pagos recibidos). Para firmar clases de
+          CrossFit, entra en su ficha desde la lista de clientes.
+        </p>
 
-        {registrada && <div className="aviso-guardado">✔ Clase registrada — {registrada} de hoy</div>}
-        {deshecha && <div className="aviso-guardado">✔ Deshecha — {deshecha}</div>}
         {fallo && <div className="aviso-error">{fallo}</div>}
 
-        <BotonesClase />
+        {/* Las clases de CrossFit ya NO se firman aquí (2026-08-08). Economía
+            es pantalla de consulta; se firman desde su propia ficha, igual que
+            se le firma una sesión a un cliente. Tener dos sitios para lo mismo
+            era pedir que un día se contara dos veces. */}
 
         <div className="economia-resumen-grid">
           <div className="lista">
@@ -84,8 +87,8 @@ export default async function PaginaEconomia({
               <>
                 {semana.provisional && (
                   <p className="aviso-texto">
-                    ⚠ Provisional — esta semana tiene clases de CrossFit Kids sin facturación mensual
-                    introducida todavía, así que la facturación y las horas de abajo no las incluyen aún.
+                    ⚠ Incompleto — quedan clases de CrossFit Kids sin facturación introducida. Sus
+                    horas ya están contadas, pero su dinero todavía no.
                   </p>
                 )}
                 <Metricas
@@ -119,14 +122,16 @@ export default async function PaginaEconomia({
               <>
                 {mes.provisional && (
                   <p className="aviso-texto">
-                    ⚠ Provisional — este mes tiene clases de CrossFit Kids sin facturación mensual
-                    introducida todavía, así que la facturación y las horas de abajo no las incluyen aún.
+                    ⚠ Incompleto — quedan clases de CrossFit Kids sin facturación introducida. Sus
+                    horas ya están contadas, pero su dinero todavía no, así que el precio medio no se
+                    puede dar por bueno. Introdúcelo desde la ficha de CrossFit Kids.
                   </p>
                 )}
                 <Metricas
                   facturacion={mes.facturacionTotal}
                   horas={mes.horasTotales}
                   medio={mes.precioMedioHora}
+                  medioFiable={mes.precioMedioFiable}
                 />
 
                 {/* De dónde sale el dinero del mes. Una mensualidad factura su
@@ -203,6 +208,7 @@ export default async function PaginaEconomia({
                   facturacion={m.facturacionTotal}
                   horas={m.horasTotales}
                   medio={m.precioMedioHora}
+                  medioFiable={m.precioMedioFiable}
                   compacta
                 />
                 {m.ajusteImporte > 0 && (

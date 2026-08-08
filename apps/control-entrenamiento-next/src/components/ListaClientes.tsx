@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { useState } from "react";
 
+import type { FichaClase } from "@/domain/clases";
 import type { ClienteEnLista } from "@/services/clientes";
 
 type Filtro = "activos" | "pendientes" | "pausados" | "cancelados";
 
 /** Los mismos textos que `webapp/templates/index.html`. */
 const VACIOS: Record<Filtro, string> = {
-  activos: "No hay clientes activos.",
+  activos: "No hay nada activo.",
   pendientes: "No hay clientes pendientes de pago.",
   pausados: "No hay clientes pausados.",
   cancelados: "No hay clientes cancelados.",
@@ -30,11 +31,21 @@ const NOMBRES: Record<Filtro, string> = {
  * El filtrado ocurre en el propio navegador: las tarjetas ya están todas en la
  * página, así que cambiar de filtro solo esconde y muestra.
  */
-export function ListaClientes({ clientes }: { clientes: ClienteEnLista[] }) {
+export function ListaClientes({
+  clientes,
+  cuentas = [],
+}: {
+  clientes: ClienteEnLista[];
+  /** CrossFit Lidomare y Kids. No son clientes: son cuentas de actividad. */
+  cuentas?: FichaClase[];
+}) {
   const [filtro, setFiltro] = useState<Filtro>("activos");
 
   const conteos: Record<Filtro, number> = {
-    activos: clientes.filter((c) => c.estado === "activo").length,
+    // Las dos cuentas de CrossFit cuentan aquí: el número tiene que coincidir
+    // con las tarjetas que se ven. Por eso el filtro se llama «Activos» y no
+    // «Clientes activos» — hay dos tarjetas que no son clientes.
+    activos: clientes.filter((c) => c.estado === "activo").length + cuentas.length,
     // Incluye a cualquiera que deba dinero, esté activo, pausado o cancelado.
     pendientes: clientes.filter((c) => c.debe).length,
     pausados: clientes.filter((c) => c.estado === "pausado").length,
@@ -67,6 +78,13 @@ export function ListaClientes({ clientes }: { clientes: ClienteEnLista[] }) {
       </div>
 
       <div className="clientes-grid" id="lista-clientes">
+        {/* Las cuentas de actividad van primero y SOLO en «Activos»: no
+            tienen deuda, ni pausa, ni cancelación — esos tres estados
+            pertenecen a clientes de verdad. */}
+        {cuentas.map((cuenta) => (
+          <TarjetaCuenta key={cuenta.tipo} cuenta={cuenta} oculta={filtro !== "activos"} />
+        ))}
+
         {clientes.map((cliente) => (
           <Link
             key={cliente.id}
@@ -112,11 +130,65 @@ export function ListaClientes({ clientes }: { clientes: ClienteEnLista[] }) {
         ))}
       </div>
 
-      <p className="empty" hidden={visibles.length > 0}>
+      <p className="empty" hidden={visibles.length > 0 || (filtro === "activos" && cuentas.length > 0)}>
         {VACIOS[filtro]}
       </p>
     </>
   );
+}
+
+/**
+ * La tarjeta de CrossFit Lidomare o Kids.
+ *
+ * Se parece a la de un cliente para que la pantalla se lea igual, pero no
+ * enseña nada que no le corresponda: ni bono, ni sesiones restantes, ni
+ * pendiente de pago, ni «al día». Son cuentas de actividad, no clientes.
+ *
+ * Lidomare no lleva barra: no tiene tope, así que no hay nada que llenar.
+ * Kids sí, porque tiene una referencia de clases al mes.
+ */
+function TarjetaCuenta({ cuenta, oculta }: { cuenta: FichaClase; oculta: boolean }) {
+  return (
+    <Link className="tarjeta-cliente tarjeta-cuenta" href={`/clases/${cuenta.tipo}`} hidden={oculta}>
+      <div className="cabecera">
+        <span className="nombre">{cuenta.nombre}</span>
+        <span className="etiquetas">
+          <span className="pill cuenta-actividad">CrossFit</span>
+        </span>
+      </div>
+
+      {cuenta.referencia ? (
+        <div className="progreso-mini">
+          <div className="progreso-mini-numeros">
+            <span>
+              <strong>{cuenta.sesiones}</strong> de {cuenta.referencia} sesiones
+            </span>
+            <span>quedan {cuenta.restantes}</span>
+          </div>
+          <div className="progreso-mini-barra">
+            <span style={{ width: `${cuenta.porcentaje ?? 0}%` }} />
+          </div>
+          <div className="meta">
+            {cuenta.facturacionPendiente
+              ? "Facturación pendiente de introducir"
+              : cuenta.facturacion !== null
+                ? `Facturación ${euros(cuenta.facturacion)}`
+                : "Sin clases este mes"}
+          </div>
+        </div>
+      ) : (
+        <div className="meta">
+          {cuenta.sesiones} {cuenta.sesiones === 1 ? "sesión" : "sesiones"} este mes ·{" "}
+          {euros(cuenta.facturacion ?? 0)}
+        </div>
+      )}
+    </Link>
+  );
+}
+
+/** 1234.5 -> 1.234,50 €, como se escribe una cantidad en España. */
+function euros(valor: number): string {
+  return `${valor.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
 }
 
 /**

@@ -50,10 +50,9 @@ import {
   firmarSesion,
 } from "@/services/sesiones";
 import { resolverAviso, resolverPorTipo } from "@/services/avisos";
+import { confirmarFacturacionKids } from "@/services/clases";
 import {
   deshacerClase,
-  etiqueta as etiquetaClase,
-  guardarFacturacionKids,
   registrarClase,
 } from "@/services/economia";
 
@@ -275,36 +274,50 @@ export async function accionBorrarSesion(datos: FormData): Promise<void> {
  * igual que `firmar_clase` y `deshacer_clase` en Flask: la pantalla se pinta ya
  * actualizada y recargar no vuelve a sumar la clase.
  */
-export async function accionRegistrarClase(datos: FormData): Promise<void> {
+/**
+ * Firma una clase de CrossFit desde la ficha de su cuenta.
+ *
+ * Antes vivía en Economía; ahora se firma desde la ficha, igual que se le
+ * firma a un cliente. La operación de debajo es la MISMA que ya había: no se
+ * ha duplicado nada, solo ha cambiado desde dónde se llama y adónde vuelve.
+ */
+export async function accionFirmarClase(datos: FormData): Promise<void> {
   await exigirSesion();
   const validado = esquemaClase.safeParse(desdeFormulario(datos));
-  if (!validado.success) redirect("/economia");
+  if (!validado.success) redirect("/clientes");
 
+  const destino = `/clases/${validado.data.tipo}`;
+  let cuando: string;
   try {
-    await registrarClase(validado.data.tipo);
+    cuando = await registrarClase(validado.data.tipo);
   } catch (error) {
     const texto = error instanceof Error ? error.message : "no se ha podido registrar la clase";
-    redirect(`/economia?error=${encodeURIComponent(texto)}`);
+    redirect(`${destino}?error=${encodeURIComponent(texto)}`);
   }
+  revalidatePath(destino);
+  revalidatePath("/clientes");
   revalidatePath("/economia");
-  redirect(`/economia?registrada=${encodeURIComponent(etiquetaClase(validado.data.tipo))}`);
+  redirect(`${destino}?firmada=${encodeURIComponent(cuando)}`);
 }
 
+/** Deshace la última clase de esa cuenta y devuelve a su ficha. */
 export async function accionDeshacerClase(datos: FormData): Promise<void> {
   await exigirSesion();
   const validado = esquemaClase.safeParse(desdeFormulario(datos));
-  if (!validado.success) redirect("/economia");
+  if (!validado.success) redirect("/clientes");
 
+  const destino = `/clases/${validado.data.tipo}`;
   let cuando: string;
   try {
     cuando = await deshacerClase(validado.data.tipo);
   } catch (error) {
     const texto = error instanceof Error ? error.message : "no se ha podido deshacer";
-    redirect(`/economia?error=${encodeURIComponent(texto)}`);
+    redirect(`${destino}?error=${encodeURIComponent(texto)}`);
   }
+  revalidatePath(destino);
+  revalidatePath("/clientes");
   revalidatePath("/economia");
-  const mensaje = `${etiquetaClase(validado.data.tipo)} del ${cuando}`;
-  redirect(`/economia?deshecha=${encodeURIComponent(mensaje)}`);
+  redirect(`${destino}?deshecha=${encodeURIComponent(cuando)}`);
 }
 
 export async function accionFacturacionKids(_previo: Resultado | null, datos: FormData): Promise<Resultado> {
@@ -315,18 +328,20 @@ export async function accionFacturacionKids(_previo: Resultado | null, datos: Fo
   }
 
   try {
-    const precio = await guardarFacturacionKids(
+    const avance = await confirmarFacturacionKids(
       validado.data.anio,
       validado.data.mes,
       validado.data.importe,
     );
     revalidatePath("/economia");
+    revalidatePath("/clases/kids");
+    revalidatePath("/clientes");
     return {
       ok: true,
       tono: "exito",
-      mensaje: precio
-        ? `Guardado. Sale a ${precio.toFixed(2).replace(".", ",")} € por clase.`
-        : "Guardado. Todavía no hay clases de Kids ese mes.",
+      mensaje: avance.precioResultante
+        ? `Guardado. Sale a ${avance.precioResultante.toFixed(2).replace(".", ",")} € por clase.`
+        : "Guardado.",
     };
   } catch (error) {
     return comoMensaje(error);

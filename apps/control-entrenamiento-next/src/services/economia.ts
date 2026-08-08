@@ -76,11 +76,13 @@ export async function obtenerMes(anio: number, mes: number): Promise<ResumenMes 
 }
 
 /** Suma una clase de grupo de hoy. */
-export async function registrarClase(tipo: TipoClase, fecha?: string): Promise<void> {
+export async function registrarClase(tipo: TipoClase, fecha?: string): Promise<string> {
   const repo = repositorio();
   const cuando = fecha ?? hoyNegocio();
   await repo.transaccion(() => repo.registrarClase(cuando, tipo));
   await comprobarYAvisar(cuando);
+  // Devuelve el día anotado para poder enseñarlo al volver a la ficha.
+  return cuando;
 }
 
 /** Deshace la última clase de ese tipo — un toque de más se puede corregir. */

@@ -21,6 +21,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { repositorio } from "@/repositories";
 import { reiniciarStagingParaPruebas } from "@/repositories/staging";
 import { listarClientes, obtenerPerfil } from "@/services/clientes";
+import { contarNoLeidos } from "@/services/avisos";
+import { obtenerCuenta } from "@/services/clases";
 import { obtenerEconomia } from "@/services/economia";
 import { obtenerPerfilPublico } from "@/services/publico";
 
@@ -60,6 +62,10 @@ const PRESUPUESTO = {
   "perfil de un cliente": 4,
   "perfil público del cliente": 5,
   economía: 8,
+  "ficha de una cuenta de CrossFit": 2,
+  /** La pantalla entera: clientes, avisos y las dos cuentas de CrossFit.
+   *  Las cuatro cargas se lanzan a la vez, así que en tiempo es como una. */
+  "pantalla de clientes completa": 6,
 };
 
 describe("presupuesto de consultas por pantalla", () => {
@@ -126,6 +132,32 @@ describe("presupuesto de consultas por pantalla", () => {
       contador.total(),
       `economía hizo ${contador.total()} consultas: ${JSON.stringify(contador.porMetodo())}`,
     ).toBeLessThanOrEqual(PRESUPUESTO.economía);
+  });
+
+  it("la pantalla de clientes entera, con sus dos cuentas de CrossFit", async () => {
+    const contador = contarConsultas();
+    // Lo mismo que carga `app/clientes/page.tsx`, y en paralelo igual que allí.
+    await Promise.all([
+      listarClientes(),
+      contarNoLeidos(),
+      obtenerCuenta("lidomare"),
+      obtenerCuenta("kids"),
+    ]);
+
+    expect(
+      contador.total(),
+      `la pantalla hizo ${contador.total()} consultas: ${JSON.stringify(contador.porMetodo())}`,
+    ).toBeLessThanOrEqual(PRESUPUESTO["pantalla de clientes completa"]);
+  });
+
+  it("la ficha de una cuenta de CrossFit", async () => {
+    const contador = contarConsultas();
+    await obtenerCuenta("kids");
+
+    expect(
+      contador.total(),
+      `la ficha de Kids hizo ${contador.total()} consultas: ${JSON.stringify(contador.porMetodo())}`,
+    ).toBeLessThanOrEqual(PRESUPUESTO["ficha de una cuenta de CrossFit"]);
   });
 });
 

@@ -1226,3 +1226,18 @@ a.pill { text-decoration: none; }
   text-align: center;
 }
 .boton-texto:hover { color: var(--acento); }
+
+/* ----- Cuentas de actividad: CrossFit Lidomare y Kids (2026-08-08) ----- */
+
+/* Se ven como una tarjeta más de la lista, porque Fernando las usa igual. Un
+   borde sutil las distingue sin gritar: no son clientes, no tienen deuda ni
+   estado, pero se firman desde el mismo sitio. */
+.tarjeta-cuenta {
+  border-color: rgba(31, 169, 154, 0.28);
+}
+
+.pill.cuenta-actividad {
+  background: rgba(31, 169, 154, 0.14);
+  color: var(--acento);
+  border: 1px solid rgba(31, 169, 154, 0.25);
+}

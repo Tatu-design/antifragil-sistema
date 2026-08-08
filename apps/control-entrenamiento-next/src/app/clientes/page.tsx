@@ -9,6 +9,7 @@ import { SinConexion } from "@/components/SinConexion";
 import { haySesion } from "@/lib/auth";
 import { BaseNoDisponible } from "@/repositories/postgres";
 import { contarNoLeidos } from "@/services/avisos";
+import { obtenerCuenta } from "@/services/clases";
 import { listarClientes } from "@/services/clientes";
 
 export const dynamic = "force-dynamic";
@@ -23,10 +24,20 @@ export default async function PaginaClientes({
   if (!(await haySesion())) redirect("/login");
 
   let clientes;
+  let cuentas;
   let sinLeer = 0;
   try {
-    clientes = await listarClientes();
-    sinLeer = await contarNoLeidos();
+    // Las cuatro lecturas van a la vez: contra Supabase cada consulta es un
+    // viaje de red, y esta es la pantalla que más se abre.
+    const [lista, avisos, lidomare, kids] = await Promise.all([
+      listarClientes(),
+      contarNoLeidos(),
+      obtenerCuenta("lidomare"),
+      obtenerCuenta("kids"),
+    ]);
+    clientes = lista;
+    sinLeer = avisos;
+    cuentas = [lidomare.ficha, kids.ficha];
   } catch (error) {
     if (error instanceof BaseNoDisponible) return <SinConexion />;
     throw error;
@@ -60,7 +71,7 @@ export default async function PaginaClientes({
         {guardado && <div className="aviso-guardado">✔ Guardado: {guardado}</div>}
         {eliminado && <div className="aviso-guardado">✔ Cliente borrado: {eliminado}</div>}
 
-        <ListaClientes clientes={clientes} />
+        <ListaClientes clientes={clientes} cuentas={cuentas} />
       </div>
 
       <BarraInferior activa="clientes" sinLeer={sinLeer} />

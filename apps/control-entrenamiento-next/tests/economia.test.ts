@@ -89,12 +89,20 @@ describe("el resumen de un mes", () => {
     expect(r.precioMedioHora).toBe(TARIFA_LIDOMARE);
   });
 
-  it("Kids no cuenta hasta tener su importe: ni dinero ni horas (E14)", () => {
+  it("las horas de Kids cuentan aunque no se sepa aún su importe (E14)", () => {
+    // Cambio de criterio de Fernando, 2026-08-08. Antes las horas de Kids no
+    // contaban hasta conocer la facturación, para que el precio medio no
+    // saliera hundido. El problema es que eso escondía trabajo real: una clase
+    // de Kids es una hora trabajada, se sepa o no lo que se va a cobrar.
+    //
+    // La solución al precio medio no es esconder horas, es avisar de que el
+    // mes aún está incompleto — eso hace `precioMedioFiable`.
     const r = resumirMes({ ...mesVacio, clasesKids: 4 });
-    expect(r.provisional).toBe(true);
+    expect(r.horasTotales).toBe(4);
     expect(r.facturacionTotal).toBe(0);
-    expect(r.horasTotales).toBe(0);
     expect(r.sesionesKids).toBe(4);
+    expect(r.provisional).toBe(true);
+    expect(r.precioMedioFiable).toBe(false);
   });
 
   it("al introducir el importe, Kids deja de ser provisional (E14b)", () => {
