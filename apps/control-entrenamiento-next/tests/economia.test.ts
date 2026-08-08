@@ -10,6 +10,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { TARIFA_LIDOMARE, precioClaseKids, resumirMes, resumirSemana } from "@/domain/economia";
 import { BONO, CUENTA, MENSUALIDAD, type Modalidad } from "@/domain/modalidades";
+import { hoyNegocio } from "@/lib/fechas";
 import { repositorio } from "@/repositories";
 import { reiniciarStagingParaPruebas } from "@/repositories/staging";
 import { deshacerClase, guardarFacturacionKids, obtenerEconomia, registrarClase } from "@/services/economia";
@@ -224,30 +225,64 @@ describe("la pantalla de Economía", () => {
     expect(JSON.stringify(await repositorio().listarSemanas())).toBe(antes);
   });
 
-  it("una firma aparece en la semana y en su mes", async () => {
-    await firmarSesion("cli-a", { fecha: "2026-08-03" });
-    const { semanas, meses } = await obtenerEconomia();
-    const semana = semanas.find((s) => s.inicio === "2026-08-03")!;
-    const mes = meses.find((m) => m.anio === 2026 && m.mes === 8)!;
-    expect(semana.facturacionTotal).toBe(45);
-    // El mes suma además la cuota de la mensualidad de Cliente B, que se cobra
-    // por tener las plazas reservadas y no por firmar sesiones.
-    expect(mes.facturacionTotal).toBe(45 + 720);
+  it("el mes en curso existe siempre, aunque no haya nada firmado", async () => {
+    // Desde el 2026-08-08 la pantalla enseña su bloque en cero el día 1, no un
+    // hueco. Se comprueba con un mes futuro, que no tiene nada.
+    const { mesActual } = await obtenerEconomia();
+    expect(mesActual).toBeDefined();
+    expect(mesActual.anio).toBeGreaterThan(2000);
+    expect(typeof mesActual.facturacionTotal).toBe("number");
+    expect(typeof mesActual.horasTotales).toBe("number");
   });
 
-  it("una semana a caballo se muestra entera, pero el mes la reparte (E10 y E11)", async () => {
+  it("una firma aparece en el mes en curso", async () => {
+    const hoy = hoyNegocio();
+    await firmarSesion("cli-a", { fecha: hoy });
+
+    const { mesActual } = await obtenerEconomia();
+    expect(mesActual.horasTotales).toBeGreaterThan(0);
+  });
+
+  it("los meses anteriores van del más reciente al más antiguo, sin el actual", async () => {
+    await firmarSesion("cli-a", { fecha: "2026-07-31" });
+    await firmarSesion("cli-a", { fecha: "2026-06-10" });
+
+    const { mesActual, anteriores } = await obtenerEconomia();
+
+    // El mes en curso no se repite abajo.
+    expect(anteriores.some((m) => m.anio === mesActual.anio && m.mes === mesActual.mes)).toBe(false);
+
+    // Y el orden es del más reciente al más antiguo.
+    const claves = anteriores.map((m) => m.anio * 100 + m.mes);
+    expect([...claves].sort((a, b) => b - a)).toEqual(claves);
+  });
+
+  it("el mes reparte por fecha real, no por semanas", async () => {
     await firmarSesion("cli-a", { fecha: "2026-07-31" }); // viernes
     await firmarSesion("cli-a", { fecha: "2026-08-01" }); // sábado, misma semana
-    const { semanas, meses } = await obtenerEconomia();
 
-    // Esa semana ya traía 3 sesiones de la situación de partida.
-    const semana = semanas.find((s) => s.inicio === "2026-07-27")!;
-    expect(semana.horasTotales).toBe(3 + 2);
+    const { anteriores } = await obtenerEconomia();
+    const julio = anteriores.find((m) => m.anio === 2026 && m.mes === 7)!;
 
-    // Pero el mes las separa por su fecha real: una a julio y otra a agosto.
-    const julio = meses.find((m) => m.mes === 7)!;
-    const agosto = meses.find((m) => m.mes === 8)!;
-    expect(julio.horasTotales).toBe(9 + 1); // 9 de partida + la del 31 de julio
-    expect(agosto.horasTotales).toBe(1);
+    // 9 sesiones de partida en julio + la del 31.
+    expect(julio.horasTotales).toBe(9 + 1);
+  });
+
+  it("ya no se piden las semanas ni las clases de la semana", async () => {
+    // La pantalla dejó de enseñarlas (2026-08-08), así que pedirlas serían dos
+    // viajes de red para nada.
+    const repo = repositorio() as unknown as Record<string, unknown>;
+    const llamadas: string[] = [];
+    for (const nombre of ["listarSemanas", "contarClases"]) {
+      const original = repo[nombre] as (...a: unknown[]) => unknown;
+      repo[nombre] = (...args: unknown[]) => {
+        llamadas.push(nombre);
+        return original.apply(repo, args);
+      };
+    }
+
+    await obtenerEconomia();
+
+    expect(llamadas).toEqual([]);
   });
 });

@@ -1241,3 +1241,90 @@ a.pill { text-decoration: none; }
   color: var(--acento);
   border: 1px solid rgba(31, 169, 154, 0.25);
 }
+
+/* ----- Economía: un mes, tres cifras (2026-08-08) ----- */
+
+.mes-economico {
+  padding: 1.1rem 1.25rem 1.25rem;
+  border-radius: var(--radio);
+  background: var(--cristal);
+  border: 1px solid var(--cristal-borde);
+  box-shadow: var(--cristal-sombra);
+  margin-bottom: 0.75rem;
+}
+
+/* El mes en curso pesa más: es el que se mira todos los días. */
+.mes-economico.destacado {
+  padding: 1.35rem 1.35rem 1.5rem;
+  margin-bottom: 2rem;
+  border-color: rgba(31, 169, 154, 0.28);
+}
+
+.mes-economico-titulo {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0 0 0.9rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--tinta-suave);
+}
+
+.mes-economico.destacado .mes-economico-titulo {
+  font-size: 0.8125rem;
+  color: var(--tinta);
+}
+
+/* Tres columnas iguales: en móvil caben de sobra y se leen de un vistazo,
+   sin desplazamiento lateral. */
+.mes-economico-cifras {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+}
+
+.mes-economico-cifras .cifra {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.mes-economico-cifras .etiqueta {
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--tinta-suave);
+}
+
+.mes-economico-cifras .valor {
+  font-size: 1.0625rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  /* Que un importe largo no empuje a las otras dos columnas. */
+  overflow-wrap: anywhere;
+}
+
+.mes-economico.destacado .mes-economico-cifras .valor {
+  font-size: 1.5rem;
+}
+
+.titulo-seccion {
+  margin: 0 0 0.9rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--tinta-suave);
+}
+
+/* Discreto a propósito: dice que falta algo, no da una explicación. */
+.pill.provisional {
+  background: var(--alerta-velo);
+  color: var(--alerta);
+  border: 1px solid rgba(245, 158, 11, 0.28);
+  letter-spacing: 0.04em;
+}

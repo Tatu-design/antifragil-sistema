@@ -61,7 +61,10 @@ const PRESUPUESTO = {
   "lista de clientes": 3,
   "perfil de un cliente": 4,
   "perfil público del cliente": 5,
-  economía: 8,
+  /** Bajó de 8 a 5 el 2026-08-08: la pantalla dejó de enseñar la semana, así
+   *  que dejó de pedir `listarSemanas` y `contarClases`. Son un viaje de red
+   *  para los meses con datos y uno más para el mes en curso. */
+  economía: 5,
   "ficha de una cuenta de CrossFit": 2,
   /** La pantalla entera: clientes, avisos y las dos cuentas de CrossFit.
    *  Las cuatro cargas se lanzan a la vez, así que en tiempo es como una. */
@@ -132,6 +135,17 @@ describe("presupuesto de consultas por pantalla", () => {
       contador.total(),
       `economía hizo ${contador.total()} consultas: ${JSON.stringify(contador.porMetodo())}`,
     ).toBeLessThanOrEqual(PRESUPUESTO.economía);
+  });
+
+  it("economía ya no pide las semanas ni las clases de la semana", async () => {
+    const contador = contarConsultas();
+    await obtenerEconomia();
+    const porMetodo = contador.porMetodo();
+
+    // Dos viajes de red que se pagaban para pintar una sección que ya no
+    // existe (2026-08-08).
+    expect(porMetodo.listarSemanas ?? 0).toBe(0);
+    expect(porMetodo.contarClases ?? 0).toBe(0);
   });
 
   it("la pantalla de clientes entera, con sus dos cuentas de CrossFit", async () => {

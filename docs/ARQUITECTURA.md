@@ -60,6 +60,50 @@ al hacer scroll, 3-4 conexiones por pantalla.
   cuenta en sesiones pero su importe se reparte hacia atrás sobre las
   semanas del mes en cuanto Fernando indica la facturación mensual total.
 
+### Economía, reducida a una sola pregunta (2026-08-08)
+
+«¿Cómo va mi producción económica cada mes?» Eso es todo lo que responde la
+pantalla ahora. Tres cifras por mes —facturación, horas y € por hora— con el
+mes en curso arriba y con más peso visual, y los anteriores debajo.
+
+**Qué se ha quitado de la vista**, no de los datos: la sección semanal
+completa, el desglose por modalidades, las cuotas, los ajustes con su motivo,
+los párrafos explicativos sobre CrossFit Kids y el subtítulo. Todo eso
+respondía a preguntas que no se estaban haciendo desde aquí. Los cálculos
+internos siguen existiendo (`porModalidad`, `facturacionCuotas`, `ajustes`) y
+siguen entrando en los totales; simplemente ya no se pintan.
+
+**El mes en curso existe siempre**, aunque no haya nada firmado: se calcula
+aparte de la lista de meses con actividad, así que el día 1 se ve su bloque en
+cero en vez de un hueco. Sin horas, el € por hora es un guion — no un cero que
+parezca un dato.
+
+**Provisional en una palabra.** Cuando quedan clases de Kids sin facturar, sus
+horas ya cuentan pero su dinero no, así que el precio medio saldría a la baja.
+El mes lleva una etiqueta «Provisional» y el € por hora enseña un guion. Se
+acabaron las cajas de aviso explicando Kids dentro de Economía: eso se gestiona
+en la ficha de CrossFit Kids.
+
+**Dos consultas menos por carga.** La pantalla pedía `listarSemanas` y
+`contarClases` para pintar la sección semanal; al desaparecer esa sección, se
+dejaron de pedir. Los dos métodos siguen en el repositorio porque la
+comprobación de sincronización sí los usa. Medido contra Supabase: de 18 a 16
+consultas y de 1.811 a 839 ms. El presupuesto de la puerta de rendimiento baja
+de 8 a 5 llamadas al repositorio.
+
+**Los meses no son pulsables todavía**, a propósito: el detalle de cada mes es
+otra iteración, y una tarjeta que parece un botón y no lleva a ningún sitio es
+peor que una que no lo parece.
+
+Archivos: `app/economia/page.tsx` (reescrita), `components/MesEconomico.tsx`
+(nuevo), `services/economia.ts`, `public/style.css`. Borrado
+`components/Metricas.tsx`, que se quedó sin usar.
+
+**Pruebas:** 240 en verde, 15 nuevas en `tests/pantalla-economia.test.ts`
+—mes vacío, PT, PT + Lidomare, PT + Lidomare + Kids, Kids sin facturar y
+facturado, meses anteriores ordenados, mes anterior provisional, y que la
+pantalla no pide lo que ya no enseña.
+
 ### CrossFit Lidomare y Kids, en la lista de clientes (2026-08-08)
 
 Fernando quería registrar TODO su trabajo desde la pantalla principal. Hasta

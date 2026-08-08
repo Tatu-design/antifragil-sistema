@@ -13,59 +13,49 @@ import { ErrorDeNegocio } from "@/domain/modalidades";
 import {
   precioClaseKids,
   resumirMes,
-  resumirSemana,
   type ResumenMes,
-  type ResumenSemana,
   type TipoClase,
 } from "@/domain/economia";
-import { hoyNegocio, rangoSemana } from "@/lib/fechas";
+import { hoyNegocio } from "@/lib/fechas";
 import { repositorio } from "@/repositories";
 import { comprobarYAvisar } from "./verificacion";
 
 export interface VistaEconomia {
-  /** La semana más reciente con movimiento, no necesariamente la de hoy. */
-  semana: ResumenSemana | null;
-  semanas: ResumenSemana[];
-  meses: ResumenMes[];
-  /** Clases dadas esta semana, para los botones de CrossFit. */
-  clasesEstaSemana: Record<TipoClase, number>;
-  precioClaseKidsDelMes: number;
+  /** El mes natural en curso. **Siempre existe**, aunque esté todo a cero. */
+  mesActual: ResumenMes;
+  /** Los demás meses con actividad, del más reciente al más antiguo. */
+  anteriores: ResumenMes[];
 }
 
+/**
+ * Lo que enseña la pantalla de Economía: el mes en curso y los anteriores.
+ *
+ * Desde el 2026-08-08 la pantalla es solo mensual, así que ya NO se piden ni
+ * las semanas ni las clases de esta semana: eran dos viajes de red para
+ * pintar algo que ha dejado de existir. Los métodos siguen en el repositorio
+ * porque la comprobación de sincronización sí los usa.
+ *
+ * El mes en curso se calcula aparte y siempre, aunque no tenga ninguna sesión
+ * todavía: la pantalla debe enseñar su bloque en cero el día 1, no un hueco.
+ */
 export async function obtenerEconomia(): Promise<VistaEconomia> {
   const repo = repositorio();
-
   const hoy = hoyNegocio();
-  const { inicio, fin } = rangoSemana(hoy);
-
-  // Las tres lecturas de arranque no dependen entre sí, así que van a la vez
-  // (2026-08-05). Contra Supabase cada consulta es un viaje de red de ~180 ms:
-  // encadenarlas era esperar tres veces para nada.
-  const [filasSemanas, mesesConDatos, clasesEstaSemana] = await Promise.all([
-    repo.listarSemanas(),
-    repo.mesesConDatos(),
-    repo.contarClases(inicio, fin),
-  ]);
-  const semanas = filasSemanas.map(resumirSemana);
-
-  // Y cada mes se calcula en paralelo con los demás, no uno detrás de otro.
-  const meses: ResumenMes[] = await Promise.all(
-    mesesConDatos.map(async ({ anio, mes }) =>
-      resumirMes({ anio, mes, ...(await repo.datosDelMes(anio, mes)) }),
-    ),
-  );
-
   const anio = Number(hoy.slice(0, 4));
   const mes = Number(hoy.slice(5, 7));
-  const delMes = meses.find((m) => m.anio === anio && m.mes === mes);
 
-  return {
-    semana: semanas[0] ?? null,
-    semanas,
-    meses,
-    clasesEstaSemana,
-    precioClaseKidsDelMes: precioClaseKids(delMes?.facturacionKids ?? null, delMes?.sesionesKids ?? 0),
-  };
+  const conDatos = await repo.mesesConDatos();
+  const anteriores = conDatos.filter((m) => m.anio !== anio || m.mes !== mes);
+
+  // El mes en curso y los anteriores se calculan a la vez.
+  const [mesActual, ...resto] = await Promise.all([
+    repo.datosDelMes(anio, mes).then((datos) => resumirMes({ anio, mes, ...datos })),
+    ...anteriores.map(async (m) =>
+      resumirMes({ anio: m.anio, mes: m.mes, ...(await repo.datosDelMes(m.anio, m.mes)) }),
+    ),
+  ]);
+
+  return { mesActual, anteriores: resto };
 }
 
 export async function obtenerMes(anio: number, mes: number): Promise<ResumenMes | null> {
