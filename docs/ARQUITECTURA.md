@@ -112,6 +112,26 @@ Economía enseña un guion en lugar del número y explica que quedan clases de
 Kids sin facturar. Priorizar el dato exacto sobre la apariencia, que es lo que
 pedía el encargo.
 
+**Firmar es un solo toque, desde la propia lista (2026-08-08).** Cada tarjeta
+—de un cliente o de una cuenta de CrossFit— lleva su botón «Firmar sesión»: no
+hace falta abrir la ficha. La tarjeta deja de ser un enlace entero y pasa a
+contener el enlace a la ficha y el botón por separado, porque un botón dentro
+de un enlace no es HTML válido y el toque se lo comería el enlace.
+
+No pregunta antes. Fernando firma varias veces al día y ve el resultado al
+momento; si sobra una sesión, la borra del historial. Preguntar ahí molestaba
+más de lo que protegía. El botón se desactiva al pulsarlo, que es lo que
+impide que un doble toque cuente dos veces, y solo aparece cuando de verdad se
+puede firmar.
+
+Por eso `claveIdempotencia` pasa a ser opcional: desde la lista no hay una
+carga de página por cliente que la genere. La ficha la sigue enviando.
+
+**«Deshacer la última» se ha retirado.** Se sustituye por borrar la clase
+concreta desde el historial, igual que con la sesión de un cliente: así se ve
+cuál se está borrando y no depende de que sea la más reciente. El importe sale
+de la semana en la misma operación, como hacía el deshacer.
+
 Archivos: `domain/clases.ts` (reglas puras), `services/clases.ts` (lecturas y
 validación), `app/clases/[tipo]/page.tsx` (una ficha para las dos),
 `app/clases/kids/facturacion/page.tsx`, `components/AccionesClase.tsx`,

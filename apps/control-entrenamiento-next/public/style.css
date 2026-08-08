@@ -1241,3 +1241,37 @@ a.pill { text-decoration: none; }
   color: var(--acento);
   border: 1px solid rgba(31, 169, 154, 0.25);
 }
+
+/* ----- Firmar con un toque desde la lista (2026-08-08) ----- */
+
+/* La tarjeta deja de ser un enlace entero: dentro hay el enlace a la ficha y,
+   debajo, el botón de firmar. Un botón dentro de un enlace no es HTML válido
+   y el toque se lo comería el enlace. */
+.tarjeta-cuerpo {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+}
+
+.tarjeta-firmar {
+  margin-top: 12px;
+}
+
+/* Superficie táctil cómoda: es el botón que más se pulsa del día. */
+.boton-firmar-rapido {
+  width: 100%;
+  min-height: 44px;
+  padding: 0.6rem 1rem;
+  border: 0;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(180deg, var(--acento-claro), var(--acento));
+  box-shadow: 0 6px 16px -8px rgba(31, 169, 154, 0.6);
+  cursor: pointer;
+}
+
+.boton-firmar-rapido:active { transform: scale(0.98); }
+.boton-firmar-rapido:disabled { opacity: 0.6; cursor: default; }

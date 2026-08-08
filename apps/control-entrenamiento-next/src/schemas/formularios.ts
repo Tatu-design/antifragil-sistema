@@ -30,7 +30,15 @@ export const esquemaClaveUnica = z.object({
 
 export const esquemaFirma = z.object({
   clienteId: z.string().min(1),
-  claveIdempotencia: z.string().min(1),
+  /**
+   * Valor de un solo uso por carga de página, para que un reintento de red no
+   * guarde la firma dos veces.
+   *
+   * Es OPCIONAL porque desde la lista de clientes se firma con un toque y ahí
+   * no hay una carga de página por cliente que lo genere (2026-08-08). El
+   * botón se desactiva al pulsarlo, que es la protección que queda ahí.
+   */
+  claveIdempotencia: z.string().min(1).optional(),
 });
 
 export const esquemaAlta = z.object({
@@ -66,6 +74,11 @@ export const esquemaRenombrar = z.object({
 });
 
 export const esquemaClase = z.object({
+  tipo: z.enum(["lidomare", "kids"]),
+});
+
+export const esquemaBorrarClase = z.object({
+  id: z.string().min(1),
   tipo: z.enum(["lidomare", "kids"]),
 });
 

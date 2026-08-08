@@ -25,6 +25,7 @@ import {
 } from "@/domain/clases";
 import { anioDe, hoyNegocio, mesDe } from "@/lib/fechas";
 import { repositorio } from "@/repositories";
+import { comprobarYAvisar } from "./verificacion";
 
 export interface VistaCuenta {
   ficha: FichaClase;
@@ -79,7 +80,27 @@ export async function obtenerCuenta(
  * Se reexportan para que las pantallas de las cuentas no tengan que saber que
  * viven en el módulo de economía.
  */
-export { deshacerClase, registrarClase as firmarClase } from "./economia";
+export { registrarClase as firmarClase } from "./economia";
+
+/**
+ * Borra una clase CONCRETA del historial.
+ *
+ * Sustituye al antiguo «deshacer la última» (2026-08-08). Fernando prefiere
+ * ir al historial y borrar la que se equivocó, igual que hace con la sesión de
+ * un cliente: así elige cuál, y no depende de que sea la más reciente.
+ *
+ * El repositorio se encarga de descontar su importe de la semana, igual que
+ * hacía el deshacer. Después se comprueba que esa semana sigue cuadrando.
+ */
+export async function borrarClase(id: string): Promise<{ fecha: string; tipo: TipoClase }> {
+  const repo = repositorio();
+
+  const borrada = await repo.transaccion(() => repo.borrarClase(id));
+  if (!borrada) throw new ErrorDeNegocio("Esa clase ya no existe");
+
+  await comprobarYAvisar(borrada.fecha);
+  return borrada;
+}
 
 import { guardarFacturacionKids as guardarImporteKids } from "./economia";
 

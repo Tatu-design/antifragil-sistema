@@ -112,6 +112,9 @@ export interface Repositorio {
   registrarClase(fecha: string, tipo: TipoClase): Promise<void>;
   /** Deshace la última de ese tipo. Devuelve su fecha, o null si no había. */
   deshacerUltimaClase(tipo: TipoClase): Promise<string | null>;
+  /** Borra una clase concreta por su identificador. Devuelve su fecha, o
+   *  `null` si ya no estaba. */
+  borrarClase(id: string): Promise<{ fecha: string; tipo: TipoClase } | null>;
   contarClases(desde: string, hasta: string): Promise<Record<TipoClase, number>>;
   /**
    * Las clases de un tipo dadas en un mes natural, de la más reciente a la

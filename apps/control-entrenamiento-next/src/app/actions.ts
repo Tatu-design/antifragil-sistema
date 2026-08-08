@@ -22,6 +22,7 @@ import { cerrarSesion, entrar, entrarConClaveUnica, haySesion } from "@/lib/auth
 import {
   desdeFormulario,
   esquemaAlta,
+  esquemaBorrarClase,
   esquemaBorrarSesion,
   esquemaClase,
   esquemaAviso,
@@ -50,9 +51,8 @@ import {
   firmarSesion,
 } from "@/services/sesiones";
 import { resolverAviso, resolverPorTipo } from "@/services/avisos";
-import { confirmarFacturacionKids } from "@/services/clases";
+import { borrarClase, confirmarFacturacionKids } from "@/services/clases";
 import {
-  deshacerClase,
   registrarClase,
 } from "@/services/economia";
 
@@ -300,24 +300,29 @@ export async function accionFirmarClase(datos: FormData): Promise<void> {
   redirect(`${destino}?firmada=${encodeURIComponent(cuando)}`);
 }
 
-/** Deshace la última clase de esa cuenta y devuelve a su ficha. */
-export async function accionDeshacerClase(datos: FormData): Promise<void> {
+/**
+ * Borra una clase concreta del historial de su cuenta.
+ *
+ * Sustituye al «deshacer la última»: se elige cuál, igual que con la sesión
+ * de un cliente. Su importe sale de la semana en la misma operación.
+ */
+export async function accionBorrarClase(datos: FormData): Promise<void> {
   await exigirSesion();
-  const validado = esquemaClase.safeParse(desdeFormulario(datos));
+  const validado = esquemaBorrarClase.safeParse(desdeFormulario(datos));
   if (!validado.success) redirect("/clientes");
 
   const destino = `/clases/${validado.data.tipo}`;
   let cuando: string;
   try {
-    cuando = await deshacerClase(validado.data.tipo);
+    cuando = (await borrarClase(validado.data.id)).fecha;
   } catch (error) {
-    const texto = error instanceof Error ? error.message : "no se ha podido deshacer";
+    const texto = error instanceof Error ? error.message : "no se ha podido borrar";
     redirect(`${destino}?error=${encodeURIComponent(texto)}`);
   }
   revalidatePath(destino);
   revalidatePath("/clientes");
   revalidatePath("/economia");
-  redirect(`${destino}?deshecha=${encodeURIComponent(cuando)}`);
+  redirect(`${destino}?borrada=${encodeURIComponent(cuando)}`);
 }
 
 export async function accionFacturacionKids(_previo: Resultado | null, datos: FormData): Promise<Resultado> {

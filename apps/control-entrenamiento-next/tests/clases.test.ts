@@ -20,8 +20,8 @@ import { TARIFA_LIDOMARE } from "@/domain/economia";
 import { repositorio } from "@/repositories";
 import { reiniciarStagingParaPruebas } from "@/repositories/staging";
 import {
+  borrarClase,
   confirmarFacturacionKids,
-  deshacerClase,
   firmarClase,
   obtenerCuenta,
   revisarFacturacionKids,
@@ -82,11 +82,12 @@ describe("CrossFit Lidomare", () => {
     expect(ficha.facturacion).toBe(20 * TARIFA_LIDOMARE);
   });
 
-  it("deshacer la última quita su clase y su dinero", async () => {
+  it("borrar una clase del historial quita su clase y su dinero", async () => {
     await firmar("lidomare", 3);
     const antes = await agosto();
+    const { historial } = await obtenerCuenta("lidomare", AGOSTO.anio, AGOSTO.mes);
 
-    await deshacerClase("lidomare");
+    await borrarClase(historial[0].id);
 
     const { ficha } = await obtenerCuenta("lidomare", AGOSTO.anio, AGOSTO.mes);
     expect(ficha.sesiones).toBe(2);
@@ -96,8 +97,21 @@ describe("CrossFit Lidomare", () => {
     expect(despues!.horasTotales).toBe(antes!.horasTotales - 1);
   });
 
-  it("deshacer sin ninguna clase avisa en vez de romperse", async () => {
-    await expect(deshacerClase("lidomare")).rejects.toThrow(/no hay ninguna clase/i);
+  it("se borra la clase ELEGIDA, no la última", async () => {
+    await firmarClase("lidomare", "2026-08-03");
+    await firmarClase("lidomare", "2026-08-10");
+    await firmarClase("lidomare", "2026-08-06");
+
+    const { historial } = await obtenerCuenta("lidomare", AGOSTO.anio, AGOSTO.mes);
+    const delMedio = historial.find((c) => c.fecha === "2026-08-06")!;
+    await borrarClase(delMedio.id);
+
+    const despues = await obtenerCuenta("lidomare", AGOSTO.anio, AGOSTO.mes);
+    expect(despues.historial.map((c) => c.fecha)).toEqual(["2026-08-10", "2026-08-03"]);
+  });
+
+  it("borrar una clase que ya no existe avisa en vez de romperse", async () => {
+    await expect(borrarClase("no-existe")).rejects.toThrow(/ya no existe/i);
   });
 
   it("el historial guarda las fechas reales, de la más reciente primero", async () => {
@@ -163,9 +177,11 @@ describe("CrossFit Kids", () => {
     expect(ficha.porcentaje).toBe(100);
   });
 
-  it("deshacer quita la última clase", async () => {
+  it("borrar una clase del historial baja el contador", async () => {
     await firmar("kids", 3);
-    await deshacerClase("kids");
+    const { historial } = await obtenerCuenta("kids", AGOSTO.anio, AGOSTO.mes);
+
+    await borrarClase(historial[0].id);
 
     expect((await obtenerCuenta("kids", AGOSTO.anio, AGOSTO.mes)).ficha.sesiones).toBe(2);
   });
@@ -330,11 +346,12 @@ describe("Economía suma PT, Lidomare y Kids", () => {
     expect(mes.horasTotales).toBeGreaterThanOrEqual(8);
   });
 
-  it("deshacer una clase de Kids también quita su hora", async () => {
+  it("borrar una clase de Kids también quita su hora", async () => {
     await firmar("kids", 3);
     const antes = (await agosto())!.horasTotales;
+    const { historial } = await obtenerCuenta("kids", AGOSTO.anio, AGOSTO.mes);
 
-    await deshacerClase("kids");
+    await borrarClase(historial[0].id);
 
     expect((await agosto())!.horasTotales).toBe(antes - 1);
   });
@@ -369,5 +386,30 @@ describe("las dos cuentas no ensucian los datos de PT", () => {
 
     expect((await julio())?.facturacionTotal ?? 0).toBeCloseTo(antes?.facturacionTotal ?? 0, 2);
     expect((await julio())?.horasTotales ?? 0).toBe(antes?.horasTotales ?? 0);
+  });
+});
+
+describe("firmar de un toque desde la lista", () => {
+  beforeEach(() => reiniciarStagingParaPruebas());
+
+  it("firmar sin clave de un solo uso funciona igual", async () => {
+    // Desde la tarjeta de la lista no hay una carga de página por cliente que
+    // genere esa clave, así que se firma sin ella (2026-08-08). El botón se
+    // desactiva al pulsarlo, que es la protección que queda ahí.
+    const { firmarSesion } = await import("@/services/sesiones");
+    const [cliente] = await repositorio().listarClientes();
+
+    const antes = (await repositorio().listarSesiones(cliente.id)).length;
+    await firmarSesion(cliente.id, { fecha: "2026-08-10" });
+
+    expect((await repositorio().listarSesiones(cliente.id)).length).toBe(antes + 1);
+  });
+
+  it("una cuenta de CrossFit se firma igual desde la lista que desde su ficha", async () => {
+    await firmarClase("lidomare", "2026-08-10");
+    const desdeLista = (await obtenerCuenta("lidomare", AGOSTO.anio, AGOSTO.mes)).ficha;
+
+    expect(desdeLista.sesiones).toBe(1);
+    expect(desdeLista.facturacion).toBe(TARIFA_LIDOMARE);
   });
 });

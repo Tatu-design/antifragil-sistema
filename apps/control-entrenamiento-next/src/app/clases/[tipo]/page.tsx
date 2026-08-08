@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
-import { AccionesClase } from "@/components/AccionesClase";
+import { AccionesClase, BorrarClase } from "@/components/AccionesClase";
 import { BarraInferior } from "@/components/BarraInferior";
 import { Iconos, Icono } from "@/components/Iconos";
 import { SinConexion } from "@/components/SinConexion";
@@ -35,7 +35,7 @@ export default async function PaginaClase({
   searchParams,
 }: {
   params: Promise<{ tipo: string }>;
-  searchParams: Promise<{ firmada?: string; deshecha?: string; facturado?: string }>;
+  searchParams: Promise<{ firmada?: string; borrada?: string; facturado?: string; error?: string }>;
 }) {
   if (!(await haySesion())) redirect("/login");
 
@@ -54,7 +54,7 @@ export default async function PaginaClase({
   }
 
   const { ficha, historial } = vista;
-  const { firmada, deshecha, facturado } = await searchParams;
+  const { firmada, borrada, facturado, error: fallo } = await searchParams;
 
   return (
     <>
@@ -71,7 +71,8 @@ export default async function PaginaClase({
         </div>
 
         {firmada && <div className="aviso-guardado">✔ Clase firmada — {fechaEs(firmada)}</div>}
-        {deshecha && <div className="aviso-guardado">✔ Clase deshecha — {fechaEs(deshecha)}</div>}
+        {borrada && <div className="aviso-guardado">✔ Clase borrada — {fechaEs(borrada)}</div>}
+        {fallo && <div className="aviso-error">{fallo}</div>}
         {facturado && <div className="aviso-guardado">✔ Facturación guardada — {facturado}</div>}
 
         <div className="perfil-hero">
@@ -151,12 +152,7 @@ export default async function PaginaClase({
           )}
         </div>
 
-        <AccionesClase
-          tipo={ficha.tipo}
-          nombre={ficha.nombre}
-          hayClases={historial.length > 0}
-          esKids={ficha.referencia !== null}
-        />
+        <AccionesClase tipo={ficha.tipo} esKids={ficha.referencia !== null} />
 
         <div className="lista historial">
           <div className="cabecera-seccion">
@@ -172,10 +168,11 @@ export default async function PaginaClase({
               <div key={clase.id} className="fila">
                 <div className="sesion-fila">
                   <div className="sesion-badge">{historial.length - indice}</div>
-                  <div className="sesion-info">
+                  <div className="sesion-info" style={{ flex: 1 }}>
                     <div className="fecha">{fechaEs(clase.fecha)}</div>
                     <div className="tipo">{ficha.nombre}</div>
                   </div>
+                  <BorrarClase id={clase.id} tipo={ficha.tipo} fecha={fechaEs(clase.fecha)} />
                 </div>
               </div>
             ))

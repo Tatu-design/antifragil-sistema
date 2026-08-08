@@ -511,6 +511,19 @@ export class RepositorioPostgres implements Repositorio {
     return cuenta;
   }
 
+  async borrarClase(id: string): Promise<{ fecha: string; tipo: TipoClase } | null> {
+    const filas = await consultar(
+      "delete from clases_grupo where id = $1 returning to_char(fecha,'YYYY-MM-DD') as fecha, tipo",
+      [id],
+    );
+    if (!filas[0]) return null;
+    const borrada = { fecha: String(filas[0].fecha), tipo: filas[0].tipo as TipoClase };
+    // Igual que `deshacerUltimaClase`: si era de Lidomare, su dinero sale
+    // también de la semana. Si no, quedarían 15 € contados sin clase detrás.
+    if (borrada.tipo === "lidomare") await this.sumarASemana(borrada.fecha, TARIFA_LIDOMARE, -1);
+    return borrada;
+  }
+
   async clasesDelMes(tipo: TipoClase, anio: number, mes: number): Promise<ClaseGrupo[]> {
     const desde = `${anio}-${String(mes).padStart(2, "0")}-01`;
     const filas = await consultar(

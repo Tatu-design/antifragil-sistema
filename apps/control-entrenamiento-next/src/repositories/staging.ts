@@ -399,6 +399,18 @@ export class RepositorioStaging implements Repositorio {
     return cuenta;
   }
 
+  async borrarClase(id: string): Promise<{ fecha: string; tipo: TipoClase } | null> {
+    const datos = await cargar();
+    const indice = datos.clases.findIndex((c) => c.id === id);
+    if (indice < 0) return null;
+    const [clase] = datos.clases.splice(indice, 1);
+    await volcar();
+    // Igual que `deshacerUltimaClase`: si era de Lidomare, su dinero sale
+    // también de la semana. Si no, quedarían 15 € contados sin clase detrás.
+    if (clase.tipo === "lidomare") await this.sumarASemana(clase.fecha, TARIFA_LIDOMARE, -1);
+    return { fecha: clase.fecha, tipo: clase.tipo };
+  }
+
   async clasesDelMes(tipo: TipoClase, anio: number, mes: number): Promise<ClaseGrupo[]> {
     const datos = await cargar();
     const prefijo = `${anio}-${String(mes).padStart(2, "0")}`;
