@@ -52,7 +52,7 @@ import { MENSUALIDAD, type Modalidad } from "@/domain/modalidades";
 import type { CargoMensual, Ciclo, Cliente, Estado, Sesion } from "@/domain/tipos";
 import { TARIFA_LIDOMARE } from "@/domain/economia";
 import { rangoSemana } from "@/lib/fechas";
-import type { Aviso, ClaseGrupo, DatosDeLaLista, Repositorio, SemanaEconomica } from "./tipos";
+import type { Aviso, ClaseGrupo, DatosDeLaLista, DatosMes, Repositorio, SemanaEconomica } from "./tipos";
 
 // -----------------------------------------------------------------------------
 // Conexión
@@ -79,8 +79,16 @@ function pool(): Pool {
       // El plan gratuito de Supabase da pocas conexiones y esto puede correr
       // en varias instancias a la vez.
       max: 3,
-      idleTimeoutMillis: 10_000,
+      // Abrir una conexión nueva cuesta unos 700 ms (saludo TCP + cifrado +
+      // autenticación) ANTES de la primera consulta. Con los 10 segundos de
+      // antes, cualquier pausa normal —mirar un cliente, guardar el móvil,
+      // volver a los dos minutos— cerraba la conexión y la siguiente pantalla
+      // pagaba otra vez esos 700 ms. Un minuto cubre el uso real sin acaparar
+      // conexiones del plan gratuito (2026-08-08).
+      idleTimeoutMillis: 60_000,
       connectionTimeoutMillis: 15_000,
+      // Que la red no dé por muerta una conexión que solo está en silencio.
+      keepAlive: true,
     });
   }
   return g.pool;
@@ -564,6 +572,88 @@ export class RepositorioPostgres implements Repositorio {
        order by 1 desc, 2 desc`,
     );
     return filas.map((f) => ({ anio: Number(f.anio), mes: Number(f.mes) }));
+  }
+
+  /**
+   * Todos los meses de una vez, en cinco consultas fijas.
+   *
+   * Cada consulta trae su tabla entera agrupada por mes y el reparto se hace
+   * aquí, en memoria. Es deliberado: contra Supabase lo caro no es la
+   * consulta, es el viaje de ida y vuelta (unos 20 ms desde el servidor de
+   * París, unos 110 ms desde un portátil en España). Cinco viajes largos
+   * ganan siempre a sesenta cortos.
+   *
+   * El volumen no preocupa: son las sesiones de un entrenador personal, unos
+   * pocos miles de filas en toda la historia del negocio.
+   */
+  async datosDeTodosLosMeses(): Promise<Array<{ anio: number; mes: number } & DatosMes>> {
+    const clave = (anio: number, mes: number) => `${anio}-${String(mes).padStart(2, "0")}`;
+
+    const [sesiones, cargos, clases, ajustes, kids] = await Promise.all([
+      consultar(
+        `select to_char(s.fecha,'YYYY-MM-DD') as fecha, s.tarifa,
+                coalesce(c.modalidad::text, 'bono') as modalidad
+           from sesiones s
+           left join ciclos c on c.cliente_id = s.cliente_id and c.ciclo = s.ciclo`,
+      ),
+      consultar("select anio, mes, importe from cargos_mensuales"),
+      consultar(
+        `select extract(year from fecha)::int as anio, extract(month from fecha)::int as mes,
+                tipo, count(*)::int as n
+           from clases_grupo group by 1, 2, 3`,
+      ),
+      consultar("select anio, mes, origen, importe, horas, motivo from ajustes_mensuales order by origen"),
+      consultar("select anio, mes, importe from facturacion_kids_mensual"),
+    ]);
+
+    // Un mes existe si algo lo menciona, aunque sea solo una cuota o un
+    // ajuste: si no se incluyera, ese dinero desaparecería de la pantalla.
+    const meses = new Map<string, { anio: number; mes: number } & DatosMes>();
+    const mesDe = (anio: number, mes: number) => {
+      const k = clave(anio, mes);
+      let m = meses.get(k);
+      if (!m) {
+        m = {
+          anio,
+          mes,
+          sesiones: [],
+          cuotas: [],
+          clasesLidomare: 0,
+          clasesKids: 0,
+          facturacionKids: null,
+          ajustes: [],
+        };
+        meses.set(k, m);
+      }
+      return m;
+    };
+
+    for (const s of sesiones) {
+      const f = fecha(s.fecha)!;
+      mesDe(Number(f.slice(0, 4)), Number(f.slice(5, 7))).sesiones.push({
+        fecha: f,
+        tarifa: numero(s.tarifa),
+        modalidad: s.modalidad as Modalidad,
+      });
+    }
+    for (const c of cargos) mesDe(Number(c.anio), Number(c.mes)).cuotas.push(Number(c.importe));
+    for (const c of clases) {
+      const m = mesDe(Number(c.anio), Number(c.mes));
+      if (c.tipo === "kids") m.clasesKids = Number(c.n);
+      else if (c.tipo === "lidomare") m.clasesLidomare = Number(c.n);
+    }
+    for (const a of ajustes) {
+      mesDe(Number(a.anio), Number(a.mes)).ajustes.push({
+        origen: a.origen as string,
+        importe: Number(a.importe),
+        horas: Number(a.horas),
+        motivo: a.motivo as string,
+      });
+    }
+    for (const k of kids) mesDe(Number(k.anio), Number(k.mes)).facturacionKids = Number(k.importe);
+
+    // Del más reciente al más antiguo, como los enseña la pantalla.
+    return [...meses.entries()].sort((a, b) => b[0].localeCompare(a[0])).map(([, m]) => m);
   }
 
   async datosDelMes(anio: number, mes: number) {

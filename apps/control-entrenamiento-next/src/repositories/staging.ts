@@ -444,6 +444,50 @@ export class RepositorioStaging implements Repositorio {
       .map((k) => ({ anio: Number(k.slice(0, 4)), mes: Number(k.slice(5, 7)) }));
   }
 
+  /**
+   * Todos los meses de una vez. Aquí no ahorra viajes de red —no los hay—
+   * pero tiene que existir y dar exactamente el mismo resultado que en
+   * Postgres, o las pruebas dejarían de comprobar lo que corre de verdad.
+   *
+   * No se apoya en `mesesConDatos` ni en `datosDelMes` a propósito: la
+   * prueba de rendimiento cuenta llamadas al repositorio, y llamarse a sí
+   * mismo por dentro le haría contar viajes que en Postgres no existen.
+   */
+  async datosDeTodosLosMeses() {
+    const datos = await cargar();
+
+    const claves = new Set<string>();
+    for (const s of datos.sesiones) claves.add(s.fecha.slice(0, 7));
+    for (const c of datos.clases) claves.add(c.fecha.slice(0, 7));
+    for (const c of datos.cargos) claves.add(`${c.anio}-${String(c.mes).padStart(2, "0")}`);
+    for (const a of datos.ajustes) claves.add(`${a.anio}-${String(a.mes).padStart(2, "0")}`);
+
+    const modalidadDe = (clienteId: string, ciclo: number) =>
+      datos.ciclos.find((c) => c.clienteId === clienteId && c.ciclo === ciclo)?.modalidad ?? BONO;
+
+    return [...claves]
+      .sort((a, b) => b.localeCompare(a))
+      .map((prefijo) => {
+        const anio = Number(prefijo.slice(0, 4));
+        const mes = Number(prefijo.slice(5, 7));
+        return {
+          anio,
+          mes,
+          sesiones: datos.sesiones
+            .filter((s) => s.fecha.startsWith(prefijo))
+            .map((s) => ({ fecha: s.fecha, tarifa: s.tarifa, modalidad: modalidadDe(s.clienteId, s.ciclo) })),
+          cuotas: datos.cargos.filter((c) => c.anio === anio && c.mes === mes).map((c) => c.importe),
+          clasesLidomare: datos.clases.filter((c) => c.tipo === "lidomare" && c.fecha.startsWith(prefijo)).length,
+          clasesKids: datos.clases.filter((c) => c.tipo === "kids" && c.fecha.startsWith(prefijo)).length,
+          facturacionKids:
+            datos.facturacionKids.find((f) => f.anio === anio && f.mes === mes)?.importe ?? null,
+          ajustes: datos.ajustes
+            .filter((a) => a.anio === anio && a.mes === mes)
+            .map((a) => ({ origen: a.origen, importe: a.importe, horas: a.horas, motivo: a.motivo })),
+        };
+      });
+  }
+
   async datosDelMes(anio: number, mes: number) {
     const datos = await cargar();
     const prefijo = `${anio}-${String(mes).padStart(2, "0")}`;

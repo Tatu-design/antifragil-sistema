@@ -128,6 +128,17 @@ export interface Repositorio {
   /** Los meses con algo que enseñar, del más reciente al más antiguo. */
   mesesConDatos(): Promise<Array<{ anio: number; mes: number }>>;
   datosDelMes(anio: number, mes: number): Promise<DatosMes>;
+  /**
+   * Lo mismo que `datosDelMes`, pero de TODOS los meses de una vez.
+   *
+   * Existe por una razón de velocidad, no de comodidad. Economía enseña todos
+   * los meses, y pedirlos uno a uno costaba cinco viajes de red por mes: con
+   * cinco meses eran veinticinco, y en diciembre habrían sido sesenta. La
+   * pantalla se iba haciendo más lenta sola, sin que nadie tocara nada.
+   *
+   * Así son cinco viajes en total, hoy y dentro de tres años.
+   */
+  datosDeTodosLosMeses(): Promise<Array<{ anio: number; mes: number } & DatosMes>>;
 
   /** Sesiones de hoy de ese cliente que aún no ha confirmado. */
   sesionesSinConfirmarHoy(clienteId: string, hoy: string): Promise<Sesion[]>;

@@ -1253,9 +1253,11 @@ a.pill { text-decoration: none; }
   margin-bottom: 0.75rem;
 }
 
-/* El mes en curso pesa más: es el que se mira todos los días. */
+/* El mes en curso se distingue solo por ir el primero y por el borde: mismo
+   tamaño de letra que los demás. Con la letra más grande, un importe de cuatro
+   cifras no cabía en su columna y partía el símbolo del euro a la línea
+   siguiente (2026-08-08). */
 .mes-economico.destacado {
-  padding: 1.35rem 1.35rem 1.5rem;
   margin-bottom: 2rem;
   border-color: rgba(31, 169, 154, 0.28);
 }
@@ -1281,7 +1283,9 @@ a.pill { text-decoration: none; }
    sin desplazamiento lateral. */
 .mes-economico-cifras {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  /* La facturación es la cifra más larga: se le da algo más de sitio en vez
+     de repartir a partes iguales. */
+  grid-template-columns: 1.3fr 0.7fr 1fr;
   gap: 0.5rem;
 }
 
@@ -1304,12 +1308,14 @@ a.pill { text-decoration: none; }
   font-size: 1.0625rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  /* Que un importe largo no empuje a las otras dos columnas. */
-  overflow-wrap: anywhere;
+  /* El importe no se parte nunca: «1.147,50 €» en una línea o nada. */
+  white-space: nowrap;
 }
 
-.mes-economico.destacado .mes-economico-cifras .valor {
-  font-size: 1.5rem;
+/* Con importes de cinco cifras la columna se queda justa en pantallas
+   estrechas. Antes que partir el número, se encoge un punto. */
+@media (max-width: 380px) {
+  .mes-economico-cifras .valor { font-size: 0.9375rem; }
 }
 
 .titulo-seccion {

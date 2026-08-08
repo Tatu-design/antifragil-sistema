@@ -24,6 +24,7 @@ import { listarClientes, obtenerPerfil } from "@/services/clientes";
 import { contarNoLeidos } from "@/services/avisos";
 import { obtenerCuenta } from "@/services/clases";
 import { obtenerEconomia } from "@/services/economia";
+import { firmarSesion } from "@/services/sesiones";
 import { obtenerPerfilPublico } from "@/services/publico";
 
 /**
@@ -61,10 +62,16 @@ const PRESUPUESTO = {
   "lista de clientes": 3,
   "perfil de un cliente": 4,
   "perfil público del cliente": 5,
-  /** Bajó de 8 a 5 el 2026-08-08: la pantalla dejó de enseñar la semana, así
-   *  que dejó de pedir `listarSemanas` y `contarClases`. Son un viaje de red
-   *  para los meses con datos y uno más para el mes en curso. */
-  economía: 5,
+  /**
+   * Bajó de 8 a 5 y de 5 a 1 el 2026-08-08.
+   *
+   * Primero dejó de enseñar la semana (fuera `listarSemanas` y `contarClases`).
+   * Después dejó de pedir los meses uno a uno: eso costaba cinco viajes de red
+   * POR MES, así que la pantalla se hacía más lenta sola cada vez que pasaba
+   * un mes. Ahora es una sola llamada, y por eso el presupuesto es 1: si
+   * alguna vez vuelve a subir, es que ha vuelto el problema.
+   */
+  economía: 1,
   "ficha de una cuenta de CrossFit": 2,
   /** La pantalla entera: clientes, avisos y las dos cuentas de CrossFit.
    *  Las cuatro cargas se lanzan a la vez, así que en tiempo es como una. */
@@ -135,6 +142,30 @@ describe("presupuesto de consultas por pantalla", () => {
       contador.total(),
       `economía hizo ${contador.total()} consultas: ${JSON.stringify(contador.porMetodo())}`,
     ).toBeLessThanOrEqual(PRESUPUESTO.economía);
+  });
+
+  it("economía no se hace más lenta según pasan los meses", async () => {
+    // Esta es la prueba que de verdad importa. Un presupuesto fijo se puede
+    // cumplir hoy y romperse solo en diciembre si el coste depende de cuántos
+    // meses lleve el negocio funcionando. Aquí se mide con pocos meses y con
+    // muchos, y tiene que costar lo mismo.
+    const contador = contarConsultas();
+    await obtenerEconomia();
+    const conPocosMeses = contador.total();
+
+    // Un año y medio largo de historia repartida por meses distintos.
+    for (let i = 0; i < 20; i += 1) {
+      const mes = String((i % 12) + 1).padStart(2, "0");
+      await firmarSesion("cli-a", { fecha: `${2024 + Math.floor(i / 12)}-${mes}-05` });
+    }
+
+    const contador2 = contarConsultas();
+    await obtenerEconomia();
+
+    expect(
+      contador2.total(),
+      `con más meses pasó de ${conPocosMeses} a ${contador2.total()} consultas: el coste crece con el tiempo`,
+    ).toBe(conPocosMeses);
   });
 
   it("economía ya no pide las semanas ni las clases de la semana", async () => {

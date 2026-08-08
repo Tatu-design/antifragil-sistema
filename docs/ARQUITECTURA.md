@@ -1746,6 +1746,36 @@ el orden original está completa; quedan ajustes y pulido según el uso real.
 - Milestone 3 de `webapp/` (ver `docs/APRENDIZAJE_WEBAPP.md`): elegir dónde
   alojar la web app ahora que ya no depende de un archivo Excel local
 
+## Rendimiento de la app de Vercel: el coste que crecía solo (2026-08-08)
+
+Fernando volvió a decir que la app iba lenta después de haberla optimizado.
+Medir la app desplegada, y no el código en local, dio el diagnóstico:
+
+- **La región no era el problema.** Las funciones corren en `cdg1` (París) y
+  Supabase está en `eu-west-1` (Irlanda): unos 20 ms entre ellas. Se
+  descartó.
+- **El middleware tampoco.** Solo mira si existe la cookie, no toca la base.
+- **El problema era Economía**, y era de los que empeoran solos: pedía los
+  datos **mes a mes**, y cada mes costaba cinco viajes de red. Con tres meses
+  eran 15 viajes; en diciembre habrían sido 60. Cada mes que pasara, la
+  pantalla iría un poco más lenta sin que nadie tocara nada.
+
+La solución es `datosDeTodosLosMeses()`: cinco consultas que traen sus tablas
+enteras agrupadas por mes, y el reparto se hace en memoria. **Cinco viajes,
+hoy y dentro de tres años.** Medido contra la base real: 15 consultas y
+1842 ms → 5 consultas y 509 ms (3,6× más rápida).
+
+Lo protege una prueba en `tests/rendimiento.test.ts` que no comprueba un
+número fijo, sino que el coste **no cambia** al añadir veinte meses de
+historia. Un presupuesto fijo se cumple hoy y se rompe solo en diciembre; esta
+prueba no.
+
+Segundo arreglo, en el pool de conexiones: abrir una conexión cuesta unos
+700 ms (saludo TCP, cifrado y autenticación) antes de la primera consulta, y
+se cerraba a los 10 segundos de inactividad. Cualquier pausa normal —mirar un
+cliente, guardar el móvil, volver a los dos minutos— hacía pagar esos 700 ms
+otra vez. Ahora aguanta un minuto, con `keepAlive`.
+
 ## Principios de arquitectura (de SYSTEM_VISION.md)
 
 - Módulos independientes: Calendar, base de datos de clientes, resumen

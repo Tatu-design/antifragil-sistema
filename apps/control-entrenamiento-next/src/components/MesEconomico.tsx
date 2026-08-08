@@ -1,11 +1,13 @@
 import type { ResumenMes } from "@/domain/economia";
-import { eurosPlano, mesEs } from "@/lib/formato";
+import { euros, mesEs } from "@/lib/formato";
 
 /**
  * Un mes de Economía: su nombre y sus tres cifras.
  *
- * `destacado` es el mes en curso, que va arriba y con más peso visual. Los
- * anteriores usan el mismo lenguaje, más compacto.
+ * Todos los meses se ven igual (decisión de Fernando, 2026-08-08). El mes en
+ * curso llegó a ir en un tamaño mayor y el importe no cabía: partía el símbolo
+ * del euro a la línea siguiente. Se distingue solo por ir el primero y por un
+ * borde algo más marcado.
  *
  * **No es pulsable a propósito.** El detalle de cada mes será otra iteración;
  * mientras tanto no debe parecer un botón que no lleva a ningún sitio.
@@ -26,7 +28,7 @@ export function MesEconomico({ mes, destacado = false }: { mes: ResumenMes; dest
       <div className="mes-economico-cifras">
         <div className="cifra">
           <span className="etiqueta">Facturación</span>
-          <span className="valor">{eurosPlano(mes.facturacionTotal)}</span>
+          <span className="valor">{euros(mes.facturacionTotal)}</span>
         </div>
         <div className="cifra">
           <span className="etiqueta">Horas</span>
@@ -37,7 +39,7 @@ export function MesEconomico({ mes, destacado = false }: { mes: ResumenMes; dest
           {/* Un guion, no un número inventado: sin horas no hay media, y con
               Kids sin facturar la media saldría a la baja. */}
           <span className="valor">
-            {mes.horasTotales > 0 && mes.precioMedioFiable ? eurosPlano(mes.precioMedioHora) : "—"}
+            {mes.horasTotales > 0 && mes.precioMedioFiable ? euros(mes.precioMedioHora) : "—"}
           </span>
         </div>
       </div>

@@ -37,6 +37,11 @@ export interface VistaEconomia {
  *
  * El mes en curso se calcula aparte y siempre, aunque no tenga ninguna sesión
  * todavía: la pantalla debe enseñar su bloque en cero el día 1, no un hueco.
+ *
+ * TODO se pide en una sola llamada al repositorio (2026-08-08). Antes se
+ * pedía mes a mes, y como cada mes costaba cinco viajes de red, la pantalla
+ * se volvía más lenta cada mes que pasaba: sesenta viajes en diciembre contra
+ * veinticinco en agosto. Ahora son cinco, siempre.
  */
 export async function obtenerEconomia(): Promise<VistaEconomia> {
   const repo = repositorio();
@@ -44,18 +49,26 @@ export async function obtenerEconomia(): Promise<VistaEconomia> {
   const anio = Number(hoy.slice(0, 4));
   const mes = Number(hoy.slice(5, 7));
 
-  const conDatos = await repo.mesesConDatos();
-  const anteriores = conDatos.filter((m) => m.anio !== anio || m.mes !== mes);
+  const todos = await repo.datosDeTodosLosMeses();
+  const esActual = (m: { anio: number; mes: number }) => m.anio === anio && m.mes === mes;
 
-  // El mes en curso y los anteriores se calculan a la vez.
-  const [mesActual, ...resto] = await Promise.all([
-    repo.datosDelMes(anio, mes).then((datos) => resumirMes({ anio, mes, ...datos })),
-    ...anteriores.map(async (m) =>
-      resumirMes({ anio: m.anio, mes: m.mes, ...(await repo.datosDelMes(m.anio, m.mes)) }),
-    ),
-  ]);
+  // El día 1, con el mes recién empezado, no hay ninguna fila que lo
+  // mencione: se construye vacío para que la pantalla enseñe ceros, no hueco.
+  const actual = todos.find(esActual) ?? {
+    anio,
+    mes,
+    sesiones: [],
+    cuotas: [],
+    clasesLidomare: 0,
+    clasesKids: 0,
+    facturacionKids: null,
+    ajustes: [],
+  };
 
-  return { mesActual, anteriores: resto };
+  return {
+    mesActual: resumirMes(actual),
+    anteriores: todos.filter((m) => !esActual(m)).map(resumirMes),
+  };
 }
 
 export async function obtenerMes(anio: number, mes: number): Promise<ResumenMes | null> {
