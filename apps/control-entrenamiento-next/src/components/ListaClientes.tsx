@@ -2,9 +2,6 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { useFormStatus } from "react-dom";
-
-import { accionFirmar, accionFirmarClase } from "@/app/actions";
 
 import type { FichaClase } from "@/domain/clases";
 import type { ClienteEnLista } from "@/services/clientes";
@@ -89,14 +86,14 @@ export function ListaClientes({
         ))}
 
         {clientes.map((cliente) => (
-          <div
+          <Link
             key={cliente.id}
             className="tarjeta-cliente"
+            href={`/clientes/${cliente.id}`}
             data-estado={cliente.estado}
             data-pendiente={cliente.debe ? "si" : "no"}
             hidden={!visible(cliente)}
           >
-            <Link className="tarjeta-cuerpo" href={`/clientes/${cliente.id}`}>
             {/* Dos etiquetas para dos cosas distintas (2026-08-05): la
                 continuidad del cliente y su deuda. Nunca se mezclan en una
                 sola, y la de pago se ve SIEMPRE — un pausado o un cancelado
@@ -129,19 +126,7 @@ export function ListaClientes({
             ) : (
               <div className="meta">{sinBarra(cliente)}</div>
             )}
-            </Link>
-
-            {/* Firmar con UN toque, sin entrar en la ficha (2026-08-08).
-                No pregunta: si sobra una sesión se borra del historial, y
-                preguntar en algo que se hace varias veces al día molesta más
-                de lo que protege. Solo aparece si de verdad se puede firmar. */}
-            {cliente.ficha.puedeFirmar && (
-              <form action={accionFirmar} className="tarjeta-firmar">
-                <input type="hidden" name="clienteId" value={cliente.id} />
-                <BotonFirmarRapido />
-              </form>
-            )}
-          </div>
+          </Link>
         ))}
       </div>
 
@@ -164,8 +149,7 @@ export function ListaClientes({
  */
 function TarjetaCuenta({ cuenta, oculta }: { cuenta: FichaClase; oculta: boolean }) {
   return (
-    <div className="tarjeta-cliente tarjeta-cuenta" hidden={oculta}>
-      <Link className="tarjeta-cuerpo" href={`/clases/${cuenta.tipo}`}>
+    <Link className="tarjeta-cliente tarjeta-cuenta" href={`/clases/${cuenta.tipo}`} hidden={oculta}>
       <div className="cabecera">
         <span className="nombre">{cuenta.nombre}</span>
         <span className="etiquetas">
@@ -198,24 +182,7 @@ function TarjetaCuenta({ cuenta, oculta }: { cuenta: FichaClase; oculta: boolean
           {euros(cuenta.facturacion ?? 0)}
         </div>
       )}
-      </Link>
-
-      <form action={accionFirmarClase} className="tarjeta-firmar">
-        <input type="hidden" name="tipo" value={cuenta.tipo} />
-        <BotonFirmarRapido />
-      </form>
-    </div>
-  );
-}
-
-/** El botón de firmar de una tarjeta. Se desactiva al pulsarlo, que es lo que
- *  impide que un doble toque cuente dos sesiones. */
-function BotonFirmarRapido() {
-  const { pending } = useFormStatus();
-  return (
-    <button type="submit" className="boton-firmar-rapido" disabled={pending}>
-      {pending ? "Guardando…" : "✓ Firmar sesión"}
-    </button>
+    </Link>
   );
 }
 

@@ -388,28 +388,3 @@ describe("las dos cuentas no ensucian los datos de PT", () => {
     expect((await julio())?.horasTotales ?? 0).toBe(antes?.horasTotales ?? 0);
   });
 });
-
-describe("firmar de un toque desde la lista", () => {
-  beforeEach(() => reiniciarStagingParaPruebas());
-
-  it("firmar sin clave de un solo uso funciona igual", async () => {
-    // Desde la tarjeta de la lista no hay una carga de página por cliente que
-    // genere esa clave, así que se firma sin ella (2026-08-08). El botón se
-    // desactiva al pulsarlo, que es la protección que queda ahí.
-    const { firmarSesion } = await import("@/services/sesiones");
-    const [cliente] = await repositorio().listarClientes();
-
-    const antes = (await repositorio().listarSesiones(cliente.id)).length;
-    await firmarSesion(cliente.id, { fecha: "2026-08-10" });
-
-    expect((await repositorio().listarSesiones(cliente.id)).length).toBe(antes + 1);
-  });
-
-  it("una cuenta de CrossFit se firma igual desde la lista que desde su ficha", async () => {
-    await firmarClase("lidomare", "2026-08-10");
-    const desdeLista = (await obtenerCuenta("lidomare", AGOSTO.anio, AGOSTO.mes)).ficha;
-
-    expect(desdeLista.sesiones).toBe(1);
-    expect(desdeLista.facturacion).toBe(TARIFA_LIDOMARE);
-  });
-});
