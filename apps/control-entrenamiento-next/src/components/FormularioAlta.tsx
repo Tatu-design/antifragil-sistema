@@ -15,10 +15,23 @@ import { CamposServicio, detalleServicio, valoresIniciales, type ValoresServicio
  * programa de un catálogo, aquí se describen las condiciones igual que en
  * «Editar programa» — el catálogo de programas no existe en el modelo nuevo.
  */
-export function FormularioAlta() {
+export function FormularioAlta({
+  profesionales = [],
+  porDefecto = "",
+}: {
+  /** Quiénes pueden llevarlo. Solo llega si hay más de uno. */
+  profesionales?: Array<{ id: string; nombre: string }>;
+  /** El administrador que está dando de alta: lo normal es que sea suyo. */
+  porDefecto?: string;
+}) {
   const [nombre, setNombre] = useState("");
   const [servicio, setServicio] = useState<ValoresServicio>(valoresIniciales());
+  const [entrenadorId, setEntrenadorId] = useState(porDefecto);
   const [revisando, setRevisando] = useState(false);
+
+  // Con un solo profesional no hay nada que elegir: el campo sobra.
+  const hayQueElegir = profesionales.length > 1;
+  const responsable = profesionales.find((p) => p.id === entrenadorId)?.nombre ?? "—";
 
   if (!revisando) {
     return (
@@ -43,6 +56,19 @@ export function FormularioAlta() {
               onChange={(e) => setNombre(e.target.value)}
             />
           </label>
+
+          {hayQueElegir && (
+            <label className="campo">
+              <span>Quién lo lleva</span>
+              <select value={entrenadorId} onChange={(e) => setEntrenadorId(e.target.value)}>
+                {profesionales.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.nombre}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
 
           <CamposServicio valores={servicio} alCambiar={setServicio} />
 
@@ -76,6 +102,12 @@ export function FormularioAlta() {
           <span className="etiqueta">Condiciones</span>
           <span className="despues">{detalleServicio(servicio)}</span>
         </div>
+        {hayQueElegir && (
+          <div className="fila">
+            <span className="etiqueta">Quién lo lleva</span>
+            <span className="despues">{responsable}</span>
+          </div>
+        )}
       </div>
 
       {servicio.modalidad === "mensualidad" && (
@@ -94,6 +126,7 @@ export function FormularioAlta() {
         <input type="hidden" name="cuotaMensual" value={servicio.cuotaMensual} />
         <input type="hidden" name="sesionesReferencia" value={servicio.sesionesReferencia} />
         <input type="hidden" name="tarifa" value={servicio.tarifa} />
+        <input type="hidden" name="entrenadorId" value={entrenadorId} />
         <Crear />
       </form>
 

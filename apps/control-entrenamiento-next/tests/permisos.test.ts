@@ -20,6 +20,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { BONO } from "@/domain/modalidades";
 import { esAdmin, puedeVerCliente } from "@/lib/permisos";
 import { repositorio } from "@/repositories";
 import { reiniciarStagingParaPruebas } from "@/repositories/staging";
@@ -129,6 +130,42 @@ describe("qué datos salen de la base", () => {
     const repo = repositorio();
     expect(await repo.perfilPorCorreo(ADMIN.correo)).not.toBeNull();
     expect(await repo.perfilPorCorreo("nadie@pruebas.local")).toBeNull();
+  });
+
+  it("un cliente creado para el entrenador aparece en SU lista, no en la de nadie más", async () => {
+    // Es el caso real: Fernando da de alta al cliente de Rafa. Si el alta no
+    // guardara el responsable, el cliente nacería sin dueño y Rafa no lo
+    // vería nunca — que es justo lo que pasaba antes de añadir el selector.
+    const { crearCliente } = await import("@/services/clientes");
+    const nuevo = await crearCliente({
+      nombre: "Cliente de prueba",
+      modalidad: BONO,
+      servicio: "Bono 10",
+      sesionesTotales: 10,
+      precioTotal: 450,
+      tarifa: 45,
+      entrenadorId: RAFA.id,
+    });
+
+    const deRafa = await listarClientes(RAFA.id);
+    expect(deRafa.map((c) => c.id)).toContain(nuevo.id);
+    expect(await listarClientes(OTRO.id)).toEqual([]);
+  });
+
+  it("sin responsable, un cliente nuevo no aparece en la lista de ningún entrenador", async () => {
+    const { crearCliente } = await import("@/services/clientes");
+    const huerfano = await crearCliente({
+      nombre: "Cliente sin dueño",
+      modalidad: BONO,
+      servicio: "Bono 10",
+      sesionesTotales: 10,
+      precioTotal: 450,
+      tarifa: 45,
+    });
+
+    expect((await listarClientes(RAFA.id)).map((c) => c.id)).not.toContain(huerfano.id);
+    // Pero el administrador sí lo ve: no se pierde.
+    expect((await listarClientes()).map((c) => c.id)).toContain(huerfano.id);
   });
 
   it("el administrador puede reasignar un cliente y el alcance cambia con él", async () => {

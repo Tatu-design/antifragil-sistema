@@ -20,6 +20,7 @@ import { redirect } from "next/navigation";
 import { ErrorDeNegocio } from "@/domain/modalidades";
 import { cerrarSesion, entrar, entrarConClaveUnica } from "@/lib/auth";
 import { exigirAccesoACliente, exigirAdmin, exigirUsuario } from "@/lib/permisos";
+import { listarProfesionales } from "@/repositories/perfiles";
 import {
   desdeFormulario,
   esquemaAlta,
@@ -147,12 +148,14 @@ export async function accionFirmar(datos: FormData): Promise<void> {
 
 /** «Confirmar y crear». Termina en la ficha del cliente nuevo, como Flask. */
 export async function accionCrearCliente(datos: FormData): Promise<void> {
-  await exigirAdmin();
+  const admin = await exigirAdmin();
   const validado = esquemaAlta.safeParse(desdeFormulario(datos));
   if (!validado.success) {
     const texto = validado.error.issues[0]?.message ?? "revisa los datos";
     redirect(`/clientes/nuevo?error=${encodeURIComponent(texto)}`);
   }
+
+  const profesionales = await listarProfesionales();
 
   let id: string;
   try {
@@ -165,6 +168,12 @@ export async function accionCrearCliente(datos: FormData): Promise<void> {
       cuotaMensual: validado.data.cuotaMensual,
       tarifa: validado.data.tarifa,
       sesionesReferencia: validado.data.sesionesReferencia,
+      // El responsable, comprobado contra la lista real de profesionales: no
+      // se acepta un identificador cualquiera venido del formulario. Sin
+      // elegir nada, el cliente es de quien lo da de alta.
+      entrenadorId: profesionales.some((p) => p.id === validado.data.entrenadorId)
+        ? validado.data.entrenadorId
+        : admin.id,
     });
     id = cliente.id;
   } catch (error) {

@@ -4,6 +4,7 @@ import { FormularioAlta } from "@/components/FormularioAlta";
 import { Iconos } from "@/components/Iconos";
 
 import { exigirAdmin } from "@/lib/permisos";
+import { listarProfesionales } from "@/repositories/perfiles";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Nuevo cliente — Antifrágil" };
@@ -14,7 +15,8 @@ export default async function PaginaNuevoCliente({
 }: {
   searchParams: Promise<{ error?: string }>;
 }) {
-  await exigirAdmin();
+  const admin = await exigirAdmin();
+  const profesionales = await listarProfesionales();
 
   const { error: fallo } = await searchParams;
 
@@ -28,7 +30,7 @@ export default async function PaginaNuevoCliente({
 
         {fallo && <div className="aviso-error">{fallo}</div>}
 
-        <FormularioAlta />
+        <FormularioAlta profesionales={profesionales} porDefecto={admin.id} />
       </div>
     </>
   );
