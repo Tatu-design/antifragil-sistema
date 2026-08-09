@@ -19,10 +19,18 @@ import { fileURLToPath } from "node:url";
 import pg from "pg";
 
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
-const [correo, clave] = process.argv.slice(2);
+const [correo, clave, rol = "admin", ...resto] = process.argv.slice(2);
+const nombre = resto.join(" ").trim() || (correo ? correo.split("@")[0] : "");
 
 if (!correo || !clave) {
-  console.error("\n  Uso: node scripts/crear-usuario.mjs <correo> <contraseña>\n");
+  console.error(
+    "\n  Uso: node scripts/crear-usuario.mjs <correo> <contraseña> [rol] [nombre]\n" +
+      "       rol: admin | entrenador   (por defecto admin)\n",
+  );
+  process.exit(1);
+}
+if (rol !== "admin" && rol !== "entrenador") {
+  console.error(`\n  ✗ Rol desconocido: «${rol}». Solo hay dos: admin o entrenador.\n`);
   process.exit(1);
 }
 if (clave.length < 8) {
@@ -84,11 +92,14 @@ try {
       [id, id, correo],
     );
 
+    // El rol va en el perfil, no en la cuenta: `auth.users` dice quién eres y
+    // `perfiles` dice qué puedes hacer. Quitarle el perfil a alguien le retira
+    // el acceso sin tocar su cuenta de correo.
     await bd.query(
-      "insert into public.perfiles (id, nombre, rol) values ($1, $2, 'admin') on conflict (id) do nothing",
-      [id, correo.split("@")[0]],
+      "insert into public.perfiles (id, nombre, rol) values ($1, $2, $3) on conflict (id) do nothing",
+      [id, nombre, rol],
     );
-    console.log(`\n  ✓ Usuario creado: ${correo}\n`);
+    console.log(`\n  ✓ Usuario creado: ${correo} — ${nombre} (${rol})\n`);
   }
 
   await bd.query("commit");

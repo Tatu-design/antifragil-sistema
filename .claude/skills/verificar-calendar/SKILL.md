@@ -5,6 +5,12 @@ description: Comprobación semanal de solo lectura — compara lo que Fernando h
 
 # Skill: Verificar semana contra Calendar
 
+> ⚠️ **Este skill apunta a la aplicación ANTIGUA de Flask/PythonAnywhere**
+> (`tatu17.pythonanywhere.com`), que ya NO es la aplicación del proyecto.
+> La actual es la de Next.js + Supabase en Vercel. No ejecutes esto creyendo
+> que compruebas la app que usa Fernando: comprueba el respaldo. Está
+> pendiente de portarse.
+
 Desde el 2026-07-22, las sesiones se cuentan **firmando en la app**, no
 leyendo Calendar (ver `docs/ARQUITECTURA.md`). Este skill usa Calendar solo
 como comprobación al final de la semana: ¿coincide lo firmado con lo que

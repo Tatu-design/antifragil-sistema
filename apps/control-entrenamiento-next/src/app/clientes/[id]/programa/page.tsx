@@ -1,14 +1,15 @@
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 
 import { FormularioServicio } from "@/components/FormularioServicio";
 import { Iconos, Icono } from "@/components/Iconos";
 import { SinConexion } from "@/components/SinConexion";
 import { ETIQUETAS } from "@/domain/modalidades";
-import { haySesion } from "@/lib/auth";
 import { euros } from "@/lib/formato";
 import { BaseNoDisponible } from "@/repositories/postgres";
 import { obtenerPerfil } from "@/services/clientes";
+
+import { exigirAdmin } from "@/lib/permisos";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Editar programa — Antifrágil" };
@@ -21,7 +22,7 @@ export default async function PaginaPrograma({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ error?: string }>;
 }) {
-  if (!(await haySesion())) redirect("/login");
+  await exigirAdmin();
 
   const { id } = await params;
   let perfil;

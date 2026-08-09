@@ -14,6 +14,14 @@
 import type { SesionEconomica, TipoClase } from "@/domain/economia";
 import type { CargoMensual, Ciclo, Cliente, Sesion } from "@/domain/tipos";
 
+/** Un profesional que usa la aplicación. Los clientes NO son perfiles. */
+export interface Perfil {
+  id: string;
+  correo: string;
+  nombre: string;
+  rol: "admin" | "entrenador";
+}
+
 export interface SemanaEconomica {
   inicio: string;
   fin: string;
@@ -66,7 +74,14 @@ export interface DatosDeLaLista {
 }
 
 export interface Repositorio {
-  listarClientes(): Promise<Cliente[]>;
+  /**
+   * Los clientes. Con `soloDe`, únicamente los de ese profesional.
+   *
+   * El filtro va aquí y no en la pantalla a propósito: esconder tarjetas en el
+   * navegador no es seguridad — los datos habrían viajado igual al móvil de
+   * quien no debe verlos.
+   */
+  listarClientes(soloDe?: string | null): Promise<Cliente[]>;
   obtenerCliente(id: string): Promise<Cliente | null>;
   obtenerClientePorToken(token: string): Promise<Cliente | null>;
   crearCliente(cliente: Cliente, cicloInicial: Ciclo): Promise<void>;
@@ -84,7 +99,7 @@ export interface Repositorio {
    * segundos de espera. Esto lo deja en tres, sea cual sea el número de
    * clientes.
    */
-  cargarTodoParaLaLista(): Promise<DatosDeLaLista>;
+  cargarTodoParaLaLista(soloDe?: string | null): Promise<DatosDeLaLista>;
   listarCiclos(clienteId: string): Promise<Ciclo[]>;
   guardarCiclo(ciclo: Ciclo): Promise<void>;
 
@@ -121,6 +136,22 @@ export interface Repositorio {
    * más antigua. Es el historial que enseña la ficha de cada cuenta.
    */
   clasesDelMes(tipo: TipoClase, anio: number, mes: number): Promise<ClaseGrupo[]>;
+
+  // ---------------------------------------------------------------------------
+  // Quién usa la aplicación
+  // ---------------------------------------------------------------------------
+  // Van en el mismo contrato que el resto para que las comprobaciones de
+  // permisos se puedan probar con el repositorio de pruebas. La seguridad es
+  // justo lo que no se puede dejar sin probar (2026-08-09).
+
+  /** El profesional con ese correo, o `null` si no tiene perfil. */
+  perfilPorCorreo(correo: string): Promise<Perfil | null>;
+  /** De quién es ese cliente. `null` si no existe o si no tiene responsable. */
+  profesionalDelCliente(clienteId: string): Promise<string | null>;
+  /** Todos los profesionales. Para el filtro del administrador. */
+  listarProfesionales(): Promise<Perfil[]>;
+  /** Asigna el responsable de un cliente. Solo el administrador. */
+  asignarProfesional(clienteId: string, profesionalId: string | null): Promise<void>;
 
   facturacionKids(anio: number, mes: number): Promise<number | null>;
   guardarFacturacionKids(anio: number, mes: number, importe: number): Promise<void>;

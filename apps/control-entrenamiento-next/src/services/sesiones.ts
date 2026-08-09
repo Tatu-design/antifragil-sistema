@@ -25,6 +25,14 @@ export interface OpcionesFirma {
   /** Valor de un solo uso por carga de página. Impide que un reintento de red
    *  o dos pestañas guarden la misma petición dos veces. */
   claveIdempotencia?: string;
+  /**
+   * Quién está firmando. Se guarda con la sesión para poder responder más
+   * adelante «¿qué hizo cada profesional?» sin tener que reconstruirlo.
+   *
+   * Es opcional porque la lógica de firma no depende de ello: el bono, el
+   * historial y la economía se comportan exactamente igual lo pongas o no.
+   */
+  firmadaPor?: string | null;
 }
 
 export async function firmarSesion(clienteId: string, opciones: OpcionesFirma = {}): Promise<ResultadoFirma> {
@@ -107,6 +115,7 @@ export async function firmarSesion(clienteId: string, opciones: OpcionesFirma = 
       tarifa,
       ciclo: ciclo.ciclo,
       servicio: ciclo.servicio,
+      firmadaPor: opciones.firmadaPor ?? null,
     };
     await repo.guardarSesion(sesion);
     await repo.sumarASemana(fecha, tarifa, 1);

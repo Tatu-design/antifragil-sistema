@@ -13,7 +13,23 @@ import { Icono } from "./Iconos";
  * Todo sale de `ficha`, que se construye desde el ciclo en curso: este
  * componente no decide nada ni mezcla dos fuentes.
  */
-export function PerfilHero({ clienteId, ficha }: { clienteId: string; ficha: FichaServicio }) {
+export function PerfilHero({
+  clienteId,
+  ficha,
+  verImportes = true,
+}: {
+  clienteId: string;
+  ficha: FichaServicio;
+  /**
+   * Si se enseñan las cantidades de dinero.
+   *
+   * Un entrenador ve lo que necesita para dar la sesión —qué servicio es,
+   * cuántas van y cuántas quedan— pero no el tarifario (decisión de Fernando,
+   * 2026-08-09). Sí ve y puede cambiar el estado de cobro: para eso no hace
+   * falta saber el importe.
+   */
+  verImportes?: boolean;
+}) {
   const plural = (n: number) => (n === 1 ? "sesión" : "sesiones");
 
   return (
@@ -38,13 +54,13 @@ export function PerfilHero({ clienteId, ficha }: { clienteId: string; ficha: Fic
             </div>
           ) : null}
           <dl className="datos-servicio">
-            {ficha.precioTotal ? (
+            {verImportes && ficha.precioTotal ? (
               <div>
                 <dt>Precio del bono</dt>
                 <dd>{euros(ficha.precioTotal)}</dd>
               </div>
             ) : null}
-            {ficha.tarifa ? (
+            {verImportes && ficha.tarifa ? (
               <div>
                 <dt>Por sesión</dt>
                 <dd>{euros(ficha.tarifa)}</dd>
@@ -67,14 +83,18 @@ export function PerfilHero({ clienteId, ficha }: { clienteId: string; ficha: Fic
             </div>
           </div>
           <dl className="datos-servicio">
-            <div>
-              <dt>Cuota del mes</dt>
-              <dd>{euros(ficha.cuotaMensual)}</dd>
-            </div>
-            <div>
-              <dt>Sale a</dt>
-              <dd>{ficha.precioEfectivo ? `${euros(ficha.precioEfectivo)}/h` : "—"}</dd>
-            </div>
+            {verImportes && (
+              <>
+                <div>
+                  <dt>Cuota del mes</dt>
+                  <dd>{euros(ficha.cuotaMensual)}</dd>
+                </div>
+                <div>
+                  <dt>Sale a</dt>
+                  <dd>{ficha.precioEfectivo ? `${euros(ficha.precioEfectivo)}/h` : "—"}</dd>
+                </div>
+              </>
+            )}
             {ficha.mes ? (
               <div>
                 <dt>Periodo</dt>
@@ -96,14 +116,18 @@ export function PerfilHero({ clienteId, ficha }: { clienteId: string; ficha: Fic
             </div>
           </div>
           <dl className="datos-servicio">
-            <div>
-              <dt>Precio por sesión</dt>
-              <dd>{euros(ficha.tarifa)}</dd>
-            </div>
-            <div>
-              <dt>Total del mes</dt>
-              <dd className="acumulado">{euros(ficha.facturacion)}</dd>
-            </div>
+            {verImportes && (
+              <>
+                <div>
+                  <dt>Precio por sesión</dt>
+                  <dd>{euros(ficha.tarifa)}</dd>
+                </div>
+                <div>
+                  <dt>Total del mes</dt>
+                  <dd className="acumulado">{euros(ficha.facturacion)}</dd>
+                </div>
+              </>
+            )}
             {ficha.mes ? (
               <div>
                 <dt>Periodo</dt>
@@ -114,11 +138,15 @@ export function PerfilHero({ clienteId, ficha }: { clienteId: string; ficha: Fic
             ) : null}
           </dl>
           {/* El cálculo a la vista, para que el total no haya que creérselo. */}
+          {verImportes && (
           <p className="meta calculo-total">
             {ficha.sesionesHechas} {plural(ficha.sesionesHechas)} × {euros(ficha.tarifa)} ={" "}
             {euros(ficha.facturacion)}
           </p>
-          <p className="meta">Es lo producido este periodo, no necesariamente lo ya cobrado.</p>
+          )}
+          {verImportes && (
+            <p className="meta">Es lo producido este periodo, no necesariamente lo ya cobrado.</p>
+          )}
         </>
       )}
 

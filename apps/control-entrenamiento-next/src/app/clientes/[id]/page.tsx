@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { headers } from "next/headers";
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import QRCode from "qrcode";
 
 import { accionFirmar } from "@/app/actions";
@@ -11,9 +11,10 @@ import { Iconos, Icono } from "@/components/Iconos";
 import { Ltv } from "@/components/Ltv";
 import { PerfilHero } from "@/components/PerfilHero";
 import { SinConexion } from "@/components/SinConexion";
-import { haySesion } from "@/lib/auth";
 import { BaseNoDisponible } from "@/repositories/postgres";
 import { confirmacionDeHoy, obtenerPerfil } from "@/services/clientes";
+
+import { esAdmin, exigirAccesoACliente } from "@/lib/permisos";
 
 export const dynamic = "force-dynamic";
 
@@ -25,9 +26,14 @@ export default async function PaginaPerfil({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ firmado?: string; borrado?: string; cobro?: string; guardado?: string }>;
 }) {
-  if (!(await haySesion())) redirect("/login");
-
   const { id } = await params;
+
+  // El candado. Antes de leer nada de este cliente: un entrenador que
+  // escriba la dirección a mano de un cliente ajeno recibe «no existe».
+  const usuario = await exigirAccesoACliente(id);
+  // El dinero es del administrador. Un entrenador ve el servicio y las
+  // sesiones, no el tarifario ni el valor acumulado del cliente.
+  const verImportes = esAdmin(usuario);
   let perfil;
   try {
     perfil = await obtenerPerfil(id);
@@ -100,7 +106,7 @@ export default async function PaginaPerfil({
           )
         )}
 
-        <PerfilHero clienteId={cliente.id} ficha={ficha} />
+        <PerfilHero clienteId={cliente.id} ficha={ficha} verImportes={verImportes} />
 
         {/* Acción principal. Depende de `ficha.puedeFirmar`, que mira el estado
             del cliente y los datos que SU modalidad necesita. */}
@@ -118,16 +124,21 @@ export default async function PaginaPerfil({
             las secundarias, por dos motivos: no empuja hacia abajo el botón de
             firmar —que es lo que se usa a diario— y queda a la altura de lo
             que de verdad es, un dato de consulta. */}
-        <Ltv ltv={ltv} />
+        {verImportes && <Ltv ltv={ltv} />}
 
         {/* Acciones secundarias, del mismo tamaño. */}
         <div className="acciones-perfil">
           <Link className="boton-secundario" href={`/clientes/${cliente.id}/datos`}>
             Editar datos
           </Link>
-          <Link className="boton-secundario" href={`/clientes/${cliente.id}/programa`}>
-            Editar programa
-          </Link>
+          {/* Cambiar el programa es cambiar tarifas: solo el administrador.
+              La pantalla lo exige por su cuenta, esto solo evita enseñar un
+              botón que respondería «no existe». */}
+          {verImportes && (
+            <Link className="boton-secundario" href={`/clientes/${cliente.id}/programa`}>
+              Editar programa
+            </Link>
+          )}
         </div>
 
         <EnlaceYQr
@@ -138,7 +149,12 @@ export default async function PaginaPerfil({
           confirmadas={confirmacion.confirmadas}
         />
 
-        <HistorialProgramas clienteId={cliente.id} nombre={cliente.nombre} servicios={servicios} />
+        <HistorialProgramas
+          clienteId={cliente.id}
+          nombre={cliente.nombre}
+          servicios={servicios}
+          verImportes={verImportes}
+        />
       </div>
     </>
   );

@@ -1,7 +1,15 @@
 # Control de entrenamiento — versión Next.js
 
-Migración en paralelo de la aplicación Flask. **No sustituye a nada**: la app de
-PythonAnywhere sigue siendo la oficial y esta no toca sus datos.
+**Esta es LA aplicación del proyecto** (decisión de Fernando, 2026-08-05):
+Next.js + Supabase, desplegada en Vercel. Es la que se usa a diario y sobre la
+que se desarrolla.
+
+La aplicación Flask en PythonAnywhere fue la anterior. Se conserva solo como
+respaldo hasta el cambio definitivo y **no recibe funcionalidades nuevas**.
+
+> Este README decía lo contrario hasta el 2026-08-10 («PythonAnywhere sigue
+> siendo la oficial»): era cierto cuando la migración empezó y dejó de serlo
+> sin que nadie actualizara el texto.
 
 ## Arrancar en local
 

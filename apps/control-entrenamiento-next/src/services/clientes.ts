@@ -26,12 +26,25 @@ export interface ClienteEnLista extends Cliente {
 // para su ciclo y otra para contar sus sesiones. Ahora la lista y el perfil
 // componen la ficha con datos que ya tienen en memoria.
 
-export async function listarClientes(): Promise<ClienteEnLista[]> {
+/**
+ * La lista de clientes.
+ *
+ * `soloDe` es el identificador del profesional cuando quien mira es un
+ * entrenador. Un administrador lo llama sin nada y los ve todos.
+ *
+ * El alcance viaja hasta el SQL: no se cargan todos para esconder luego los
+ * ajenos. Esa diferencia es la que separa una restricción visual de una
+ * restricción de verdad.
+ */
+export async function listarClientes(soloDe?: string | null): Promise<ClienteEnLista[]> {
   const repo = repositorio();
   // Dos lecturas en total, no cinco por cliente (2026-08-05). Contra Supabase
   // cada consulta es un viaje de red de ~180 ms: ir cliente a cliente hacía
   // que la pantalla más usada tardara varios segundos en abrirse.
-  const [clientes, datos] = await Promise.all([repo.listarClientes(), repo.cargarTodoParaLaLista()]);
+  const [clientes, datos] = await Promise.all([
+    repo.listarClientes(soloDe),
+    repo.cargarTodoParaLaLista(soloDe),
+  ]);
 
   const ciclosPorCliente = new Map<string, Ciclo[]>();
   for (const ciclo of datos.ciclos) {
@@ -141,6 +154,12 @@ export interface DatosAlta {
   cuotaMensual?: number | null;
   tarifa?: number | null;
   sesionesReferencia?: number | null;
+  /**
+   * Profesional responsable. Lo elige el administrador al dar de alta: es la
+   * única forma de que un cliente nazca ya asignado a Rafa, porque un
+   * entrenador no puede crear clientes.
+   */
+  profesionalId?: string | null;
 }
 
 export async function crearCliente(datos: DatosAlta): Promise<Cliente> {
@@ -162,6 +181,9 @@ export async function crearCliente(datos: DatosAlta): Promise<Cliente> {
     pendientePago: true,
     sesionesCompletadas: 0,
     cicloActual: 1,
+    // Sin responsable explícito, el cliente es del administrador. Nunca queda
+    // suelto: un cliente sin dueño no lo ve nadie salvo el administrador.
+    profesionalId: datos.profesionalId ?? null,
   };
 
   const ciclo: Ciclo = {
@@ -211,6 +233,12 @@ export interface CambioDeServicio {
   cuotaMensual?: number | null;
   tarifa?: number | null;
   sesionesReferencia?: number | null;
+  /**
+   * Profesional responsable. Lo elige el administrador al dar de alta: es la
+   * única forma de que un cliente nazca ya asignado a Rafa, porque un
+   * entrenador no puede crear clientes.
+   */
+  profesionalId?: string | null;
 }
 
 export interface ResultadoCambio {

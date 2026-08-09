@@ -52,7 +52,7 @@ import { MENSUALIDAD, type Modalidad } from "@/domain/modalidades";
 import type { CargoMensual, Ciclo, Cliente, Estado, Sesion } from "@/domain/tipos";
 import { TARIFA_LIDOMARE } from "@/domain/economia";
 import { rangoSemana } from "@/lib/fechas";
-import type { Aviso, ClaseGrupo, DatosDeLaLista, DatosMes, Repositorio, SemanaEconomica } from "./tipos";
+import type { Aviso, ClaseGrupo, DatosDeLaLista, DatosMes, Perfil, Repositorio, SemanaEconomica } from "./tipos";
 
 // -----------------------------------------------------------------------------
 // Conexión
@@ -168,6 +168,11 @@ function aCliente(f: Record<string, unknown>): Cliente {
     pendientePago: Boolean(f.pendiente_pago),
     sesionesCompletadas: Number(f.sesiones_completadas),
     cicloActual: Number(f.ciclo_actual),
+    // La columna de la base se llama `entrenador_id` y el código dice
+    // `profesionalId`: es la misma cosa. Fernando llama «profesional» a la
+    // persona y «entrenador» al rol, que es una distinción útil. Renombrar la
+    // columna exigiría una migración y no cambiaría nada de lo que se ve.
+    profesionalId: (f.entrenador_id as string | null) ?? null,
   };
 }
 
@@ -203,6 +208,7 @@ function aSesion(f: Record<string, unknown>): Sesion {
     tarifa: numero(f.tarifa),
     ciclo: Number(f.ciclo),
     servicio: f.servicio as string,
+    firmadaPor: (f.firmada_por as string | null) ?? null,
   };
 }
 
@@ -212,8 +218,12 @@ const CAMPOS_CICLO = `cliente_id, ciclo, modalidad, servicio, tarifa, sesiones_t
 // -----------------------------------------------------------------------------
 
 export class RepositorioPostgres implements Repositorio {
-  async listarClientes(): Promise<Cliente[]> {
-    const filas = await consultar("select * from clientes order by nombre");
+  async listarClientes(soloDe?: string | null): Promise<Cliente[]> {
+    // Sin `soloDe` vienen todos: es lo que ve un administrador. Con él, solo
+    // los suyos, y el filtro lo hace la base de datos — los demás ni salen.
+    const filas = soloDe
+      ? await consultar("select * from clientes where entrenador_id = $1 order by nombre", [soloDe])
+      : await consultar("select * from clientes order by nombre");
     return filas.map(aCliente);
   }
 
@@ -287,12 +297,25 @@ export class RepositorioPostgres implements Repositorio {
    * más de siete segundos de espera. Estas tres consultas no crecen con el
    * número de clientes.
    */
-  async cargarTodoParaLaLista(): Promise<DatosDeLaLista> {
+  async cargarTodoParaLaLista(soloDe?: string | null): Promise<DatosDeLaLista> {
+    // Los ciclos, las cuotas y las sesiones de OTROS clientes no se traen
+    // siquiera. No es una optimización: es que el historial y el dinero de los
+    // clientes de Fernando no deben salir de la base hacia el móvil de un
+    // entrenador, ni aunque la pantalla luego no los pinte (2026-08-09).
+    const suyos = "cliente_id in (select id from clientes where entrenador_id = $1)";
     const [filasCiclos, filasCargos, filasConteo] = await Promise.all([
-      consultar(`select ${CAMPOS_CICLO} from ciclos order by cliente_id, ciclo desc`),
-      consultar("select * from cargos_mensuales"),
+      consultar(
+        `select ${CAMPOS_CICLO} from ciclos${soloDe ? ` where ${suyos}` : ""} order by cliente_id, ciclo desc`,
+        soloDe ? [soloDe] : [],
+      ),
+      consultar(
+        `select * from cargos_mensuales${soloDe ? ` where ${suyos}` : ""}`,
+        soloDe ? [soloDe] : [],
+      ),
       consultar<{ cliente_id: string; ciclo: number; n: string }>(
-        "select cliente_id, ciclo, count(*)::int as n from sesiones group by cliente_id, ciclo",
+        `select cliente_id, ciclo, count(*)::int as n from sesiones${soloDe ? ` where ${suyos}` : ""}
+          group by cliente_id, ciclo`,
+        soloDe ? [soloDe] : [],
       ),
     ]);
 
@@ -366,11 +389,12 @@ export class RepositorioPostgres implements Repositorio {
   async guardarSesion(sesion: Sesion): Promise<void> {
     await consultar(
       `insert into sesiones (id, cliente_id, ciclo, fecha, hora, numero_sesion,
-                             sesiones_totales, tarifa, servicio)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+                             sesiones_totales, tarifa, servicio, firmada_por)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
       [
         sesion.id, sesion.clienteId, sesion.ciclo, sesion.fecha, sesion.hora,
         sesion.numeroSesion, sesion.sesionesTotales, sesion.tarifa, sesion.servicio,
+        sesion.firmadaPor ?? null,
       ],
     );
   }
@@ -541,6 +565,53 @@ export class RepositorioPostgres implements Repositorio {
       [tipo, desde],
     );
     return filas.map((f) => ({ id: String(f.id), fecha: String(f.fecha), tipo: f.tipo as TipoClase }));
+  }
+
+  // ---------------------------------------------------------------------------
+  // Quién usa la aplicación
+  // ---------------------------------------------------------------------------
+
+  /**
+   * La cuenta de acceso vive en `auth.users` (la gestiona Supabase) y el rol
+   * en `perfiles`. El vínculo es el mismo identificador en las dos.
+   *
+   * Se exige aquí, otra vez, que la cuenta esté confirmada y sin bloquear: la
+   * cookie de sesión dura dos semanas y no debe sobrevivir a un bloqueo.
+   */
+  async perfilPorCorreo(correo: string): Promise<Perfil | null> {
+    const filas = await consultar<{ id: string; email: string; nombre: string; rol: string }>(
+      `select p.id, u.email, p.nombre, p.rol
+         from public.perfiles p
+         join auth.users u on u.id = p.id
+        where u.email = $1
+          and u.email_confirmed_at is not null
+          and u.banned_until is null`,
+      [correo.trim().toLowerCase()],
+    );
+    const f = filas[0];
+    return f ? { id: f.id, correo: f.email, nombre: f.nombre, rol: f.rol as Perfil["rol"] } : null;
+  }
+
+  async profesionalDelCliente(clienteId: string): Promise<string | null> {
+    const filas = await consultar<{ entrenador_id: string | null }>(
+      "select entrenador_id from clientes where id = $1",
+      [clienteId],
+    );
+    return filas[0]?.entrenador_id ?? null;
+  }
+
+  async listarProfesionales(): Promise<Perfil[]> {
+    const filas = await consultar<{ id: string; email: string; nombre: string; rol: string }>(
+      `select p.id, u.email, p.nombre, p.rol
+         from public.perfiles p
+         join auth.users u on u.id = p.id
+        order by (p.rol = 'admin') desc, p.nombre`,
+    );
+    return filas.map((f) => ({ id: f.id, correo: f.email, nombre: f.nombre, rol: f.rol as Perfil["rol"] }));
+  }
+
+  async asignarProfesional(clienteId: string, profesionalId: string | null): Promise<void> {
+    await consultar("update clientes set entrenador_id = $2 where id = $1", [clienteId, profesionalId]);
   }
 
   async facturacionKids(anio: number, mes: number): Promise<number | null> {

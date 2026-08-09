@@ -1,14 +1,14 @@
 import Image from "next/image";
-import { redirect } from "next/navigation";
 
 import { BarraInferior } from "@/components/BarraInferior";
 import { Iconos } from "@/components/Iconos";
 import { MesEconomico } from "@/components/MesEconomico";
 import { SinConexion } from "@/components/SinConexion";
-import { haySesion } from "@/lib/auth";
 import { BaseNoDisponible } from "@/repositories/postgres";
 import { contarNoLeidos } from "@/services/avisos";
 import { obtenerEconomia } from "@/services/economia";
+
+import { exigirAdmin } from "@/lib/permisos";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Antifrágil — Economía" };
@@ -25,7 +25,7 @@ export const metadata = { title: "Antifrágil — Economía" };
  * que las sesiones de un cliente en la suya.
  */
 export default async function PaginaEconomia() {
-  if (!(await haySesion())) redirect("/login");
+  await exigirAdmin();
 
   let vista;
   let sinLeer = 0;

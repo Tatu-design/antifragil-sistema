@@ -1,5 +1,12 @@
 # Cómo alojar la web app en PythonAnywhere
 
+> ⚠️ **DOCUMENTO HISTÓRICO.** Describe la aplicación **Flask en
+> PythonAnywhere**, que fue la del proyecto hasta el 2026-08-05 y **ya no lo
+> es**. La aplicación actual es la de **Next.js + Supabase en Vercel**
+> (`apps/control-entrenamiento-next`). Se conserva porque explica de dónde
+> viene el sistema, no cómo funciona hoy.
+
+
 Esto se hace **una sola vez**. Son pasos en una cuenta nueva (tuya) en
 pythonanywhere.com — necesitan tu usuario, así que no puedo hacerlos yo por
 ti, igual que pasó con Google Calendar. Te dejo el proceso completo; si te

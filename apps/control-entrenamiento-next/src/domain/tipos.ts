@@ -27,6 +27,12 @@ export interface Cliente {
   /** Contador del bono en curso. Fernando puede corregirlo a mano. */
   sesionesCompletadas: number;
   cicloActual: number;
+  /**
+   * Profesional responsable. `null` solo en clientes creados antes del
+   * 2026-08-09 y todavía sin repartir; a efectos de permiso, un cliente sin
+   * responsable es del administrador y nadie más lo ve.
+   */
+  profesionalId: string | null;
 }
 
 export interface Ciclo {
@@ -74,6 +80,11 @@ export interface Sesion {
   tarifa: number | null;
   ciclo: number;
   servicio: string;
+  /**
+   * Quién la firmó. `null` en las anteriores al 2026-08-09, cuando solo había
+   * una persona usando la aplicación: no se inventa quién las hizo.
+   */
+  firmadaPor?: string | null;
 }
 
 export interface CargoMensual {

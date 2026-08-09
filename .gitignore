@@ -30,3 +30,7 @@ datos/config_servidor.json
 *.db
 *.db-wal
 *.db-shm
+
+# Copias de seguridad de datos reales: identificadores de clientes.
+# El repositorio es publico (decision de Fernando, 2026-07-30).
+.copias/

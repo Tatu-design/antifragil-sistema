@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 
 import { AccionesClase, BorrarClase } from "@/components/AccionesClase";
 import { BarraInferior } from "@/components/BarraInferior";
@@ -7,11 +7,12 @@ import { Iconos, Icono } from "@/components/Iconos";
 import { SinConexion } from "@/components/SinConexion";
 import { NOMBRES_CLASE } from "@/domain/clases";
 import type { TipoClase } from "@/domain/economia";
-import { haySesion } from "@/lib/auth";
 import { fechaEs, mesEs } from "@/lib/formato";
 import { BaseNoDisponible } from "@/repositories/postgres";
 import { contarNoLeidos } from "@/services/avisos";
 import { obtenerCuenta } from "@/services/clases";
+
+import { exigirAdmin } from "@/lib/permisos";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +38,7 @@ export default async function PaginaClase({
   params: Promise<{ tipo: string }>;
   searchParams: Promise<{ firmada?: string; borrada?: string; facturado?: string; error?: string }>;
 }) {
-  if (!(await haySesion())) redirect("/login");
+  await exigirAdmin();
 
   const { tipo } = await params;
   if (!TIPOS.includes(tipo as TipoClase)) notFound();

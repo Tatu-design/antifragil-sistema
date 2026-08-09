@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 
 import { FormularioAlta } from "@/components/FormularioAlta";
 import { Iconos } from "@/components/Iconos";
-import { haySesion } from "@/lib/auth";
+
+import { esAdmin, exigirUsuario } from "@/lib/permisos";
+import { listarProfesionales } from "@/repositories/perfiles";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Nuevo cliente — Antifrágil" };
@@ -14,7 +15,11 @@ export default async function PaginaNuevoCliente({
 }: {
   searchParams: Promise<{ error?: string }>;
 }) {
-  if (!(await haySesion())) redirect("/login");
+  const quien = await exigirUsuario();
+  // A un entrenador se le ofrece una sola opción —él— así que el selector no
+  // llega a dibujarse. La decisión de verdad no está aquí: está en la acción,
+  // que ignora lo que venga en el formulario si no es administrador.
+  const profesionales = esAdmin(quien) ? await listarProfesionales() : [];
 
   const { error: fallo } = await searchParams;
 
@@ -28,7 +33,7 @@ export default async function PaginaNuevoCliente({
 
         {fallo && <div className="aviso-error">{fallo}</div>}
 
-        <FormularioAlta />
+        <FormularioAlta profesionales={profesionales} porDefecto={quien.id} />
       </div>
     </>
   );
