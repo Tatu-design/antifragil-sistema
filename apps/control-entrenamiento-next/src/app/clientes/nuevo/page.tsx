@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 
 import { FormularioAlta } from "@/components/FormularioAlta";
 import { Iconos } from "@/components/Iconos";
-import { haySesion } from "@/lib/auth";
+
+import { exigirAdmin } from "@/lib/permisos";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Nuevo cliente — Antifrágil" };
@@ -14,7 +14,7 @@ export default async function PaginaNuevoCliente({
 }: {
   searchParams: Promise<{ error?: string }>;
 }) {
-  if (!(await haySesion())) redirect("/login");
+  await exigirAdmin();
 
   const { error: fallo } = await searchParams;
 

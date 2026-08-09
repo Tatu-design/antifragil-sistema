@@ -313,6 +313,28 @@ h1 {
   margin-bottom: 1.1rem;
 }
 
+/* El filtro por profesional (2026-08-09). Va encima de los de estado y se
+   distingue de ellos por ser una fila de chips, no una rejilla de tarjetas:
+   son dos preguntas distintas —«de quién» y «en qué estado»— y no deben
+   parecer la misma. Solo lo ve el administrador. */
+.filtros-profesional {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.75rem;
+}
+
+.filtros-profesional .filtro {
+  width: auto;
+  flex-direction: row;
+  align-items: center;
+  padding: 0.4rem 0.85rem;
+  /* Que quepan varios nombres en el ancho de un móvil sin partirse. */
+  white-space: nowrap;
+}
+
+.filtros-profesional .filtro-nombre { font-size: 0.8125rem; }
+
 .filtro {
   display: flex;
   flex-direction: column;

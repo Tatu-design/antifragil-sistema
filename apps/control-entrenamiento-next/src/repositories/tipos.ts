@@ -74,7 +74,14 @@ export interface DatosDeLaLista {
 }
 
 export interface Repositorio {
-  listarClientes(): Promise<Cliente[]>;
+  /**
+   * Los clientes. Con `soloDe`, únicamente los de ese profesional.
+   *
+   * El filtro va aquí y no en la pantalla a propósito: esconder tarjetas en el
+   * navegador no es seguridad — los datos habrían viajado igual al móvil de
+   * quien no debe verlos.
+   */
+  listarClientes(soloDe?: string | null): Promise<Cliente[]>;
   obtenerCliente(id: string): Promise<Cliente | null>;
   obtenerClientePorToken(token: string): Promise<Cliente | null>;
   crearCliente(cliente: Cliente, cicloInicial: Ciclo): Promise<void>;
@@ -92,7 +99,7 @@ export interface Repositorio {
    * segundos de espera. Esto lo deja en tres, sea cual sea el número de
    * clientes.
    */
-  cargarTodoParaLaLista(): Promise<DatosDeLaLista>;
+  cargarTodoParaLaLista(soloDe?: string | null): Promise<DatosDeLaLista>;
   listarCiclos(clienteId: string): Promise<Ciclo[]>;
   guardarCiclo(ciclo: Ciclo): Promise<void>;
 

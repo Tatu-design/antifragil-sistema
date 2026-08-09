@@ -18,7 +18,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { ErrorDeNegocio } from "@/domain/modalidades";
-import { cerrarSesion, entrar, entrarConClaveUnica, haySesion } from "@/lib/auth";
+import { cerrarSesion, entrar, entrarConClaveUnica } from "@/lib/auth";
+import { exigirAccesoACliente, exigirAdmin, exigirUsuario } from "@/lib/permisos";
 import {
   desdeFormulario,
   esquemaAlta,
@@ -61,10 +62,6 @@ export interface Resultado {
   mensaje: string;
   /** Para que la pantalla pueda darle otro tono a lo que ha ido bien. */
   tono?: "exito" | "aviso" | "error";
-}
-
-async function exigirSesion(): Promise<void> {
-  if (!(await haySesion())) redirect("/login");
 }
 
 /** Convierte cualquier fallo en un mensaje que se puede leer sin saber
@@ -113,14 +110,20 @@ export async function accionSalir(): Promise<void> {
  * así la pantalla se pinta ya actualizada y recargar no repite la acción.
  */
 export async function accionFirmar(datos: FormData): Promise<void> {
-  await exigirSesion();
+  await exigirUsuario();
   const validado = esquemaFirma.safeParse(desdeFormulario(datos));
   if (!validado.success) redirect("/clientes");
 
   const id = validado.data.clienteId;
+  const quien = await exigirAccesoACliente(id);
   let mensaje: string;
   try {
-    const r = await firmarSesion(id, { claveIdempotencia: validado.data.claveIdempotencia });
+    // Queda anotado quién la firmó. No cambia nada del bono, del historial ni
+    // de la economía: solo permite saber después qué hizo cada profesional.
+    const r = await firmarSesion(id, {
+      claveIdempotencia: validado.data.claveIdempotencia,
+      firmadaPor: quien.id,
+    });
     if (r.duplicado) {
       mensaje = "esa sesión ya estaba firmada, no se ha duplicado";
     } else if (r.renovado) {
@@ -144,7 +147,7 @@ export async function accionFirmar(datos: FormData): Promise<void> {
 
 /** «Confirmar y crear». Termina en la ficha del cliente nuevo, como Flask. */
 export async function accionCrearCliente(datos: FormData): Promise<void> {
-  await exigirSesion();
+  await exigirAdmin();
   const validado = esquemaAlta.safeParse(desdeFormulario(datos));
   if (!validado.success) {
     const texto = validado.error.issues[0]?.message ?? "revisa los datos";
@@ -174,7 +177,7 @@ export async function accionCrearCliente(datos: FormData): Promise<void> {
 
 /** «Guardar cambios» de Editar programa. Vuelve al perfil, como Flask. */
 export async function accionConfigurarServicio(datos: FormData): Promise<void> {
-  await exigirSesion();
+  await exigirAdmin();
   const validado = esquemaServicio.safeParse(desdeFormulario(datos));
   if (!validado.success) redirect("/clientes");
 
@@ -208,11 +211,12 @@ export async function accionConfigurarServicio(datos: FormData): Promise<void> {
  * la ruta `guardar` de Flask. Son los dos únicos campos de esa pantalla.
  */
 export async function accionGuardarDatos(datos: FormData): Promise<void> {
-  await exigirSesion();
+  await exigirUsuario();
   const validado = esquemaDatos.safeParse(desdeFormulario(datos));
   if (!validado.success) redirect("/clientes");
 
   const id = validado.data.clienteId;
+  await exigirAccesoACliente(id);
   try {
     await renombrarCliente(id, validado.data.nombre);
     await cambiarEstado(id, validado.data.estado);
@@ -229,11 +233,12 @@ export async function accionGuardarDatos(datos: FormData): Promise<void> {
 /** Solo toca el estado de COBRO: no altera sesiones, horas, historial ni
  *  economía. Vuelve al perfil con el aviso, igual que Flask. */
 export async function accionMarcarCobro(datos: FormData): Promise<void> {
-  await exigirSesion();
+  await exigirUsuario();
   const validado = esquemaCobro.safeParse(desdeFormulario(datos));
   if (!validado.success) redirect("/clientes");
 
   const id = validado.data.clienteId;
+  await exigirAccesoACliente(id);
   try {
     await marcarCobro(id, validado.data.ciclo, validado.data.pagado);
   } catch (error) {
@@ -246,11 +251,12 @@ export async function accionMarcarCobro(datos: FormData): Promise<void> {
 }
 
 export async function accionBorrarSesion(datos: FormData): Promise<void> {
-  await exigirSesion();
+  await exigirUsuario();
   const validado = esquemaBorrarSesion.safeParse(desdeFormulario(datos));
   if (!validado.success) redirect("/clientes");
 
   const id = validado.data.clienteId;
+  await exigirAccesoACliente(id);
   const aviso = "su importe se ha descontado de la semana correspondiente";
   try {
     await eliminarSesion(id, validado.data.sesionId);
@@ -282,7 +288,7 @@ export async function accionBorrarSesion(datos: FormData): Promise<void> {
  * ha duplicado nada, solo ha cambiado desde dónde se llama y adónde vuelve.
  */
 export async function accionFirmarClase(datos: FormData): Promise<void> {
-  await exigirSesion();
+  await exigirAdmin();
   const validado = esquemaClase.safeParse(desdeFormulario(datos));
   if (!validado.success) redirect("/clientes");
 
@@ -307,7 +313,7 @@ export async function accionFirmarClase(datos: FormData): Promise<void> {
  * de un cliente. Su importe sale de la semana en la misma operación.
  */
 export async function accionBorrarClase(datos: FormData): Promise<void> {
-  await exigirSesion();
+  await exigirAdmin();
   const validado = esquemaBorrarClase.safeParse(desdeFormulario(datos));
   if (!validado.success) redirect("/clientes");
 
@@ -326,7 +332,7 @@ export async function accionBorrarClase(datos: FormData): Promise<void> {
 }
 
 export async function accionFacturacionKids(_previo: Resultado | null, datos: FormData): Promise<Resultado> {
-  await exigirSesion();
+  await exigirAdmin();
   const validado = esquemaKids.safeParse(desdeFormulario(datos));
   if (!validado.success) {
     return { ok: false, mensaje: validado.error.issues[0]?.message ?? "Revisa el importe.", tono: "error" };
@@ -360,7 +366,7 @@ export async function accionFacturacionKids(_previo: Resultado | null, datos: Fo
 /** Descartar vuelve a la bandeja, igual que Flask: sin mensaje, la lista ya
  *  enseña el resultado. */
 export async function accionResolverAviso(datos: FormData): Promise<void> {
-  await exigirSesion();
+  await exigirAdmin();
   const validado = esquemaAviso.safeParse(desdeFormulario(datos));
   if (validado.success) await resolverAviso(validado.data.id);
   revalidatePath("/avisos");
@@ -368,7 +374,7 @@ export async function accionResolverAviso(datos: FormData): Promise<void> {
 }
 
 export async function accionResolverTipo(datos: FormData): Promise<void> {
-  await exigirSesion();
+  await exigirAdmin();
   const validado = esquemaTipoAviso.safeParse(desdeFormulario(datos));
   if (validado.success) await resolverPorTipo(validado.data.tipo);
   revalidatePath("/avisos");
@@ -376,7 +382,7 @@ export async function accionResolverTipo(datos: FormData): Promise<void> {
 }
 
 export async function accionEditarSesion(datos: FormData): Promise<void> {
-  await exigirSesion();
+  await exigirUsuario();
   const entrada = desdeFormulario(datos);
   const validado = esquemaEditarSesion.safeParse(entrada);
   if (!validado.success) {
@@ -387,6 +393,7 @@ export async function accionEditarSesion(datos: FormData): Promise<void> {
   }
 
   const { clienteId, sesionId, fecha, numeroSesion } = validado.data;
+  await exigirAccesoACliente(clienteId);
   try {
     await editarSesion(clienteId, sesionId, fecha, numeroSesion);
   } catch (error) {
@@ -400,7 +407,7 @@ export async function accionEditarSesion(datos: FormData): Promise<void> {
 }
 
 export async function accionBorrarCliente(datos: FormData): Promise<void> {
-  await exigirSesion();
+  await exigirAdmin();
   const validado = esquemaBorrarCliente.safeParse(desdeFormulario(datos));
   if (!validado.success) redirect("/clientes");
 

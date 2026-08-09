@@ -1,7 +1,7 @@
 import "server-only";
 
 import { cache } from "react";
-import { notFound, redirect } from "next/navigation";
+import { redirect } from "next/navigation";
 
 import { correoActual } from "./auth";
 import { perfilPorCorreo, entrenadorDelCliente, type Perfil } from "@/repositories/perfiles";
@@ -57,6 +57,25 @@ export function esAdmin(usuario: Perfil | null): boolean {
 }
 
 /**
+ * LA regla de acceso, sin nada alrededor.
+ *
+ * Se separa de `exigirAccesoACliente` para poder probarla a conciencia: la
+ * otra habla con cookies y con la base, esta es aritmética pura y se le pueden
+ * pasar los casos raros de uno en uno.
+ *
+ * `responsable` es de quién es el cliente, o `null` si no existe o si nadie lo
+ * lleva todavía.
+ */
+export function puedeVerCliente(usuario: Perfil | null, responsable: string | null): boolean {
+  if (!usuario) return false;
+  if (esAdmin(usuario)) return true;
+  // Un cliente sin responsable NO es de quien pregunte primero: es del
+  // administrador hasta que se le asigne a alguien a propósito.
+  if (responsable === null) return false;
+  return responsable === usuario.id;
+}
+
+/**
  * Exige haber iniciado sesión. Devuelve quién es.
  *
  * Si la cuenta existe en la cookie pero ya no tiene perfil —porque se le ha
@@ -71,13 +90,24 @@ export async function exigirUsuario(): Promise<Perfil> {
 /**
  * Exige ser administrador. Economía, avisos, alta y baja de clientes.
  *
- * Responde «no existe» en vez de «no puedes». Es a propósito: un «no puedes»
- * confirma que la pantalla existe y qué hay detrás. `forbidden()` de Next
- * exigiría encender una función experimental, y tampoco haría falta.
+ * A quien no lo sea se le devuelve a su lista, sin explicaciones: no se le
+ * dice «no puedes», que confirmaría qué hay detrás.
+ *
+ * POR QUÉ REDIRIGIR Y NO `notFound()` (2026-08-09)
+ *
+ * `notFound()` era lo primero que se probó y **escondía el contenido bien,
+ * pero devolvía un 200**: estas pantallas son dinámicas, Next ya ha empezado a
+ * enviar la respuesta cuando salta, y entonces ya no puede cambiar el código
+ * de estado. Un 200 en una pantalla denegada es una trampa: cualquier prueba
+ * automática que mire el estado daría por bueno un agujero.
+ *
+ * Una redirección se resuelve antes de empezar a enviar nada, así que da un
+ * 307 inequívoco, se puede comprobar, y de paso deja a la persona en una
+ * pantalla que sí puede usar.
  */
 export async function exigirAdmin(): Promise<Perfil> {
   const usuario = await exigirUsuario();
-  if (!esAdmin(usuario)) notFound();
+  if (!esAdmin(usuario)) redirect("/clientes");
   return usuario;
 }
 
@@ -96,9 +126,10 @@ export async function exigirAccesoACliente(clienteId: string): Promise<Perfil> {
   if (esAdmin(usuario)) return usuario;
 
   const responsable = await entrenadorDelCliente(clienteId);
-  // «No existe», no «no puedes»: así ni siquiera se confirma que ese cliente
-  // esté dado de alta.
-  if (responsable === null || responsable !== usuario.id) notFound();
+  // A su lista, sin decir nada. Un cliente ajeno y uno inventado se comportan
+  // exactamente igual: no se puede averiguar quién está dado de alta probando
+  // direcciones.
+  if (!puedeVerCliente(usuario, responsable)) redirect("/clientes");
   return usuario;
 }
 

@@ -157,9 +157,10 @@ function clonar<T>(valor: T): T {
 }
 
 export class RepositorioStaging implements Repositorio {
-  async listarClientes(): Promise<Cliente[]> {
+  async listarClientes(soloDe?: string | null): Promise<Cliente[]> {
     const datos = await cargar();
-    return clonar(datos.clientes).sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+    const suyos = soloDe ? datos.clientes.filter((c) => c.entrenadorId === soloDe) : datos.clientes;
+    return clonar(suyos).sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
   }
 
   async obtenerCliente(id: string): Promise<Cliente | null> {
@@ -199,9 +200,14 @@ export class RepositorioStaging implements Repositorio {
   }
 
   /** Ver `cargarTodoParaLaLista` en el repositorio de Postgres. */
-  async cargarTodoParaLaLista(): Promise<DatosDeLaLista> {
+  async cargarTodoParaLaLista(soloDe?: string | null): Promise<DatosDeLaLista> {
     const datos = await cargar();
-    const cargos = clonar(datos.cargos);
+
+    // Mismo alcance que en Postgres: lo de los demás clientes no se toca.
+    const esSuyo = (clienteId: string) =>
+      !soloDe || datos.clientes.some((c) => c.id === clienteId && c.entrenadorId === soloDe);
+
+    const cargos = clonar(datos.cargos.filter((c) => esSuyo(c.clienteId)));
     const porCliente = new Map<string, CargoMensual[]>();
     for (const cargo of cargos) {
       const lista = porCliente.get(cargo.clienteId) ?? [];
@@ -209,7 +215,7 @@ export class RepositorioStaging implements Repositorio {
       porCliente.set(cargo.clienteId, lista);
     }
 
-    const ciclos = clonar(datos.ciclos)
+    const ciclos = clonar(datos.ciclos.filter((c) => esSuyo(c.clienteId)))
       .sort((a, b) => (a.clienteId === b.clienteId ? b.ciclo - a.ciclo : a.clienteId.localeCompare(b.clienteId)))
       // `conCobroReal` de este repositorio recibe el almacén entero, no una
       // lista de cuotas: ya lo tenemos leído aquí, así que se le pasa tal cual.
@@ -217,6 +223,7 @@ export class RepositorioStaging implements Repositorio {
 
     const sesionesPorCiclo = new Map<string, number>();
     for (const sesion of datos.sesiones) {
+      if (!esSuyo(sesion.clienteId)) continue;
       const clave = `${sesion.clienteId}:${sesion.ciclo}`;
       sesionesPorCiclo.set(clave, (sesionesPorCiclo.get(clave) ?? 0) + 1);
     }

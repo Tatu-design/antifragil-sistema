@@ -1,20 +1,20 @@
 import Image from "next/image";
-import { redirect } from "next/navigation";
 
 import { accionResolverAviso, accionResolverTipo } from "@/app/actions";
 import { BarraInferior } from "@/components/BarraInferior";
 import { Iconos } from "@/components/Iconos";
 import { SinConexion } from "@/components/SinConexion";
-import { haySesion } from "@/lib/auth";
 import { BaseNoDisponible } from "@/repositories/postgres";
 import { contarNoLeidos, listarAvisos, marcarTodosLeidos } from "@/services/avisos";
+
+import { exigirAdmin } from "@/lib/permisos";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Antifrágil — Avisos" };
 
 /** Misma estructura que `webapp/templates/avisos.html`. */
 export default async function PaginaAvisos() {
-  if (!(await haySesion())) redirect("/login");
+  await exigirAdmin();
 
   let avisos;
   let sinLeer = 0;

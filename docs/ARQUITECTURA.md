@@ -1812,6 +1812,115 @@ componente en esa pantalla.
 El desglose por modalidad (bonos, mensualidades, cuentas) se calcula pero no
 se enseña todavía: primero validar que el total cuadra.
 
+## ⚠️ CUÁL ES LA APLICACIÓN ACTUAL (leer antes que nada)
+
+**La aplicación es la de Next.js desplegada en Vercel** (`apps/control-entrenamiento-next`,
+base de datos en Supabase). Es sobre la que se desarrolla y la que usa Fernando
+a diario.
+
+**La aplicación Flask en PythonAnywhere ya NO es la aplicación del proyecto.**
+Se conserva como respaldo histórico hasta el cambio definitivo y solo recibe
+correcciones críticas. Cualquier parte de este documento que la describa como
+«producción» es histórica: describe cómo fue, no cómo es.
+
+Cuando Fernando dice «la app», habla siempre de la de Vercel.
+
+---
+
+## Usuarios, roles y profesionales (2026-08-09)
+
+Hasta hoy la aplicación era de una sola persona: quien entraba, veía todo. Con
+la entrada de Rafa Galindo como entrenador hay dos roles y un dueño por cliente.
+
+### El modelo, que ya existía a medias
+
+| Pieza | Dónde | Para qué |
+|---|---|---|
+| Cuenta de acceso | `auth.users` (Supabase) | Quién eres. Contraseña cifrada por la base |
+| Perfil y rol | `public.perfiles` | Qué puedes hacer: `admin` o `entrenador` |
+| Cliente → responsable | `clientes.entrenador_id` | De quién es cada cliente |
+| Quién firmó | `sesiones.firmada_por` | Trazabilidad. Nulo en las anteriores a hoy |
+
+La tabla `perfiles` se creó el 2026-08-03 previendo esto, así que **no se
+inventó ningún modelo nuevo**: solo faltaba el vínculo con el cliente.
+
+Se mantiene el nombre de rol `entrenador` (no `trainer`): es el que ya admitía
+la restricción de la tabla y el idioma del resto del proyecto.
+
+### Quién puede qué
+
+| | Admin (Tato) | Entrenador (Rafa) |
+|---|---|---|
+| Clientes que ve | todos, con filtro por profesional | **solo los suyos** |
+| Firmar sesiones | sí | sí, en los suyos |
+| Corregir y borrar sesiones | sí | sí, en los suyos |
+| Marcar cobros | sí | sí, en los suyos |
+| Editar datos del cliente | sí | sí, en los suyos |
+| Ver importes, tarifas y LTV | sí | **no** |
+| Editar el programa (tarifas) | sí | no |
+| Alta y baja de clientes | sí | no |
+| Economía, Avisos, CrossFit | sí | no |
+
+### Dónde vive la seguridad (importante)
+
+**En el servidor de la aplicación**, en `src/lib/permisos.ts`, y en las propias
+consultas SQL, que filtran por `entrenador_id`.
+
+**NO en las políticas RLS de Supabase.** Están escritas, activadas y dicen lo
+correcto, pero **hoy no se aplican**: la aplicación se conecta como el usuario
+`postgres`, que tiene `rolbypassrls` y se las salta por diseño (comprobado el
+2026-08-09). Se mantienen actualizadas para el día que se cambie a un rol de
+conexión normal —que es lo correcto a medio plazo— pero **no protegen nada
+ahora mismo**. Confiar en ellas sería el error peligroso.
+
+Tres barreras, en este orden:
+
+1. **La consulta.** Un entrenador pide clientes y el `where entrenador_id = $1`
+   va en el SQL. Los datos de los demás no salen de la base. No es una
+   optimización: si se cargaran todos para esconderlos luego, habrían viajado
+   igual a su móvil.
+2. **La pantalla.** Cada página privada llama a `exigirAdmin()` o a
+   `exigirAccesoACliente(id)` antes de leer nada.
+3. **La acción.** Las 13 operaciones que escriben comprueban lo mismo por su
+   cuenta. Esconder un botón no impide llamar a la acción.
+
+### Sobre el código de estado 200 al denegar
+
+Cuando a un entrenador se le deniega una pantalla, **Next devuelve 200, no 403
+ni 404**. No es un agujero y conviene saberlo para no asustarse:
+
+- Estas pantallas son dinámicas y Next empieza a enviar la respuesta antes de
+  terminar de construirla; cuando salta la denegación ya no puede cambiar el
+  código de estado.
+- Lo que sí ocurre: **la pantalla no llega a leer ni a dibujar nada**. Se envía
+  el título y la orden de volver a su lista. Medido: 3,2 KB frente a los 30 KB
+  de una ficha de verdad, y ni el nombre, ni el servicio, ni la tarifa, ni las
+  fechas del cliente aparecen en la respuesta.
+- Se probó primero con `notFound()`: escondía igual de bien y devolvía 200
+  también, por el mismo motivo. Se dejó `redirect("/clientes")` porque además
+  deja a la persona en una pantalla que sí puede usar.
+
+**Consecuencia práctica:** una prueba de seguridad aquí NO debe mirar el código
+de estado —daría por bueno cualquier cosa— sino comprobar que los datos no
+aparecen en la respuesta.
+
+### Migración de los clientes existentes
+
+Los 8 clientes que ya existían quedaron asignados al administrador con
+`scripts/repartir-clientes.mjs`, que enseña la vista previa antes de escribir,
+guarda copia en `.copias/` y permite volver atrás con `--deshacer`. Solo se
+escribió `clientes.entrenador_id`. Comprobado después: 8 clientes, 13 ciclos,
+78 sesiones, 8 tokens y 2.382,50 € exactamente igual que antes.
+
+### Añadir otro entrenador más adelante
+
+```
+node scripts/crear-usuario.mjs <correo> <contraseña> entrenador "Nombre Apellido"
+```
+
+Y asignarle clientes. No hay nada más que tocar: ni políticas, ni pantallas, ni
+consultas.
+
 ## Principios de arquitectura (de SYSTEM_VISION.md)
 
 - Módulos independientes: Calendar, base de datos de clientes, resumen

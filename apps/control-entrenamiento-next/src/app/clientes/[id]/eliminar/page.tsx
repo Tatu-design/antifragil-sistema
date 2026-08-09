@@ -1,13 +1,14 @@
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 
 import { accionBorrarCliente } from "@/app/actions";
 import { BotonBorrar } from "@/components/BotonBorrar";
 import { Iconos } from "@/components/Iconos";
 import { SinConexion } from "@/components/SinConexion";
-import { haySesion } from "@/lib/auth";
 import { BaseNoDisponible } from "@/repositories/postgres";
 import { obtenerPerfil } from "@/services/clientes";
+
+import { exigirAdmin } from "@/lib/permisos";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Borrar cliente — Antifrágil" };
@@ -20,7 +21,7 @@ export default async function PaginaEliminar({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ error?: string }>;
 }) {
-  if (!(await haySesion())) redirect("/login");
+  await exigirAdmin();
 
   const { id } = await params;
   let perfil;

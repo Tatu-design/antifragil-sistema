@@ -1,12 +1,13 @@
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 
 import { accionEditarSesion } from "@/app/actions";
 import { BorrarSesion } from "@/components/BorrarSesion";
 import { SinConexion } from "@/components/SinConexion";
-import { haySesion } from "@/lib/auth";
 import { BaseNoDisponible } from "@/repositories/postgres";
 import { obtenerPerfil } from "@/services/clientes";
+
+import { exigirAccesoACliente } from "@/lib/permisos";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Editar sesión — Antifrágil" };
@@ -19,9 +20,11 @@ export default async function PaginaEditarSesion({
   params: Promise<{ id: string; sesionId: string }>;
   searchParams: Promise<{ error?: string }>;
 }) {
-  if (!(await haySesion())) redirect("/login");
-
   const { id, sesionId } = await params;
+
+  // El candado. Antes de leer nada de este cliente: un entrenador que
+  // escriba la dirección a mano de un cliente ajeno recibe «no existe».
+  await exigirAccesoACliente(id);
   let perfil;
   try {
     perfil = await obtenerPerfil(id);

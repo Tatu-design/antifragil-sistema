@@ -1,14 +1,14 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 
 import { BarraInferior } from "@/components/BarraInferior";
 import { FormularioFacturacionKids } from "@/components/FormularioFacturacionKids";
 import { Iconos, Icono } from "@/components/Iconos";
 import { SinConexion } from "@/components/SinConexion";
-import { haySesion } from "@/lib/auth";
 import { euros, mesEs } from "@/lib/formato";
 import { BaseNoDisponible } from "@/repositories/postgres";
 import { obtenerCuenta } from "@/services/clases";
+
+import { exigirAdmin } from "@/lib/permisos";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Facturación de CrossFit Kids — Antifrágil" };
@@ -21,7 +21,7 @@ export const metadata = { title: "Facturación de CrossFit Kids — Antifrágil"
  * resultado, porque de ahí sale el precio por hora que verá en Economía.
  */
 export default async function PaginaFacturacionKids() {
-  if (!(await haySesion())) redirect("/login");
+  await exigirAdmin();
 
   let vista;
   try {

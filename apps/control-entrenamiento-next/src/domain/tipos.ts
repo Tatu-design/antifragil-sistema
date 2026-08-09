@@ -80,6 +80,11 @@ export interface Sesion {
   tarifa: number | null;
   ciclo: number;
   servicio: string;
+  /**
+   * Quién la firmó. `null` en las anteriores al 2026-08-09, cuando solo había
+   * una persona usando la aplicación: no se inventa quién las hizo.
+   */
+  firmadaPor?: string | null;
 }
 
 export interface CargoMensual {

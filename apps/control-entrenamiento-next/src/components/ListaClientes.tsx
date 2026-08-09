@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 
 import type { FichaClase } from "@/domain/clases";
+import type { Perfil } from "@/repositories/tipos";
 import type { ClienteEnLista } from "@/services/clientes";
 
 type Filtro = "activos" | "pendientes" | "pausados" | "cancelados";
@@ -34,31 +35,62 @@ const NOMBRES: Record<Filtro, string> = {
 export function ListaClientes({
   clientes,
   cuentas = [],
+  profesionales = [],
 }: {
   clientes: ClienteEnLista[];
   /** CrossFit Lidomare y Kids. No son clientes: son cuentas de actividad. */
   cuentas?: FichaClase[];
+  /**
+   * Los profesionales, para que el administrador pueda filtrar por quién
+   * lleva a cada cliente. Llega vacío para un entrenador: él ya solo recibe
+   * los suyos, así que un filtro por profesional no tendría nada que filtrar.
+   */
+  profesionales?: Perfil[];
 }) {
   const [filtro, setFiltro] = useState<Filtro>("activos");
+  const [quien, setQuien] = useState<string>("todos");
 
+  // Solo se enseña si de verdad hay entre quién elegir.
+  const hayFiltroProfesional = profesionales.length > 1;
+  const suyo = (c: ClienteEnLista) => quien === "todos" || c.entrenadorId === quien;
+
+  // Los contadores cuentan dentro del profesional elegido: si el número dice
+  // 3, tienen que verse 3 tarjetas.
+  const delFiltro = clientes.filter(suyo);
   const conteos: Record<Filtro, number> = {
     // Las dos cuentas de CrossFit cuentan aquí: el número tiene que coincidir
     // con las tarjetas que se ven. Por eso el filtro se llama «Activos» y no
     // «Clientes activos» — hay dos tarjetas que no son clientes.
-    activos: clientes.filter((c) => c.estado === "activo").length + cuentas.length,
+    activos: delFiltro.filter((c) => c.estado === "activo").length + (quien === "todos" ? cuentas.length : 0),
     // Incluye a cualquiera que deba dinero, esté activo, pausado o cancelado.
-    pendientes: clientes.filter((c) => c.debe).length,
-    pausados: clientes.filter((c) => c.estado === "pausado").length,
-    cancelados: clientes.filter((c) => c.estado === "cancelado").length,
+    pendientes: delFiltro.filter((c) => c.debe).length,
+    pausados: delFiltro.filter((c) => c.estado === "pausado").length,
+    cancelados: delFiltro.filter((c) => c.estado === "cancelado").length,
   };
 
   const visible = (c: ClienteEnLista) =>
-    filtro === "pendientes" ? c.debe : c.estado === filtro.slice(0, -1);
+    suyo(c) && (filtro === "pendientes" ? c.debe : c.estado === filtro.slice(0, -1));
 
   const visibles = clientes.filter(visible);
 
   return (
     <>
+      {hayFiltroProfesional && (
+        <div className="filtros filtros-profesional" role="group" aria-label="Filtrar por profesional">
+          {[{ id: "todos", nombre: "Todos" }, ...profesionales].map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              className={`filtro${quien === p.id ? " activo" : ""}`}
+              aria-pressed={quien === p.id}
+              onClick={() => setQuien(p.id)}
+            >
+              <span className="filtro-nombre">{p.nombre}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="filtros" role="group" aria-label="Filtrar clientes">
         {(Object.keys(NOMBRES) as Filtro[]).map((clave) => (
           <button
@@ -82,7 +114,7 @@ export function ListaClientes({
             tienen deuda, ni pausa, ni cancelación — esos tres estados
             pertenecen a clientes de verdad. */}
         {cuentas.map((cuenta) => (
-          <TarjetaCuenta key={cuenta.tipo} cuenta={cuenta} oculta={filtro !== "activos"} />
+          <TarjetaCuenta key={cuenta.tipo} cuenta={cuenta} oculta={filtro !== "activos" || quien !== "todos"} />
         ))}
 
         {clientes.map((cliente) => (
@@ -130,7 +162,7 @@ export function ListaClientes({
         ))}
       </div>
 
-      <p className="empty" hidden={visibles.length > 0 || (filtro === "activos" && cuentas.length > 0)}>
+      <p className="empty" hidden={visibles.length > 0 || (filtro === "activos" && quien === "todos" && cuentas.length > 0)}>
         {VACIOS[filtro]}
       </p>
     </>

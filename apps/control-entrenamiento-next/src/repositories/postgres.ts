@@ -204,6 +204,7 @@ function aSesion(f: Record<string, unknown>): Sesion {
     tarifa: numero(f.tarifa),
     ciclo: Number(f.ciclo),
     servicio: f.servicio as string,
+    firmadaPor: (f.firmada_por as string | null) ?? null,
   };
 }
 
@@ -213,8 +214,12 @@ const CAMPOS_CICLO = `cliente_id, ciclo, modalidad, servicio, tarifa, sesiones_t
 // -----------------------------------------------------------------------------
 
 export class RepositorioPostgres implements Repositorio {
-  async listarClientes(): Promise<Cliente[]> {
-    const filas = await consultar("select * from clientes order by nombre");
+  async listarClientes(soloDe?: string | null): Promise<Cliente[]> {
+    // Sin `soloDe` vienen todos: es lo que ve un administrador. Con él, solo
+    // los suyos, y el filtro lo hace la base de datos — los demás ni salen.
+    const filas = soloDe
+      ? await consultar("select * from clientes where entrenador_id = $1 order by nombre", [soloDe])
+      : await consultar("select * from clientes order by nombre");
     return filas.map(aCliente);
   }
 
@@ -288,12 +293,25 @@ export class RepositorioPostgres implements Repositorio {
    * más de siete segundos de espera. Estas tres consultas no crecen con el
    * número de clientes.
    */
-  async cargarTodoParaLaLista(): Promise<DatosDeLaLista> {
+  async cargarTodoParaLaLista(soloDe?: string | null): Promise<DatosDeLaLista> {
+    // Los ciclos, las cuotas y las sesiones de OTROS clientes no se traen
+    // siquiera. No es una optimización: es que el historial y el dinero de los
+    // clientes de Fernando no deben salir de la base hacia el móvil de un
+    // entrenador, ni aunque la pantalla luego no los pinte (2026-08-09).
+    const suyos = "cliente_id in (select id from clientes where entrenador_id = $1)";
     const [filasCiclos, filasCargos, filasConteo] = await Promise.all([
-      consultar(`select ${CAMPOS_CICLO} from ciclos order by cliente_id, ciclo desc`),
-      consultar("select * from cargos_mensuales"),
+      consultar(
+        `select ${CAMPOS_CICLO} from ciclos${soloDe ? ` where ${suyos}` : ""} order by cliente_id, ciclo desc`,
+        soloDe ? [soloDe] : [],
+      ),
+      consultar(
+        `select * from cargos_mensuales${soloDe ? ` where ${suyos}` : ""}`,
+        soloDe ? [soloDe] : [],
+      ),
       consultar<{ cliente_id: string; ciclo: number; n: string }>(
-        "select cliente_id, ciclo, count(*)::int as n from sesiones group by cliente_id, ciclo",
+        `select cliente_id, ciclo, count(*)::int as n from sesiones${soloDe ? ` where ${suyos}` : ""}
+          group by cliente_id, ciclo`,
+        soloDe ? [soloDe] : [],
       ),
     ]);
 
@@ -367,11 +385,12 @@ export class RepositorioPostgres implements Repositorio {
   async guardarSesion(sesion: Sesion): Promise<void> {
     await consultar(
       `insert into sesiones (id, cliente_id, ciclo, fecha, hora, numero_sesion,
-                             sesiones_totales, tarifa, servicio)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+                             sesiones_totales, tarifa, servicio, firmada_por)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
       [
         sesion.id, sesion.clienteId, sesion.ciclo, sesion.fecha, sesion.hora,
         sesion.numeroSesion, sesion.sesionesTotales, sesion.tarifa, sesion.servicio,
+        sesion.firmadaPor ?? null,
       ],
     );
   }
