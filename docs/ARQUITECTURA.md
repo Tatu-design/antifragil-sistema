@@ -1849,7 +1849,7 @@ la restricción de la tabla y el idioma del resto del proyecto.
 
 ### Quién puede qué
 
-| | Admin (Tato) | Entrenador (Rafa) |
+| | Admin (Tatu) | Entrenador (Rafa) |
 |---|---|---|
 | Clientes que ve | todos, con filtro por profesional | **solo los suyos** |
 | Firmar sesiones | sí | sí, en los suyos |

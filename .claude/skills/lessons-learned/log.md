@@ -628,3 +628,25 @@ Es el error de portar una arquitectura sin portar sus supuestos de coste.
    a la base por pantalla y falla si alguna se pasa del presupuesto. Incluye
    una prueba que duplica los clientes y comprueba que el número NO sube —
    así, si alguien vuelve a meter una consulta por cliente, salta.
+
+---
+
+## 2026-08-09 — Escribí mal su nombre teniendo la prueba delante
+
+**Qué pasó:** puse «Tato» como nombre del administrador en la base de datos y
+en la documentación. Se llama **Tatu**.
+
+**Por qué pasó:** el encargo escrito decía «Todos | Tato | Rafa», y lo copié
+tal cual. Pero el repositorio lleva toda la sesión enseñando lo contrario: la
+cuenta de Vercel es `tatu5` y el repositorio es `Tatu-design`. Tenía dos
+pruebas a la vista de que el nombre real era otro y no las miré, porque el
+texto del encargo parecía zanjar la cuestión.
+
+**Qué se hace distinto:** un nombre propio que va a quedar escrito en la base
+de datos y en una pantalla se contrasta con lo que dice el repositorio antes de
+escribirlo. Si el encargo y los datos no coinciden, **se pregunta en una línea**
+— no se elige el que viene en el texto por ser el más reciente. Un encargo
+largo puede tener una errata; el nombre de la cuenta de alguien, no.
+
+Vale para cualquier dato que identifique a una persona: nombre, correo, alias.
+
