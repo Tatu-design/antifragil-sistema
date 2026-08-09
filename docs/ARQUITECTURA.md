@@ -8,8 +8,12 @@
 ### Migración a Next.js/Supabase/Vercel — Fases 0 a 3 (2026-08-03)
 
 Trabajo en `feat/migracion-next-vercel`, salida de `feat/modalidades-servicio`.
-**La aplicación Flask de PythonAnywhere no se ha tocado en ningún momento** y
-sigue siendo la oficial. Cero líneas modificadas del código de producción.
+Durante estas cuatro fases **la aplicación Flask de PythonAnywhere no se tocó
+en ningún momento** y siguió siendo la oficial. Cero líneas modificadas.
+
+> Eso valía mientras duró la migración. **Desde el 2026-08-05 la aplicación del
+> proyecto es la de Next.js/Supabase/Vercel** y Flask pasó a ser el respaldo —
+> ver el aviso al principio de este documento.
 
 - **Fase 0**: copia de la base de datos verificada (`integrity_check` correcto,
   0 claves rotas), rama nueva, `main` y `feat/webapp-flask` intactas.

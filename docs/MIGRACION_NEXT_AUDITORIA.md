@@ -433,9 +433,14 @@ comprobarse solo a nivel de funciones: tiene que llegar hasta la pantalla.**
 
 ---
 
-## 5. Qué NO se toca durante toda la migración
+## 5. Qué NO se tocó durante toda la migración
 
-- La aplicación Flask de PythonAnywhere sigue siendo la oficial.
+> Esta lista describe las reglas que rigieron **mientras** duró la migración
+> (agosto de 2026). Terminó: desde el 2026-08-05 la aplicación del proyecto es
+> la de Next.js/Supabase/Vercel y Flask quedó como respaldo.
+
+- La aplicación Flask de PythonAnywhere siguió siendo la oficial **durante la
+  migración**. Ya no lo es.
 - No se apaga, no se modifica destructivamente, no se cambia su dominio.
 - No se borra la rama `feat/webapp-flask` ni ninguna otra.
 - No se hace `push --force` ni se reescribe historia.

@@ -1,5 +1,12 @@
 # Proyecto de aprendizaje: web app con Flask
 
+> ⚠️ **DOCUMENTO HISTÓRICO.** Describe la aplicación **Flask en
+> PythonAnywhere**, que fue la del proyecto hasta el 2026-08-05 y **ya no lo
+> es**. La aplicación actual es la de **Next.js + Supabase en Vercel**
+> (`apps/control-entrenamiento-next`). Se conserva porque explica de dónde
+> viene el sistema, no cómo funciona hoy.
+
+
 > Este es un proyecto aparte del sistema operativo de Antifrágil (que sigue
 > funcionando por chat + skills + dashboard). El objetivo aquí es que
 > Fernando aprenda a construir una web app real, paso a paso, sin arriesgar
