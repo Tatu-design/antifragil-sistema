@@ -26,12 +26,12 @@ export function FormularioAlta({
 }) {
   const [nombre, setNombre] = useState("");
   const [servicio, setServicio] = useState<ValoresServicio>(valoresIniciales());
-  const [entrenadorId, setEntrenadorId] = useState(porDefecto);
+  const [profesionalId, setEntrenadorId] = useState(porDefecto);
   const [revisando, setRevisando] = useState(false);
 
   // Con un solo profesional no hay nada que elegir: el campo sobra.
   const hayQueElegir = profesionales.length > 1;
-  const responsable = profesionales.find((p) => p.id === entrenadorId)?.nombre ?? "—";
+  const responsable = profesionales.find((p) => p.id === profesionalId)?.nombre ?? "—";
 
   if (!revisando) {
     return (
@@ -59,8 +59,8 @@ export function FormularioAlta({
 
           {hayQueElegir && (
             <label className="campo">
-              <span>Quién lo lleva</span>
-              <select value={entrenadorId} onChange={(e) => setEntrenadorId(e.target.value)}>
+              <span>Profesional</span>
+              <select value={profesionalId} onChange={(e) => setEntrenadorId(e.target.value)}>
                 {profesionales.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.nombre}
@@ -104,7 +104,7 @@ export function FormularioAlta({
         </div>
         {hayQueElegir && (
           <div className="fila">
-            <span className="etiqueta">Quién lo lleva</span>
+            <span className="etiqueta">Profesional</span>
             <span className="despues">{responsable}</span>
           </div>
         )}
@@ -126,7 +126,7 @@ export function FormularioAlta({
         <input type="hidden" name="cuotaMensual" value={servicio.cuotaMensual} />
         <input type="hidden" name="sesionesReferencia" value={servicio.sesionesReferencia} />
         <input type="hidden" name="tarifa" value={servicio.tarifa} />
-        <input type="hidden" name="entrenadorId" value={entrenadorId} />
+        <input type="hidden" name="profesionalId" value={profesionalId} />
         <Crear />
       </form>
 

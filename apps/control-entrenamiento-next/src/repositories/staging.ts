@@ -50,11 +50,11 @@ function semilla(): Almacen {
   ];
 
   const clientes: Cliente[] = [
-    { id: "cli-a", nombre: "Cliente A", estado: "activo", token: "tok-cliente-a", pendientePago: false, sesionesCompletadas: 6, cicloActual: 1, entrenadorId: "per-admin" },
-    { id: "cli-b", nombre: "Cliente B", estado: "activo", token: "tok-cliente-b", pendientePago: true, sesionesCompletadas: 0, cicloActual: 1, entrenadorId: "per-admin" },
-    { id: "cli-c", nombre: "Pareja C", estado: "activo", token: "tok-pareja-c", pendientePago: false, sesionesCompletadas: 3, cicloActual: 1, entrenadorId: "per-admin" },
-    { id: "cli-d", nombre: "Cliente D", estado: "activo", token: "tok-cliente-d", pendientePago: false, sesionesCompletadas: 0, cicloActual: 1, entrenadorId: "per-rafa" },
-    { id: "cli-e", nombre: "Cliente E", estado: "pausado", token: "tok-cliente-e", pendientePago: false, sesionesCompletadas: 2, cicloActual: 1, entrenadorId: "per-admin" },
+    { id: "cli-a", nombre: "Cliente A", estado: "activo", token: "tok-cliente-a", pendientePago: false, sesionesCompletadas: 6, cicloActual: 1, profesionalId: "per-admin" },
+    { id: "cli-b", nombre: "Cliente B", estado: "activo", token: "tok-cliente-b", pendientePago: true, sesionesCompletadas: 0, cicloActual: 1, profesionalId: "per-admin" },
+    { id: "cli-c", nombre: "Pareja C", estado: "activo", token: "tok-pareja-c", pendientePago: false, sesionesCompletadas: 3, cicloActual: 1, profesionalId: "per-admin" },
+    { id: "cli-d", nombre: "Cliente D", estado: "activo", token: "tok-cliente-d", pendientePago: false, sesionesCompletadas: 0, cicloActual: 1, profesionalId: "per-rafa" },
+    { id: "cli-e", nombre: "Cliente E", estado: "pausado", token: "tok-cliente-e", pendientePago: false, sesionesCompletadas: 2, cicloActual: 1, profesionalId: "per-admin" },
   ];
 
   const ciclos: Ciclo[] = [
@@ -159,7 +159,7 @@ function clonar<T>(valor: T): T {
 export class RepositorioStaging implements Repositorio {
   async listarClientes(soloDe?: string | null): Promise<Cliente[]> {
     const datos = await cargar();
-    const suyos = soloDe ? datos.clientes.filter((c) => c.entrenadorId === soloDe) : datos.clientes;
+    const suyos = soloDe ? datos.clientes.filter((c) => c.profesionalId === soloDe) : datos.clientes;
     return clonar(suyos).sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
   }
 
@@ -205,7 +205,7 @@ export class RepositorioStaging implements Repositorio {
 
     // Mismo alcance que en Postgres: lo de los demás clientes no se toca.
     const esSuyo = (clienteId: string) =>
-      !soloDe || datos.clientes.some((c) => c.id === clienteId && c.entrenadorId === soloDe);
+      !soloDe || datos.clientes.some((c) => c.id === clienteId && c.profesionalId === soloDe);
 
     const cargos = clonar(datos.cargos.filter((c) => esSuyo(c.clienteId)));
     const porCliente = new Map<string, CargoMensual[]>();
@@ -444,11 +444,11 @@ export class RepositorioStaging implements Repositorio {
     return clonar(datos.perfiles.find((p) => p.correo.toLowerCase() === buscado) ?? null);
   }
 
-  async entrenadorDelCliente(clienteId: string): Promise<string | null> {
+  async profesionalDelCliente(clienteId: string): Promise<string | null> {
     const datos = await cargar();
     // El cliente que no existe y el que no tiene responsable responden igual:
     // así nadie averigua quién está dado de alta preguntando.
-    return datos.clientes.find((c) => c.id === clienteId)?.entrenadorId ?? null;
+    return datos.clientes.find((c) => c.id === clienteId)?.profesionalId ?? null;
   }
 
   async listarProfesionales(): Promise<Perfil[]> {
@@ -460,10 +460,10 @@ export class RepositorioStaging implements Repositorio {
     );
   }
 
-  async asignarEntrenador(clienteId: string, entrenadorId: string | null): Promise<void> {
+  async asignarProfesional(clienteId: string, profesionalId: string | null): Promise<void> {
     const datos = await cargar();
     const cliente = datos.clientes.find((c) => c.id === clienteId);
-    if (cliente) cliente.entrenadorId = entrenadorId;
+    if (cliente) cliente.profesionalId = profesionalId;
     await volcar();
   }
 

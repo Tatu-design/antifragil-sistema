@@ -119,8 +119,8 @@ describe("qué datos salen de la base", () => {
     // Si respondieran distinto, se podría averiguar quién está dado de alta
     // probando direcciones.
     const repo = repositorio();
-    const ajeno = await repo.entrenadorDelCliente(AJENO);
-    const inventado = await repo.entrenadorDelCliente("no-existe-este-cliente");
+    const ajeno = await repo.profesionalDelCliente(AJENO);
+    const inventado = await repo.profesionalDelCliente("no-existe-este-cliente");
 
     expect(puedeVerCliente(RAFA, ajeno)).toBe(false);
     expect(puedeVerCliente(RAFA, inventado)).toBe(false);
@@ -144,7 +144,7 @@ describe("qué datos salen de la base", () => {
       sesionesTotales: 10,
       precioTotal: 450,
       tarifa: 45,
-      entrenadorId: RAFA.id,
+      profesionalId: RAFA.id,
     });
 
     const deRafa = await listarClientes(RAFA.id);
@@ -170,7 +170,7 @@ describe("qué datos salen de la base", () => {
 
   it("el administrador puede reasignar un cliente y el alcance cambia con él", async () => {
     const repo = repositorio();
-    await repo.asignarEntrenador(AJENO, RAFA.id);
+    await repo.asignarProfesional(AJENO, RAFA.id);
 
     const suyos = await listarClientes(RAFA.id);
     expect(suyos.map((c) => c.id).sort()).toEqual([AJENO, SUYO].sort());

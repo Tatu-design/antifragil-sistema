@@ -147,11 +147,11 @@ export interface Repositorio {
   /** El profesional con ese correo, o `null` si no tiene perfil. */
   perfilPorCorreo(correo: string): Promise<Perfil | null>;
   /** De quién es ese cliente. `null` si no existe o si no tiene responsable. */
-  entrenadorDelCliente(clienteId: string): Promise<string | null>;
+  profesionalDelCliente(clienteId: string): Promise<string | null>;
   /** Todos los profesionales. Para el filtro del administrador. */
   listarProfesionales(): Promise<Perfil[]>;
   /** Asigna el responsable de un cliente. Solo el administrador. */
-  asignarEntrenador(clienteId: string, entrenadorId: string | null): Promise<void>;
+  asignarProfesional(clienteId: string, profesionalId: string | null): Promise<void>;
 
   facturacionKids(anio: number, mes: number): Promise<number | null>;
   guardarFacturacionKids(anio: number, mes: number, importe: number): Promise<void>;

@@ -45,7 +45,7 @@ export const esquemaAlta = z.object({
   tarifa: numeroOpcional,
   sesionesReferencia: numeroOpcional,
   /** Quién lo va a llevar. Vacío = el propio administrador. */
-  entrenadorId: z.string().trim().default(""),
+  profesionalId: z.string().trim().default(""),
 });
 
 export const esquemaServicio = z.object({

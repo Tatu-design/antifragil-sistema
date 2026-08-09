@@ -159,7 +159,7 @@ export interface DatosAlta {
    * única forma de que un cliente nazca ya asignado a Rafa, porque un
    * entrenador no puede crear clientes.
    */
-  entrenadorId?: string | null;
+  profesionalId?: string | null;
 }
 
 export async function crearCliente(datos: DatosAlta): Promise<Cliente> {
@@ -183,7 +183,7 @@ export async function crearCliente(datos: DatosAlta): Promise<Cliente> {
     cicloActual: 1,
     // Sin responsable explícito, el cliente es del administrador. Nunca queda
     // suelto: un cliente sin dueño no lo ve nadie salvo el administrador.
-    entrenadorId: datos.entrenadorId ?? null,
+    profesionalId: datos.profesionalId ?? null,
   };
 
   const ciclo: Ciclo = {
@@ -238,7 +238,7 @@ export interface CambioDeServicio {
    * única forma de que un cliente nazca ya asignado a Rafa, porque un
    * entrenador no puede crear clientes.
    */
-  entrenadorId?: string | null;
+  profesionalId?: string | null;
 }
 
 export interface ResultadoCambio {

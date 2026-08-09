@@ -4,7 +4,7 @@ import { cache } from "react";
 import { redirect } from "next/navigation";
 
 import { correoActual } from "./auth";
-import { perfilPorCorreo, entrenadorDelCliente, type Perfil } from "@/repositories/perfiles";
+import { perfilPorCorreo, profesionalDelCliente, type Perfil } from "@/repositories/perfiles";
 
 /**
  * Quién está usando la aplicación y qué puede hacer.
@@ -125,7 +125,7 @@ export async function exigirAccesoACliente(clienteId: string): Promise<Perfil> {
   const usuario = await exigirUsuario();
   if (esAdmin(usuario)) return usuario;
 
-  const responsable = await entrenadorDelCliente(clienteId);
+  const responsable = await profesionalDelCliente(clienteId);
   // A su lista, sin decir nada. Un cliente ajeno y uno inventado se comportan
   // exactamente igual: no se puede averiguar quién está dado de alta probando
   // direcciones.

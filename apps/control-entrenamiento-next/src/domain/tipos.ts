@@ -32,7 +32,7 @@ export interface Cliente {
    * 2026-08-09 y todavía sin repartir; a efectos de permiso, un cliente sin
    * responsable es del administrador y nadie más lo ve.
    */
-  entrenadorId: string | null;
+  profesionalId: string | null;
 }
 
 export interface Ciclo {

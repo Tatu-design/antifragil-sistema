@@ -168,7 +168,11 @@ function aCliente(f: Record<string, unknown>): Cliente {
     pendientePago: Boolean(f.pendiente_pago),
     sesionesCompletadas: Number(f.sesiones_completadas),
     cicloActual: Number(f.ciclo_actual),
-    entrenadorId: (f.entrenador_id as string | null) ?? null,
+    // La columna de la base se llama `entrenador_id` y el código dice
+    // `profesionalId`: es la misma cosa. Fernando llama «profesional» a la
+    // persona y «entrenador» al rol, que es una distinción útil. Renombrar la
+    // columna exigiría una migración y no cambiaría nada de lo que se ve.
+    profesionalId: (f.entrenador_id as string | null) ?? null,
   };
 }
 
@@ -588,7 +592,7 @@ export class RepositorioPostgres implements Repositorio {
     return f ? { id: f.id, correo: f.email, nombre: f.nombre, rol: f.rol as Perfil["rol"] } : null;
   }
 
-  async entrenadorDelCliente(clienteId: string): Promise<string | null> {
+  async profesionalDelCliente(clienteId: string): Promise<string | null> {
     const filas = await consultar<{ entrenador_id: string | null }>(
       "select entrenador_id from clientes where id = $1",
       [clienteId],
@@ -606,8 +610,8 @@ export class RepositorioPostgres implements Repositorio {
     return filas.map((f) => ({ id: f.id, correo: f.email, nombre: f.nombre, rol: f.rol as Perfil["rol"] }));
   }
 
-  async asignarEntrenador(clienteId: string, entrenadorId: string | null): Promise<void> {
-    await consultar("update clientes set entrenador_id = $2 where id = $1", [clienteId, entrenadorId]);
+  async asignarProfesional(clienteId: string, profesionalId: string | null): Promise<void> {
+    await consultar("update clientes set entrenador_id = $2 where id = $1", [clienteId, profesionalId]);
   }
 
   async facturacionKids(anio: number, mes: number): Promise<number | null> {

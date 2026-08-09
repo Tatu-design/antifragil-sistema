@@ -171,8 +171,8 @@ export async function accionCrearCliente(datos: FormData): Promise<void> {
       // El responsable, comprobado contra la lista real de profesionales: no
       // se acepta un identificador cualquiera venido del formulario. Sin
       // elegir nada, el cliente es de quien lo da de alta.
-      entrenadorId: profesionales.some((p) => p.id === validado.data.entrenadorId)
-        ? validado.data.entrenadorId
+      profesionalId: profesionales.some((p) => p.id === validado.data.profesionalId)
+        ? validado.data.profesionalId
         : admin.id,
     });
     id = cliente.id;

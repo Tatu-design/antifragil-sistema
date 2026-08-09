@@ -52,7 +52,7 @@ export function ListaClientes({
 
   // Solo se enseña si de verdad hay entre quién elegir.
   const hayFiltroProfesional = profesionales.length > 1;
-  const suyo = (c: ClienteEnLista) => quien === "todos" || c.entrenadorId === quien;
+  const suyo = (c: ClienteEnLista) => quien === "todos" || c.profesionalId === quien;
 
   // Los contadores cuentan dentro del profesional elegido: si el número dice
   // 3, tienen que verse 3 tarjetas.

@@ -40,8 +40,8 @@ export const perfilPorCorreo = cache(
  * cliente que no es suyo no debe poder distinguir «no existe» de «existe pero
  * no es tuyo».
  */
-export const entrenadorDelCliente = cache(
-  async (clienteId: string): Promise<string | null> => repositorio().entrenadorDelCliente(clienteId),
+export const profesionalDelCliente = cache(
+  async (clienteId: string): Promise<string | null> => repositorio().profesionalDelCliente(clienteId),
 );
 
 /** Los profesionales, para el filtro de la lista. Solo lo usa el administrador. */
