@@ -76,13 +76,12 @@ export default async function PaginaClientes({
 
         <div className="cabecera-pagina">
           <h1>{admin ? "Lista de clientes" : "Mis clientes"}</h1>
-          {/* Dar de alta es cosa del administrador. */}
-          {admin && (
-            <Link className="boton-nuevo" href="/clientes/nuevo">
-              <Icono nombre="i-plus" pequeno />
-              Nuevo
-            </Link>
-          )}
+          {/* Dar de alta lo puede hacer cualquiera; un entrenador solo para
+              sí mismo, y eso lo garantiza la acción, no este botón. */}
+          <Link className="boton-nuevo" href="/clientes/nuevo">
+            <Icono nombre="i-plus" pequeno />
+            Nuevo
+          </Link>
         </div>
 
         {guardado && <div className="aviso-guardado">✔ Guardado: {guardado}</div>}

@@ -3,7 +3,7 @@ import Link from "next/link";
 import { FormularioAlta } from "@/components/FormularioAlta";
 import { Iconos } from "@/components/Iconos";
 
-import { exigirAdmin } from "@/lib/permisos";
+import { esAdmin, exigirUsuario } from "@/lib/permisos";
 import { listarProfesionales } from "@/repositories/perfiles";
 
 export const dynamic = "force-dynamic";
@@ -15,8 +15,11 @@ export default async function PaginaNuevoCliente({
 }: {
   searchParams: Promise<{ error?: string }>;
 }) {
-  const admin = await exigirAdmin();
-  const profesionales = await listarProfesionales();
+  const quien = await exigirUsuario();
+  // A un entrenador se le ofrece una sola opción —él— así que el selector no
+  // llega a dibujarse. La decisión de verdad no está aquí: está en la acción,
+  // que ignora lo que venga en el formulario si no es administrador.
+  const profesionales = esAdmin(quien) ? await listarProfesionales() : [];
 
   const { error: fallo } = await searchParams;
 
@@ -30,7 +33,7 @@ export default async function PaginaNuevoCliente({
 
         {fallo && <div className="aviso-error">{fallo}</div>}
 
-        <FormularioAlta profesionales={profesionales} porDefecto={admin.id} />
+        <FormularioAlta profesionales={profesionales} porDefecto={quien.id} />
       </div>
     </>
   );

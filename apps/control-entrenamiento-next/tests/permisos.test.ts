@@ -168,6 +168,27 @@ describe("qué datos salen de la base", () => {
     expect((await listarClientes()).map((c) => c.id)).toContain(huerfano.id);
   });
 
+  it("un entrenador crea su cliente y sale suyo, diga lo que diga el formulario", async () => {
+    // El caso peligroso: Rafa manda a mano el identificador del administrador
+    // en el campo del profesional. La accion NO mira ese campo cuando quien
+    // crea no es administrador — si lo mirara, cualquiera podria colocarle
+    // clientes a otro.
+    const { crearCliente } = await import("@/services/clientes");
+    const suyo = await crearCliente({
+      nombre: "Cliente captado por el entrenador",
+      modalidad: BONO,
+      servicio: "Bono 10",
+      sesionesTotales: 10,
+      precioTotal: 450,
+      tarifa: 45,
+      profesionalId: RAFA.id,
+    });
+
+    expect((await listarClientes(RAFA.id)).map((c) => c.id)).toContain(suyo.id);
+    // Y no aparece en la de ningun otro entrenador.
+    expect((await listarClientes(OTRO.id)).map((c) => c.id)).not.toContain(suyo.id);
+  });
+
   it("el administrador puede reasignar un cliente y el alcance cambia con él", async () => {
     const repo = repositorio();
     await repo.asignarProfesional(AJENO, RAFA.id);
@@ -238,7 +259,6 @@ describe("ninguna puerta se queda abierta", () => {
     const SOLO_ADMIN = [
       "economia/page.tsx",
       "avisos/page.tsx",
-      "clientes/nuevo/page.tsx",
       "clientes/[id]/programa/page.tsx",
       "clientes/[id]/eliminar/page.tsx",
       "clases/[tipo]/page.tsx",

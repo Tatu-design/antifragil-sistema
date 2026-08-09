@@ -19,7 +19,7 @@ import { redirect } from "next/navigation";
 
 import { ErrorDeNegocio } from "@/domain/modalidades";
 import { cerrarSesion, entrar, entrarConClaveUnica } from "@/lib/auth";
-import { exigirAccesoACliente, exigirAdmin, exigirUsuario } from "@/lib/permisos";
+import { esAdmin, exigirAccesoACliente, exigirAdmin, exigirUsuario } from "@/lib/permisos";
 import { listarProfesionales } from "@/repositories/perfiles";
 import {
   desdeFormulario,
@@ -148,14 +148,17 @@ export async function accionFirmar(datos: FormData): Promise<void> {
 
 /** «Confirmar y crear». Termina en la ficha del cliente nuevo, como Flask. */
 export async function accionCrearCliente(datos: FormData): Promise<void> {
-  const admin = await exigirAdmin();
+  // Desde el 2026-08-10 un entrenador también da de alta a sus clientes: si
+  // capta a alguien, no tiene por qué esperar a que se lo cree el
+  // administrador. Lo que NO puede es crearlo a nombre de otro.
+  const quien = await exigirUsuario();
   const validado = esquemaAlta.safeParse(desdeFormulario(datos));
   if (!validado.success) {
     const texto = validado.error.issues[0]?.message ?? "revisa los datos";
     redirect(`/clientes/nuevo?error=${encodeURIComponent(texto)}`);
   }
 
-  const profesionales = await listarProfesionales();
+  const profesionales = esAdmin(quien) ? await listarProfesionales() : [];
 
   let id: string;
   try {
@@ -168,12 +171,18 @@ export async function accionCrearCliente(datos: FormData): Promise<void> {
       cuotaMensual: validado.data.cuotaMensual,
       tarifa: validado.data.tarifa,
       sesionesReferencia: validado.data.sesionesReferencia,
-      // El responsable, comprobado contra la lista real de profesionales: no
-      // se acepta un identificador cualquiera venido del formulario. Sin
-      // elegir nada, el cliente es de quien lo da de alta.
-      profesionalId: profesionales.some((p) => p.id === validado.data.profesionalId)
-        ? validado.data.profesionalId
-        : admin.id,
+      // Quién lo lleva. **Esta línea es la que impide que un entrenador cree
+      // clientes a nombre de otro**, y por eso no mira el formulario cuando
+      // no es administrador: da igual lo que venga escrito ahí.
+      //
+      // Un administrador sí elige, pero solo entre profesionales que existen
+      // de verdad; cualquier otra cosa que llegue se ignora y el cliente es
+      // suyo.
+      profesionalId: esAdmin(quien)
+        ? (profesionales.some((p) => p.id === validado.data.profesionalId)
+            ? validado.data.profesionalId
+            : quien.id)
+        : quien.id,
     });
     id = cliente.id;
   } catch (error) {
