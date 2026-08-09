@@ -21,9 +21,10 @@ import { TARIFA_LIDOMARE, type TipoClase } from "@/domain/economia";
 import { BONO, CUENTA, MENSUALIDAD } from "@/domain/modalidades";
 import type { CargoMensual, Ciclo, Cliente, Sesion } from "@/domain/tipos";
 import { rangoSemana } from "@/lib/fechas";
-import type { Aviso, ClaseGrupo, DatosDeLaLista, Repositorio, SemanaEconomica } from "./tipos";
+import type { Aviso, ClaseGrupo, DatosDeLaLista, Perfil, Repositorio, SemanaEconomica } from "./tipos";
 
 interface Almacen {
+  perfiles: Perfil[];
   clientes: Cliente[];
   ciclos: Ciclo[];
   sesiones: Sesion[];
@@ -41,12 +42,19 @@ interface Almacen {
 const RUTA = path.join(process.cwd(), ".data", "staging.json");
 
 function semilla(): Almacen {
+  // Dos profesionales, para poder probar de verdad los permisos: uno que lo
+  // ve todo y otro que solo debe ver a su cliente.
+  const perfiles: Perfil[] = [
+    { id: "per-admin", correo: "admin@pruebas.local", nombre: "Administrador", rol: "admin" },
+    { id: "per-rafa", correo: "entrenador@pruebas.local", nombre: "Entrenador", rol: "entrenador" },
+  ];
+
   const clientes: Cliente[] = [
-    { id: "cli-a", nombre: "Cliente A", estado: "activo", token: "tok-cliente-a", pendientePago: false, sesionesCompletadas: 6, cicloActual: 1 },
-    { id: "cli-b", nombre: "Cliente B", estado: "activo", token: "tok-cliente-b", pendientePago: true, sesionesCompletadas: 0, cicloActual: 1 },
-    { id: "cli-c", nombre: "Pareja C", estado: "activo", token: "tok-pareja-c", pendientePago: false, sesionesCompletadas: 3, cicloActual: 1 },
-    { id: "cli-d", nombre: "Cliente D", estado: "activo", token: "tok-cliente-d", pendientePago: false, sesionesCompletadas: 0, cicloActual: 1 },
-    { id: "cli-e", nombre: "Cliente E", estado: "pausado", token: "tok-cliente-e", pendientePago: false, sesionesCompletadas: 2, cicloActual: 1 },
+    { id: "cli-a", nombre: "Cliente A", estado: "activo", token: "tok-cliente-a", pendientePago: false, sesionesCompletadas: 6, cicloActual: 1, entrenadorId: "per-admin" },
+    { id: "cli-b", nombre: "Cliente B", estado: "activo", token: "tok-cliente-b", pendientePago: true, sesionesCompletadas: 0, cicloActual: 1, entrenadorId: "per-admin" },
+    { id: "cli-c", nombre: "Pareja C", estado: "activo", token: "tok-pareja-c", pendientePago: false, sesionesCompletadas: 3, cicloActual: 1, entrenadorId: "per-admin" },
+    { id: "cli-d", nombre: "Cliente D", estado: "activo", token: "tok-cliente-d", pendientePago: false, sesionesCompletadas: 0, cicloActual: 1, entrenadorId: "per-rafa" },
+    { id: "cli-e", nombre: "Cliente E", estado: "pausado", token: "tok-cliente-e", pendientePago: false, sesionesCompletadas: 2, cicloActual: 1, entrenadorId: "per-admin" },
   ];
 
   const ciclos: Ciclo[] = [
@@ -91,7 +99,7 @@ function semilla(): Almacen {
   }
 
   return {
-    clientes, ciclos, sesiones, cargos, semanas,
+    perfiles, clientes, ciclos, sesiones, cargos, semanas,
     clases: [], facturacionKids: [], ajustes: [], confirmaciones: [], avisos: [],
     idempotencia: [], siguienteSesion: n,
   };
@@ -417,6 +425,39 @@ export class RepositorioStaging implements Repositorio {
     return clonar(datos.clases)
       .filter((c) => c.tipo === tipo && c.fecha.startsWith(prefijo))
       .sort((a, b) => (a.fecha === b.fecha ? b.id.localeCompare(a.id) : b.fecha.localeCompare(a.fecha)));
+  }
+
+  // ---------------------------------------------------------------------------
+  // Quién usa la aplicación
+  // ---------------------------------------------------------------------------
+
+  async perfilPorCorreo(correo: string): Promise<Perfil | null> {
+    const datos = await cargar();
+    const buscado = correo.trim().toLowerCase();
+    return clonar(datos.perfiles.find((p) => p.correo.toLowerCase() === buscado) ?? null);
+  }
+
+  async entrenadorDelCliente(clienteId: string): Promise<string | null> {
+    const datos = await cargar();
+    // El cliente que no existe y el que no tiene responsable responden igual:
+    // así nadie averigua quién está dado de alta preguntando.
+    return datos.clientes.find((c) => c.id === clienteId)?.entrenadorId ?? null;
+  }
+
+  async listarProfesionales(): Promise<Perfil[]> {
+    const datos = await cargar();
+    return clonar(
+      [...datos.perfiles].sort((a, b) =>
+        a.rol === b.rol ? a.nombre.localeCompare(b.nombre) : a.rol === "admin" ? -1 : 1,
+      ),
+    );
+  }
+
+  async asignarEntrenador(clienteId: string, entrenadorId: string | null): Promise<void> {
+    const datos = await cargar();
+    const cliente = datos.clientes.find((c) => c.id === clienteId);
+    if (cliente) cliente.entrenadorId = entrenadorId;
+    await volcar();
   }
 
   async facturacionKids(anio: number, mes: number): Promise<number | null> {

@@ -52,7 +52,7 @@ import { MENSUALIDAD, type Modalidad } from "@/domain/modalidades";
 import type { CargoMensual, Ciclo, Cliente, Estado, Sesion } from "@/domain/tipos";
 import { TARIFA_LIDOMARE } from "@/domain/economia";
 import { rangoSemana } from "@/lib/fechas";
-import type { Aviso, ClaseGrupo, DatosDeLaLista, DatosMes, Repositorio, SemanaEconomica } from "./tipos";
+import type { Aviso, ClaseGrupo, DatosDeLaLista, DatosMes, Perfil, Repositorio, SemanaEconomica } from "./tipos";
 
 // -----------------------------------------------------------------------------
 // Conexión
@@ -168,6 +168,7 @@ function aCliente(f: Record<string, unknown>): Cliente {
     pendientePago: Boolean(f.pendiente_pago),
     sesionesCompletadas: Number(f.sesiones_completadas),
     cicloActual: Number(f.ciclo_actual),
+    entrenadorId: (f.entrenador_id as string | null) ?? null,
   };
 }
 
@@ -541,6 +542,53 @@ export class RepositorioPostgres implements Repositorio {
       [tipo, desde],
     );
     return filas.map((f) => ({ id: String(f.id), fecha: String(f.fecha), tipo: f.tipo as TipoClase }));
+  }
+
+  // ---------------------------------------------------------------------------
+  // Quién usa la aplicación
+  // ---------------------------------------------------------------------------
+
+  /**
+   * La cuenta de acceso vive en `auth.users` (la gestiona Supabase) y el rol
+   * en `perfiles`. El vínculo es el mismo identificador en las dos.
+   *
+   * Se exige aquí, otra vez, que la cuenta esté confirmada y sin bloquear: la
+   * cookie de sesión dura dos semanas y no debe sobrevivir a un bloqueo.
+   */
+  async perfilPorCorreo(correo: string): Promise<Perfil | null> {
+    const filas = await consultar<{ id: string; email: string; nombre: string; rol: string }>(
+      `select p.id, u.email, p.nombre, p.rol
+         from public.perfiles p
+         join auth.users u on u.id = p.id
+        where u.email = $1
+          and u.email_confirmed_at is not null
+          and u.banned_until is null`,
+      [correo.trim().toLowerCase()],
+    );
+    const f = filas[0];
+    return f ? { id: f.id, correo: f.email, nombre: f.nombre, rol: f.rol as Perfil["rol"] } : null;
+  }
+
+  async entrenadorDelCliente(clienteId: string): Promise<string | null> {
+    const filas = await consultar<{ entrenador_id: string | null }>(
+      "select entrenador_id from clientes where id = $1",
+      [clienteId],
+    );
+    return filas[0]?.entrenador_id ?? null;
+  }
+
+  async listarProfesionales(): Promise<Perfil[]> {
+    const filas = await consultar<{ id: string; email: string; nombre: string; rol: string }>(
+      `select p.id, u.email, p.nombre, p.rol
+         from public.perfiles p
+         join auth.users u on u.id = p.id
+        order by (p.rol = 'admin') desc, p.nombre`,
+    );
+    return filas.map((f) => ({ id: f.id, correo: f.email, nombre: f.nombre, rol: f.rol as Perfil["rol"] }));
+  }
+
+  async asignarEntrenador(clienteId: string, entrenadorId: string | null): Promise<void> {
+    await consultar("update clientes set entrenador_id = $2 where id = $1", [clienteId, entrenadorId]);
   }
 
   async facturacionKids(anio: number, mes: number): Promise<number | null> {

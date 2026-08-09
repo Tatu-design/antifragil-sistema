@@ -27,6 +27,12 @@ export interface Cliente {
   /** Contador del bono en curso. Fernando puede corregirlo a mano. */
   sesionesCompletadas: number;
   cicloActual: number;
+  /**
+   * Profesional responsable. `null` solo en clientes creados antes del
+   * 2026-08-09 y todavía sin repartir; a efectos de permiso, un cliente sin
+   * responsable es del administrador y nadie más lo ve.
+   */
+  entrenadorId: string | null;
 }
 
 export interface Ciclo {

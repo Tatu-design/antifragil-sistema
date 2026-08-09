@@ -141,6 +141,12 @@ export interface DatosAlta {
   cuotaMensual?: number | null;
   tarifa?: number | null;
   sesionesReferencia?: number | null;
+  /**
+   * Profesional responsable. Lo elige el administrador al dar de alta: es la
+   * única forma de que un cliente nazca ya asignado a Rafa, porque un
+   * entrenador no puede crear clientes.
+   */
+  entrenadorId?: string | null;
 }
 
 export async function crearCliente(datos: DatosAlta): Promise<Cliente> {
@@ -162,6 +168,9 @@ export async function crearCliente(datos: DatosAlta): Promise<Cliente> {
     pendientePago: true,
     sesionesCompletadas: 0,
     cicloActual: 1,
+    // Sin responsable explícito, el cliente es del administrador. Nunca queda
+    // suelto: un cliente sin dueño no lo ve nadie salvo el administrador.
+    entrenadorId: datos.entrenadorId ?? null,
   };
 
   const ciclo: Ciclo = {
@@ -211,6 +220,12 @@ export interface CambioDeServicio {
   cuotaMensual?: number | null;
   tarifa?: number | null;
   sesionesReferencia?: number | null;
+  /**
+   * Profesional responsable. Lo elige el administrador al dar de alta: es la
+   * única forma de que un cliente nazca ya asignado a Rafa, porque un
+   * entrenador no puede crear clientes.
+   */
+  entrenadorId?: string | null;
 }
 
 export interface ResultadoCambio {
