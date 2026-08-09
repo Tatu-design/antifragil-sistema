@@ -427,6 +427,48 @@ h1 {
 .boton-peligro { color: var(--peligro); background: var(--peligro-velo); border-color: rgba(192, 40, 59, 0.25); }
 .boton-peligro:hover { background: rgba(192, 40, 59, 0.16); border-color: rgba(192, 40, 59, 0.45); }
 
+/* ----- LTV: valor acumulado del cliente (solo ficha del profesional) ----- */
+
+/* Indicador compacto, no tarjeta de dashboard. Usa el mismo cristal que el
+   resto de la ficha pero SIN el degradado del hero: el hero es el servicio en
+   curso y debe seguir siendo lo que más pesa después del nombre. */
+.ltv {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: 0.85rem 1rem;
+  margin-bottom: 1.25rem;
+  background: var(--cristal);
+  border: 1px solid var(--cristal-borde);
+  border-radius: var(--radio);
+  box-shadow: var(--cristal-sombra);
+}
+
+.ltv-etiqueta {
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--tinta-suave);
+}
+
+.ltv-valor {
+  font-size: 1.375rem;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  color: var(--acento-oscuro);
+  font-variant-numeric: tabular-nums;
+  /* El importe no se parte nunca: el símbolo del euro no baja de línea.
+     Pasó con las cifras de Economía el 2026-08-08. */
+  white-space: nowrap;
+}
+
+.ltv-nota {
+  font-size: 0.75rem;
+  color: var(--tinta-suave);
+}
+
 .acciones-perfil { display: flex; gap: 0.65rem; margin-bottom: 1.25rem; }
 .acciones-perfil form { flex: 2; }
 .acciones-perfil .boton-secundario { flex: 1; }

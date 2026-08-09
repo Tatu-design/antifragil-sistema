@@ -8,6 +8,7 @@ import { accionFirmar } from "@/app/actions";
 import { BotonFirmar, EnlaceYQr } from "@/components/AccionesPerfil";
 import { HistorialProgramas } from "@/components/HistorialProgramas";
 import { Iconos, Icono } from "@/components/Iconos";
+import { Ltv } from "@/components/Ltv";
 import { PerfilHero } from "@/components/PerfilHero";
 import { SinConexion } from "@/components/SinConexion";
 import { haySesion } from "@/lib/auth";
@@ -36,7 +37,7 @@ export default async function PaginaPerfil({
   }
   if (!perfil) notFound();
 
-  const { cliente, ficha, servicios } = perfil;
+  const { cliente, ficha, servicios, ltv } = perfil;
   const { firmado, borrado, cobro, guardado } = await searchParams;
 
   const confirmacion = await confirmacionDeHoy(cliente.id);
@@ -112,6 +113,12 @@ export default async function PaginaPerfil({
             <BotonFirmar />
           </form>
         )}
+
+        {/* El valor acumulado del cliente. Va aquí, entre la acción principal y
+            las secundarias, por dos motivos: no empuja hacia abajo el botón de
+            firmar —que es lo que se usa a diario— y queda a la altura de lo
+            que de verdad es, un dato de consulta. */}
+        <Ltv ltv={ltv} />
 
         {/* Acciones secundarias, del mismo tamaño. */}
         <div className="acciones-perfil">

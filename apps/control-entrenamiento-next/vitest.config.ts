@@ -14,6 +14,10 @@ export default defineConfig({
     // (ECONNRESET). Tarda algo más, pero no falla por motivos que no son.
     fileParallelism: false,
   },
+  // Las pruebas de dibujado (`tests/ltv.test.ts`) montan componentes de React
+  // de verdad. Sin esto, el JSX se transformaba a la forma antigua y pedía un
+  // `React` global que en estos archivos no existe.
+  esbuild: { jsx: "automatic" },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

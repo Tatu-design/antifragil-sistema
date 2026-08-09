@@ -6,6 +6,7 @@
 import { randomUUID } from "node:crypto";
 
 import { fichaServicio } from "@/domain/ficha";
+import { calcularLtv, type Ltv } from "@/domain/ltv";
 import { ErrorDeNegocio, MENSUALIDAD, validarCondiciones } from "@/domain/modalidades";
 import type { Modalidad } from "@/domain/modalidades";
 import type { Ciclo, Cliente, Estado, FichaServicio, Sesion } from "@/domain/tipos";
@@ -71,6 +72,9 @@ export interface PerfilCliente {
   /** Cada servicio contratado con SUS sesiones. Agrupado por ciclo, no por
    *  nombre: tres bonos iguales seguidos son tres bonos, no uno de 24. */
   servicios: Array<Ciclo & { sesiones: Sesion[]; esActual: boolean }>;
+  /** Valor económico acumulado. Solo para el profesional: `obtenerPerfilPublico`
+   *  no lo calcula ni lo devuelve. */
+  ltv: Ltv;
 }
 
 export async function obtenerPerfil(clienteId: string): Promise<PerfilCliente | null> {
@@ -81,9 +85,15 @@ export async function obtenerPerfil(clienteId: string): Promise<PerfilCliente | 
   // Los ciclos y las sesiones se piden A LA VEZ, y el ciclo en curso sale de
   // los que ya tenemos en vez de en otra consulta (2026-08-05). Antes eran
   // seis viajes de red encadenados; ahora son tres, y dos van en paralelo.
-  const [ciclos, sesiones] = await Promise.all([
+  //
+  // Las cuotas entran en la MISMA tanda (2026-08-09). Son el dinero de las
+  // mensualidades, que el LTV necesita y las sesiones no llevan. Al ir en
+  // paralelo con las otras dos, la ficha no espera ni un milisegundo más de
+  // lo que ya esperaba.
+  const [ciclos, sesiones, cargos] = await Promise.all([
     repo.listarCiclos(clienteId),
     repo.listarSesiones(clienteId),
+    repo.listarCargos(clienteId),
   ]);
 
   const ciclo = ciclos.find((c) => c.ciclo === cliente.cicloActual) ?? null;
@@ -101,7 +111,7 @@ export async function obtenerPerfil(clienteId: string): Promise<PerfilCliente | 
     esActual: c.ciclo === cliente.cicloActual,
   }));
 
-  return { cliente, ficha, ciclo, servicios };
+  return { cliente, ficha, ciclo, servicios, ltv: calcularLtv({ ciclos, sesiones, cargos }) };
 }
 
 /**

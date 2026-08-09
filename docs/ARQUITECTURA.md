@@ -1776,6 +1776,42 @@ se cerraba a los 10 segundos de inactividad. Cualquier pausa normal —mirar un
 cliente, guardar el móvil, volver a los dos minutos— hacía pagar esos 700 ms
 otra vez. Ahora aguanta un minuto, con `keepAlive`.
 
+## LTV: valor acumulado del cliente (2026-08-09)
+
+Un indicador en la ficha interna que contesta «¿cuánto ha supuesto este
+cliente para el negocio?» sin entrar en Economía.
+
+**Qué cuenta, y por qué así.** Exactamente lo mismo que cuenta Economía:
+el importe de cada sesión firmada (bono y cuenta de cliente) más la cuota de
+cada mes (mensualidad). Es valor **ya producido**, no contratado: un bono de
+16 sesiones a 45 € con 6 firmadas aporta 270 €, no 720 — las diez que faltan
+podrían no darse nunca.
+
+La razón de elegir esta base y no el bono entero: así **la suma de los LTV de
+todos los clientes es la facturación histórica de la app**, y se puede
+verificar. Comprobado el 2026-08-09 contra la base real: 3.822,50 € por ambos
+caminos, diferencia 0,00 €. Con la otra definición, el LTV diría una cifra y
+Economía otra, y no habría forma de saber cuál está mal.
+
+Quedan fuera a propósito: CrossFit Lidomare, CrossFit Kids y los ajustes
+manuales. No pertenecen a ningún cliente.
+
+**El estado de pago no lo toca.** Marcar un cobro no mueve el LTV ni un
+céntimo: son los dos ejes de siempre —dinero producido y dinero cobrado— y
+cada uno tiene su sitio en la ficha.
+
+**Coste: ninguno en espera.** `obtenerPerfil` ya pedía ciclos y sesiones en
+paralelo; las cuotas se añadieron a esa misma tanda. Es una consulta más pero
+cero milisegundos más de espera, y la ficha no gana JavaScript de cliente: el
+bloque se dibuja en el servidor.
+
+**Solo para el profesional.** El enlace público del cliente (`/mi/<token>`) ni
+lo calcula ni lo recibe. Hay una prueba que falla si alguien importa el
+componente en esa pantalla.
+
+El desglose por modalidad (bonos, mensualidades, cuentas) se calcula pero no
+se enseña todavía: primero validar que el total cuadra.
+
 ## Principios de arquitectura (de SYSTEM_VISION.md)
 
 - Módulos independientes: Calendar, base de datos de clientes, resumen

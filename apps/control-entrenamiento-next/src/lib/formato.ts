@@ -41,3 +41,25 @@ export function fechaEs(fechaIso: string): string {
   const [a, m, d] = fechaIso.split("-");
   return `${d}/${m}/${a}`;
 }
+
+/**
+ * Euros redondos, sin céntimos: 1485 → «1.485 €», 12350 → «12.350 €».
+ *
+ * Es el formato que Fernando pidió para el LTV. Tiene sentido en una cifra
+ * acumulada de varios meses: los céntimos no cambian ninguna decisión y
+ * alargan un número que compite por el sitio con el resto de la ficha.
+ *
+ * No usarlo donde el céntimo importe —un bono, una cuota, el total de un
+ * mes—: para eso está `euros`.
+ */
+export function eurosRedondos(valor: number | null | undefined): string {
+  // `useGrouping: "always"` no es un capricho: en español la agrupación
+  // automática NO pone punto en los números de cuatro cifras, así que 1485
+  // salía «1485 €» y no «1.485 €», que es como Fernando lo pidió y como se
+  // lee de un vistazo.
+  const formato = new Intl.NumberFormat("es-ES", {
+    maximumFractionDigits: 0,
+    useGrouping: "always",
+  });
+  return `${formato.format(Math.round(valor ?? 0))} €`;
+}
