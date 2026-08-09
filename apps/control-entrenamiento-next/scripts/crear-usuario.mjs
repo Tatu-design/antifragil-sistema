@@ -19,7 +19,10 @@ import { fileURLToPath } from "node:url";
 import pg from "pg";
 
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
-const [correo, clave, rol = "admin", ...resto] = process.argv.slice(2);
+const [correoTalCual, clave, rol = "admin", ...resto] = process.argv.slice(2);
+// Se guarda SIEMPRE en minúsculas, como hace Supabase. Guardarlo tal cual se
+// escriba dejaba la cuenta inaccesible: la aplicación busca en minúsculas.
+const correo = correoTalCual ? correoTalCual.trim().toLowerCase() : correoTalCual;
 const nombre = resto.join(" ").trim() || (correo ? correo.split("@")[0] : "");
 
 if (!correo || !clave) {

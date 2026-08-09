@@ -650,3 +650,34 @@ largo puede tener una errata; el nombre de la cuenta de alguien, no.
 
 Vale para cualquier dato que identifique a una persona: nombre, correo, alias.
 
+---
+
+## 2026-08-10 — Mis pruebas daban verde con la pantalla de login
+
+**Qué pasó:** desplegué el sistema de dos roles diciendo que estaba verificado.
+Rafa **no podía entrar en absoluto**: su cuenta se guardó como
+«Rafagalindo998@…» y la aplicación busca los correos en minúsculas, así que
+no lo encontraba nunca. Lo detecté por casualidad, investigando por qué no le
+salía un botón.
+
+**Por qué pasó, que es lo grave:** mis quince comprobaciones de que «Rafa ve lo
+que debe» estaban escritas **en negativo**: no ve clientes ajenos, no ve la
+pestaña de Economía, no le llega ningún nombre. **La pantalla de login cumple
+todas.** Estaba comprobando una pantalla de acceso creyendo que comprobaba la
+lista de un entrenador, y todo salía verde.
+
+Una comprobación que solo mira lo que NO aparece no distingue «funciona y está
+protegido» de «no funciona en absoluto».
+
+**Qué se hace distinto:**
+
+1. **Toda comprobación en negativo va acompañada de una en positivo** que
+   demuestre que se está mirando la pantalla correcta: el título esperado, un
+   dato que solo aparezca ahí. Si la positiva falla, las negativas no valen.
+2. Un correo electrónico se compara **siempre en minúsculas por los dos
+   lados**, y se guarda normalizado. Hay una prueba que lo busca con
+   mayúsculas, con minúsculas y con espacios.
+3. Cuando una comprobación falle por algo que parece menor —un botón que no
+   sale—, **mirar primero si la pantalla es la que se cree**, antes de tocar
+   el botón.
+

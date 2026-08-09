@@ -52,7 +52,10 @@ export async function verificarCredenciales(correo: string, clave: string): Prom
   const { rows } = await pool().query(
     `select id, email
        from auth.users
-      where email = $1
+      where lower(email) = $1
+      -- En minusculas los dos lados: un correo es el mismo escribas la
+      -- primera letra como la escribas. Sin esto, una cuenta dada de alta con
+      -- mayusculas no podia entrar NUNCA (2026-08-10).
         and email_confirmed_at is not null
         and banned_until is null
         and encrypted_password = crypt($2, encrypted_password)`,

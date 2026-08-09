@@ -132,6 +132,22 @@ describe("qué datos salen de la base", () => {
     expect(await repo.perfilPorCorreo("nadie@pruebas.local")).toBeNull();
   });
 
+  it("el correo se reconoce escriba como se escriba", async () => {
+    // Esto costó un despliegue entero (2026-08-10): la cuenta de Rafa se
+    // guardó como «Rafagalindo998@…» y la aplicación la buscaba en
+    // minúsculas, así que NO PODÍA ENTRAR. Un correo es el mismo aunque
+    // cambien las mayúsculas.
+    const repo = repositorio();
+    const normal = await repo.perfilPorCorreo("entrenador@pruebas.local");
+    expect(normal).not.toBeNull();
+
+    for (const variante of ["ENTRENADOR@PRUEBAS.LOCAL", "Entrenador@Pruebas.Local", "  entrenador@pruebas.local  "]) {
+      const encontrado = await repo.perfilPorCorreo(variante);
+      expect(encontrado, `«${variante}» debería encontrar el mismo perfil`).not.toBeNull();
+      expect(encontrado!.id).toBe(normal!.id);
+    }
+  });
+
   it("un cliente creado para el entrenador aparece en SU lista, no en la de nadie más", async () => {
     // Es el caso real: Fernando da de alta al cliente de Rafa. Si el alta no
     // guardara el responsable, el cliente nacería sin dueño y Rafa no lo

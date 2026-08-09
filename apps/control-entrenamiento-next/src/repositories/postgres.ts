@@ -583,7 +583,10 @@ export class RepositorioPostgres implements Repositorio {
       `select p.id, u.email, p.nombre, p.rol
          from public.perfiles p
          join auth.users u on u.id = p.id
-        where u.email = $1
+        where lower(u.email) = $1
+      -- En minusculas los dos lados: un correo es el mismo escribas la
+      -- primera letra como la escribas. Sin esto, una cuenta dada de alta con
+      -- mayusculas no podia entrar NUNCA (2026-08-10).
           and u.email_confirmed_at is not null
           and u.banned_until is null`,
       [correo.trim().toLowerCase()],
