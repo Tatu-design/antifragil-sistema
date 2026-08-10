@@ -1613,25 +1613,50 @@ a.pill { text-decoration: none; }
 
 /* ----- Quién entrena al cliente, en su enlace personal ----- */
 
-.fila-profesional {
+/* Misma tarjeta de cristal que el resto de la pantalla. Antes era una fila
+   dentro de una lista y la etiqueta salía subrayada, porque las cabeceras de
+   sección llevan línea inferior: aquí no es el título de un bloque, es la
+   etiqueta de un dato. */
+.tarjeta-profesional {
   display: flex;
   align-items: center;
-  gap: 0.85rem;
+  gap: 1rem;
+  padding: 1rem 1.15rem;
+  margin-bottom: 1rem;
+  background: var(--cristal);
+  border: 1px solid var(--cristal-borde);
+  border-radius: var(--radio);
+  box-shadow: var(--cristal-sombra);
 }
 
-.fila-profesional .avatar { flex: none; }
+.tarjeta-profesional .avatar { flex: none; }
 
-/* Una cabecera de sección dentro de una fila no lleva el hueco de las de
-   arriba: aquí es la etiqueta de un dato, no el título de un bloque. */
-.fila-profesional .cabecera-seccion { padding: 0; margin: 0; }
+/* La misma etiqueta pequeña en verde que encabeza el programa, para que las
+   dos tarjetas se lean con el mismo idioma. */
+.etiqueta-suave {
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--acento-oscuro);
+}
 
-/* La cabecera del historial es pulsable: ocupa toda la fila y la flecha se va
-   al extremo, para que se vea que se abre. */
+.nombre-profesional {
+  font-size: 1.0625rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin-top: 0.15rem;
+}
+
+/* La cabecera del historial es pulsable: ocupa la fila entera, la flecha se va
+   al extremo y gira al abrirse. Sin esto parecía un rótulo muerto. */
 .cabecera-plegable {
   width: 100%;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 0.6rem;
+  padding: 1rem 1.15rem;
   border: 0;
   background: none;
   font: inherit;
@@ -1642,3 +1667,11 @@ a.pill { text-decoration: none; }
   color: var(--tinta-suave);
   cursor: pointer;
 }
+
+.cabecera-plegable svg { color: var(--acento); opacity: 0.8; }
+
+/* La lista del cliente: sin la línea de arriba cuando la cabecera es un
+   botón, que ya se separa sola. */
+.historial-cliente { padding: 0; overflow: hidden; }
+.historial-cliente .fila { padding: 0.85rem 1.15rem; }
+.historial-cliente .fila:first-of-type { border-top: 1px solid var(--cristal-borde); }

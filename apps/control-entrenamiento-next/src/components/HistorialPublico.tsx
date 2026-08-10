@@ -27,10 +27,10 @@ export function HistorialPublico({ sesiones }: { sesiones: SesionPublica[] }) {
   const [abierto, setAbierto] = useState(false);
 
   return (
-    <div className="lista">
+    <div className="lista historial-cliente">
       <button
         type="button"
-        className="cabecera-seccion cabecera-plegable"
+        className="cabecera-plegable"
         onClick={() => setAbierto((v) => !v)}
         aria-expanded={abierto}
       >

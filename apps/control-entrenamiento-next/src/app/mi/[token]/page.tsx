@@ -2,6 +2,7 @@ import Image from "next/image";
 import { notFound } from "next/navigation";
 
 import { HistorialPublico } from "@/components/HistorialPublico";
+import { Iconos } from "@/components/Iconos";
 import { Avatar } from "@/components/PanelPerfil";
 import { euros, mesMinuscula } from "@/lib/formato";
 import { obtenerPerfilPublico } from "@/services/publico";
@@ -27,6 +28,10 @@ export default async function PaginaMiPerfil({ params }: { params: Promise<{ tok
 
   return (
     <div className="page sin-barra">
+      {/* Sin esto la flecha del historial no se dibuja: los iconos son un
+          único bloque que hay que incluir en cada pantalla. Faltaba aquí y la
+          barra parecía un rótulo muerto (2026-08-10). */}
+      <Iconos />
       <div className="perfil-saludo">
         <Image src="/logo-marca.png" alt="Antifrágil" className="logo-login" width={180} height={48} priority />
         <h1>Hola, {nombre}</h1>
@@ -125,13 +130,11 @@ export default async function PaginaMiPerfil({ params }: { params: Promise<{ tok
           cualquiera que tenga el enlace, así que del profesional sale lo justo
           para que el cliente sepa con quién trata. */}
       {profesional && (
-        <div className="lista">
-          <div className="fila fila-profesional">
-            <Avatar nombre={profesional.nombre} foto={profesional.foto} />
-            <div className="sesion-info">
-              <div className="cabecera-seccion">Profesional</div>
-              <div className="fecha">{profesional.nombre}</div>
-            </div>
+        <div className="tarjeta-profesional">
+          <Avatar nombre={profesional.nombre} foto={profesional.foto} grande />
+          <div>
+            <div className="etiqueta-suave">Tu profesional</div>
+            <div className="nombre-profesional">{profesional.nombre}</div>
           </div>
         </div>
       )}
