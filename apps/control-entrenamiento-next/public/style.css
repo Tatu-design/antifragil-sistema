@@ -1675,14 +1675,34 @@ a.pill { text-decoration: none; }
 .historial-cliente { padding: 0; overflow: hidden; }
 .historial-cliente .fila { padding: 0.85rem 1.15rem; }
 
-/* Cada programa dentro del historial del cliente. */
+/* Cada programa dentro del historial del cliente: pulsable, con su flecha al
+   extremo, igual que la cabecera del historial. */
 .grupo-programa-cabecera {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.9rem 1.15rem;
+  border: 0;
+  border-top: 1px solid var(--cristal-borde);
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* Un programa sin sesiones no se despliega: tampoco parece que se pueda. */
+.grupo-programa-cabecera:disabled { cursor: default; }
+
+.grupo-programa-texto {
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
-  padding: 0.9rem 1.15rem 0.6rem;
-  border-top: 1px solid var(--cristal-borde);
+  min-width: 0;
 }
+
+.grupo-programa-cabecera svg { color: var(--acento); opacity: 0.8; flex: none; }
 
 .grupo-programa-fechas {
   font-size: 0.8125rem;

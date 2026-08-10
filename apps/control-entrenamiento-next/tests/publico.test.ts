@@ -220,6 +220,17 @@ describe("la pantalla del cliente", () => {
     expect(JSON.stringify(perfil!.programas)).not.toContain("Bono 8 sesiones");
   });
 
+  it("cada programa se despliega por separado", async () => {
+    // Abrir el historial y encontrarse todas las sesiones de todos los
+    // programas de golpe era el mismo problema que tenía la pantalla antes,
+    // solo que un toque más adentro (Fernando, 2026-08-10).
+    const pagina = readFileSync("src/components/HistorialPublico.tsx", "utf8");
+    expect(pagina).toContain("desplegados");
+    expect(pagina).toContain("aria-expanded={desplegado}");
+    // Y arrancan todos plegados, como el historial de la ficha interna.
+    expect(pagina).toContain("useState<number[]>([])");
+  });
+
   it("el historial nace plegado", async () => {
     // Con dieciseis sesiones, la lista entera empujaba hacia abajo lo que el
     // cliente abre a mirar: cuántas lleva y cuántas le quedan.
