@@ -45,12 +45,13 @@ describe("lo que ve el cliente", () => {
     expect(await obtenerPerfilPublico("token-que-no-existe")).toBeNull();
   });
 
-  it("no se le enseña el estado de cobro de otros ni su deuda ajena", async () => {
+  it("en su historial solo hay sesiones suyas", async () => {
     const perfil = await obtenerPerfilPublico(TOKEN_A);
-    // Solo aparecen sus propias sesiones.
-    for (const sesion of perfil!.historial) {
-      expect(sesion.servicio).toBe("Bono 8 sesiones");
-    }
+    const suyas = await repositorio().listarSesiones("cli-a");
+
+    expect(perfil!.historial).toHaveLength(suyas.length);
+    const idsSuyos = new Set(suyas.map((s) => s.id));
+    for (const sesion of perfil!.historial) expect(idsSuyos.has(sesion.id)).toBe(true);
   });
 });
 
@@ -155,13 +156,21 @@ describe("la pantalla del cliente", () => {
     expect(perfil!.profesional).toBeNull();
   });
 
-  it("el historial NO le enseña su tarifa", async () => {
-    // Era el fallo de fondo: cada línea decía el nombre del servicio, y el
-    // nombre lleva el precio dentro («Antiguo 35€ x16»). El cliente estaba
-    // viendo su tarifa en cada línea sin que nadie lo hubiera decidido.
-    const pagina = readFileSync("src/components/HistorialPublico.tsx", "utf8");
-    expect(pagina).not.toContain("sesion.servicio");
-    expect(pagina).not.toContain("sesion.tarifa");
+  it("la tarifa NI SIQUIERA SE LE MANDA", async () => {
+    // Era el fallo de fondo, y dejar de pintarlo no bastaba: Next incrusta en
+    // la página los datos que recibe el navegador, así que la tarifa se veía
+    // mirando el código fuente aunque no saliera en pantalla.
+    //
+    // Se comprueba sobre el DATO que sale del servicio, no sobre el código de
+    // la pantalla: es lo único que demuestra que no viaja.
+    const perfil = await obtenerPerfilPublico(TOKEN_A);
+
+    for (const sesion of perfil!.historial) {
+      expect(Object.keys(sesion).sort()).toEqual(["fecha", "hora", "id", "numeroSesion"]);
+    }
+    const texto = JSON.stringify(perfil!.historial);
+    expect(texto).not.toContain("tarifa");
+    expect(texto).not.toContain("servicio");
   });
 
   it("y en el historial solo van la fecha y la hora", async () => {

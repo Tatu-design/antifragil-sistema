@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import type { Sesion } from "@/domain/tipos";
+import type { SesionPublica } from "@/services/publico";
 import { fechaEs } from "@/lib/formato";
 import { Icono } from "./Iconos";
 
@@ -18,8 +18,12 @@ import { Icono } from "./Iconos";
  * («Antiguo 35€ x16»), así que el cliente estaba viendo su tarifa en cada
  * línea del historial sin que nadie lo hubiera decidido. El número sigue en su
  * círculo, que es donde se lee de un vistazo.
+ *
+ * Recibe `SesionPublica`, no `Sesion`: la tarifa y el nombre del servicio se
+ * quedan en el servidor. Dejar de pintarlos no bastaba —Next incrusta en la
+ * página lo que recibe el navegador— y se veían en el código fuente.
  */
-export function HistorialPublico({ sesiones }: { sesiones: Sesion[] }) {
+export function HistorialPublico({ sesiones }: { sesiones: SesionPublica[] }) {
   const [abierto, setAbierto] = useState(false);
 
   return (

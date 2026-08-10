@@ -21,6 +21,23 @@ import type { FichaServicio, Sesion } from "@/domain/tipos";
 import { hoyNegocio, horaNegocio } from "@/lib/fechas";
 import { repositorio } from "@/repositories";
 
+/**
+ * Una sesión, tal y como se le manda al cliente.
+ *
+ * Es un recorte a propósito. La sesión completa lleva `tarifa` y `servicio`,
+ * y el nombre del servicio lleva el precio dentro («Antiguo 35€ x16»). Aunque
+ * la pantalla no los pinte, **Next incrusta en la página los datos que recibe
+ * el navegador**: quien mirara el código fuente le vería la tarifa (2026-08-10).
+ *
+ * No basta con no pintarlo. Hay que no enviarlo.
+ */
+export interface SesionPublica {
+  id: string;
+  numeroSesion: number;
+  fecha: string;
+  hora: string | null;
+}
+
 export interface PerfilPublico {
   nombre: string;
   /**
@@ -31,8 +48,8 @@ export interface PerfilPublico {
    */
   profesional: { nombre: string; foto: string | null } | null;
   ficha: FichaServicio;
-  /** Su historial entero, como en la página pública de Flask. */
-  historial: Sesion[];
+  /** Su historial entero, recortado a lo que se le enseña: fecha y hora. */
+  historial: SesionPublica[];
   /** Sesiones de hoy que aún puede confirmar. Vacío = nada que confirmar. */
   pendientesHoy: Sesion[];
   confirmadasHoy: Array<{ hora: string }>;
@@ -74,7 +91,9 @@ export async function obtenerPerfilPublico(token: string): Promise<PerfilPublico
       // El estado de cobro sale del ciclo, igual que en la ficha de Fernando.
       pendientePago: ciclo ? !ciclo.pagado : cliente.pendientePago,
     }),
-    historial: sesiones,
+    // Recortadas ANTES de salir del servicio: así ningún componente puede
+    // recibir por error lo que no debe llegar al navegador.
+    historial: sesiones.map(soloLoVisible),
     pendientesHoy,
     confirmadasHoy,
     hoy,
@@ -111,4 +130,14 @@ export async function confirmarSesion(token: string): Promise<ResultadoConfirmac
     await repo.confirmarSesion(cliente.id, pendientes[0]!.id, hoy, hora);
     return { ok: true, yaEstaba: false, hora };
   });
+}
+
+/** Deja de una sesión solo lo que el cliente puede ver. */
+function soloLoVisible(sesion: Sesion): SesionPublica {
+  return {
+    id: sesion.id,
+    numeroSesion: sesion.numeroSesion,
+    fecha: sesion.fecha,
+    hora: sesion.hora,
+  };
 }

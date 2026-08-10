@@ -746,3 +746,34 @@ línea de Windows y la de Vercel los de Unix, así que el mismo archivo da
 huellas distintas. Comparar hashes de archivos entre local y servidor no vale;
 hay que comparar contra lo que el servidor sirve.
 
+---
+
+## 2026-08-10 (4) — Dejar de pintar un dato no es dejar de mandarlo
+
+**Qué pasó:** quité del historial del cliente el nombre del servicio, que lleva
+el precio dentro («Antiguo 35€ x16»). En pantalla desapareció. **Seguía en el
+código fuente de la página**, junto con la tarifa de cada sesión: Next incrusta
+en el HTML los datos que recibe un componente de navegador, para poder
+continuar en el cliente lo que empezó en el servidor.
+
+Cualquiera con el enlace podía ver su tarifa mirando el código de la página.
+
+**Por qué pasó:** llevo toda la sesión repitiendo que esconder no es proteger
+—lo apliqué a la lista de clientes, filtrando en el SQL— y aquí hice
+exactamente lo contrario sin darme cuenta, porque «quitar una línea de la
+pantalla» parecía un cambio de presentación y no de datos.
+
+**Qué se hace distinto:**
+
+1. **Lo que un componente de navegador recibe, viaja al navegador entero.** Si
+   una pantalla pública o de acceso limitado necesita una lista, el servicio
+   devuelve un tipo recortado (`SesionPublica`), no la entidad completa. El
+   recorte se hace en el servicio, no en el componente: así ningún componente
+   puede recibir por error lo que no debe salir.
+2. **Las pruebas de fuga se escriben sobre el DATO, no sobre el código de la
+   pantalla.** Comprobar que un archivo no contiene `sesion.tarifa` demuestra
+   que no se pinta; solo mirar el objeto que sale del servicio demuestra que no
+   se manda.
+3. Al verificar una pantalla pública, buscar los datos sensibles **en el HTML
+   completo**, no en lo que se ve.
+
