@@ -157,6 +157,28 @@ partir de ahora:
   errores críticos que impidan el uso diario.
 - Nada de duplicar desarrollo entre las dos aplicaciones.
 
+### Avisar ANTES de lo que sale de Fernando (regla de Fernando, 2026-08-10)
+
+Todo lo que vaya a verlo **un cliente o un miembro del equipo** se avisa
+**antes** de hacerlo, no se cuenta después como resultado.
+
+Eso incluye: cambios en la pantalla pública del cliente, cambios que afecten
+a lo que ve Rafa, altas de cuentas, y cualquier despliegue que cambie lo que
+un tercero se va a encontrar.
+
+También hay que explicarle, en su idioma y sin darlo por sabido, **cómo se
+usa lo que se construye de cara a terceros**: qué enlace se manda a un
+cliente, qué se le manda a un entrenador, y qué NO hay que mandar.
+
+Nació el 2026-08-10: Fernando le pasó a un cliente la dirección de la
+aplicación en vez del enlace personal del cliente, y al cliente le salió una
+pantalla pidiendo correo y contraseña. Quedó mal delante de él. La aplicación
+funcionaba; lo que faltaba era que yo se lo hubiera explicado y que le hubiera
+avisado antes de tocar esa pantalla.
+
+**Dentro de su ordenador, Claude sigue trabajando con autonomía. Fuera de él,
+se avisa primero.**
+
 ### Reglas de código
 - Cambios pequeños y reversibles sobre grandes y arriesgados.
 - Siempre comprobar que algo funciona antes de decir que está listo.

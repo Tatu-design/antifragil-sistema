@@ -777,3 +777,34 @@ pantalla» parecía un cambio de presentación y no de datos.
 3. Al verificar una pantalla pública, buscar los datos sensibles **en el HTML
    completo**, no en lo que se ve.
 
+---
+
+## 2026-08-10 (5) — Le hice quedar mal delante de un cliente
+
+**Qué pasó:** Fernando le mandó a un cliente el enlace para que viera su
+programa. Al cliente le salió una pantalla pidiendo correo y contraseña.
+
+**Qué NO pasó:** la aplicación no estaba rota. Los nueve enlaces personales
+abren sin pedir nada, comprobado. Lo que mandó fue la dirección de la
+aplicación (`antifragil-sistema.vercel.app`) en vez del enlace del cliente
+(`.../mi/<token>`), que es la que sale en la barra del navegador cuando él
+está dentro, y por tanto la más fácil de copiar.
+
+**Por qué pasó:** nunca le expliqué que son dos direcciones distintas. Lo daba
+por evidente porque yo lo veo en el código; él no lee código. Llevo toda la
+sesión hablando de «el enlace del cliente» sin decir jamás **cuál es y cuál
+no hay que mandar**.
+
+Y encima ese mismo día cambié esa pantalla cuatro o cinco veces y la desplegué
+en directo, sabiendo que un cliente podía abrirla en cualquier momento. Se lo
+conté después, como resultado.
+
+**Qué se hace distinto:** queda escrito en `.claude/CLAUDE.md`. Todo lo que
+vaya a verlo un cliente o un miembro del equipo **se avisa antes**, no se
+cuenta después. Y se explica cómo se usa: qué enlace se manda a quién y qué no
+se manda.
+
+La regla de fondo: **dentro de su ordenador, autonomía; fuera de él, se avisa
+primero.** Un fallo dentro se corrige en dos minutos; uno fuera se lo come él
+delante de un cliente.
+
