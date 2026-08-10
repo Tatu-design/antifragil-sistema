@@ -303,86 +303,212 @@ h1 {
 
 /* ----- Filtros de la lista de clientes ----- */
 
-/* Cuadrícula 2 × 2 en móvil: cuatro controles del mismo tamaño, cómodos
-   para el pulgar. Cada uno es un botón de verdad, así que funciona con
-   teclado sin añadir nada. */
-.filtros {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.6rem;
-  margin-bottom: 1.1rem;
-}
+/* ----- Buscar y filtrar (2026-08-10) ----- */
 
-/* El filtro por profesional (2026-08-09). Va encima de los de estado y se
-   distingue de ellos por ser una fila de chips, no una rejilla de tarjetas:
-   son dos preguntas distintas —«de quién» y «en qué estado»— y no deben
-   parecer la misma. Solo lo ve el administrador. */
-.filtros-profesional {
+/* Sustituye a las dos filas de botones que había aquí. Fuera se queda solo lo
+   de diario: buscar por nombre y saber quién debe dinero. */
+.barra-busqueda {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  margin-bottom: 0.75rem;
-}
-
-.filtros-profesional .filtro {
-  width: auto;
-  flex-direction: row;
   align-items: center;
-  padding: 0.4rem 0.85rem;
-  /* Que quepan varios nombres en el ancho de un móvil sin partirse. */
-  white-space: nowrap;
-}
-
-.filtros-profesional .filtro-nombre { font-size: 0.8125rem; }
-
-.filtro {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.2rem;
-  width: 100%;
-  padding: 0.7rem 0.85rem;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  border-radius: var(--radio);
+  gap: 0.5rem;
+  padding: 0 0.85rem;
+  margin-bottom: 0.75rem;
   background: var(--cristal);
   border: 1px solid var(--cristal-borde);
+  border-radius: 999px;
   box-shadow: var(--cristal-sombra);
-  color: var(--tinta-suave);
-  transition: border-color 0.15s ease, color 0.15s ease, transform 0.12s ease;
 }
 
-.filtro:active { transform: scale(0.98); }
+.barra-busqueda svg { color: var(--tinta-suave); flex: none; }
 
-.filtro-nombre {
-  font-size: 0.5625rem;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  line-height: 1.3;
-}
-
-.filtro-numero {
-  font-size: 1.375rem;
-  font-weight: 900;
-  line-height: 1;
-  letter-spacing: -0.02em;
+.barra-busqueda input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  padding: 0.7rem 0;
+  font: inherit;
   color: var(--tinta);
+}
+
+.barra-busqueda input:focus { outline: none; }
+.barra-busqueda input::placeholder { color: var(--tinta-suave); }
+/* Fuera la «x» que pinta Safari: ya hay un botón de filtro al lado y dos
+   iconos juntos en un móvil se pulsan mal. */
+.barra-busqueda input::-webkit-search-cancel-button { display: none; }
+
+.boton-filtrar {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex: none;
+  padding: 0.45rem 0.6rem;
+  margin-right: -0.35rem;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--tinta-media);
+  cursor: pointer;
+}
+
+.boton-filtrar.con-filtros { color: var(--acento-oscuro); background: var(--acento-velo); }
+
+.boton-filtrar-numero {
+  font-size: 0.6875rem;
+  font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
 
-.filtro-alerta .filtro-numero { color: var(--alerta); }
-
-/* El seleccionado se distingue por color, por borde y por una marca a la
-   izquierda: no depende solo del color. */
-.filtro.activo {
-  color: var(--acento-oscuro);
-  border-color: rgba(31, 169, 154, 0.55);
-  box-shadow: var(--cristal-sombra), inset 3px 0 0 var(--acento);
+/* El aviso de deuda. Es información, no decoración: por eso vive fuera del
+   panel. Y es pulsable, porque lo primero que se quiere al verlo es la lista
+   de quiénes son. */
+.aviso-deuda {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.6rem 0.9rem;
+  margin-bottom: 1rem;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: var(--radio);
+  background: var(--alerta-velo);
+  color: var(--alerta);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
 }
 
-.filtro.activo .filtro-numero { color: var(--acento-oscuro); }
+.aviso-deuda.activo {
+  border-color: var(--alerta);
+  box-shadow: inset 0 0 0 1px var(--alerta);
+}
+
+.aviso-deuda-numero {
+  font-size: 1.125rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+/* ----- El panel de filtros ----- */
+
+.panel-fondo {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(17, 19, 21, 0.35);
+  /* Aquí sí compensa el desenfoque: es una capa sola y quieta, no algo que
+     se recalcule en cada fotograma del scroll (lección del 2026-07-31). */
+  backdrop-filter: blur(3px);
+  animation: panel-aparecer 0.15s ease-out;
+}
+
+/* Sube desde abajo: se usa con el pulgar, de pie en el gimnasio. */
+.panel-filtros {
+  width: 100%;
+  max-width: var(--columna);
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--perla);
+  border-radius: 20px 20px 0 0;
+  box-shadow: 0 -8px 40px rgba(17, 19, 21, 0.18);
+  animation: panel-subir 0.22s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+@keyframes panel-aparecer { from { opacity: 0; } }
+@keyframes panel-subir { from { transform: translateY(100%); } }
+
+/* Quien haya pedido menos movimiento, no lo tiene. */
+@media (prefers-reduced-motion: reduce) {
+  .panel-fondo, .panel-filtros { animation: none; }
+}
+
+.panel-cabecera {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.1rem 1.15rem 0.75rem;
+}
+
+.panel-titulo {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.6875rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--acento-oscuro);
+}
+
+.panel-cerrar {
+  display: flex;
+  padding: 0.4rem;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--tinta-media);
+  cursor: pointer;
+}
+
+.panel-cuerpo {
+  overflow-y: auto;
+  padding: 0 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.15rem;
+}
+
+.panel-grupo { border: 0; padding: 0; margin: 0; }
+
+.panel-grupo-titulo {
+  padding: 0;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--tinta-suave);
+}
+
+.panel-opciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.55rem;
+}
+
+.panel-opcion {
+  padding: 0.55rem 0.95rem;
+  border: 1px solid var(--cristal-borde);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.7);
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--tinta-media);
+  cursor: pointer;
+  /* Que un nombre largo no parta el chip en dos líneas. */
+  white-space: nowrap;
+}
+
+.panel-opcion.marcada {
+  border-color: var(--acento);
+  background: var(--acento);
+  color: #fff;
+}
+
+.panel-pie {
+  display: flex;
+  gap: 0.6rem;
+  padding: 1rem 1.15rem calc(1rem + env(safe-area-inset-bottom, 0px));
+}
+
+.panel-pie .boton-secundario { flex: 1; }
+.panel-pie .boton { flex: 1.4; margin: 0; }
 
 /* ----- Botones ----- */
 

@@ -4,33 +4,33 @@ import Link from "next/link";
 import { useState } from "react";
 
 import type { FichaClase } from "@/domain/clases";
+import { FILTROS_INICIALES, coincide, filtrosPuestos, normalizar, type Filtros } from "@/domain/filtros";
 import type { Perfil } from "@/repositories/tipos";
 import type { ClienteEnLista } from "@/services/clientes";
-
-type Filtro = "activos" | "pendientes" | "pausados" | "cancelados";
-
-/** Los mismos textos que `webapp/templates/index.html`. */
-const VACIOS: Record<Filtro, string> = {
-  activos: "No hay nada activo.",
-  pendientes: "No hay clientes pendientes de pago.",
-  pausados: "No hay clientes pausados.",
-  cancelados: "No hay clientes cancelados.",
-};
-
-const NOMBRES: Record<Filtro, string> = {
-  activos: "Activos",
-  pendientes: "Pendientes de pago",
-  pausados: "Pausados",
-  cancelados: "Cancelados",
-};
+import { Icono } from "./Iconos";
+import { PanelFiltros } from "./PanelFiltros";
 
 /**
- * Los cuatro contadores son también los filtros. Muestran SIEMPRE el total
- * general de cada grupo: dicen cuántos clientes hay de cada cosa, no cuántos
- * se están viendo, así que no cambian al filtrar.
+ * La lista de clientes.
  *
- * El filtrado ocurre en el propio navegador: las tarjetas ya están todas en la
- * página, así que cambiar de filtro solo esconde y muestra.
+ * Hasta el 2026-08-10 tenía dos filas de botones encima —cuatro contadores de
+ * estado y una fila de profesionales— y había que bajar bastante para ver al
+ * primer cliente. Fernando lo cortó: la pantalla parecía un formulario en vez
+ * de una lista.
+ *
+ * Fuera solo quedan las dos cosas que se usan a diario:
+ *
+ *   1. **Buscar por nombre**, siempre a mano.
+ *   2. **El aviso de quién debe dinero**, que es información y no solo un
+ *      filtro: tiene que verse al abrir la app, sin abrir nada.
+ *
+ * El resto —profesional, estado del cliente y tipo de programa— vive en un
+ * panel que sube desde abajo, y **los filtros se suman**: se puede pedir «los
+ * de Rafa que están pendientes de pago».
+ *
+ * Todo ocurre en el navegador: las tarjetas ya están en la página, así que
+ * filtrar solo esconde y muestra. Lo que un entrenador NO debe ver nunca llega
+ * hasta aquí — eso se resuelve en la consulta, no escondiendo tarjetas.
  */
 export function ListaClientes({
   clientes,
@@ -40,81 +40,90 @@ export function ListaClientes({
   clientes: ClienteEnLista[];
   /** CrossFit Lidomare y Kids. No son clientes: son cuentas de actividad. */
   cuentas?: FichaClase[];
-  /**
-   * Los profesionales, para que el administrador pueda filtrar por quién
-   * lleva a cada cliente. Llega vacío para un entrenador: él ya solo recibe
-   * los suyos, así que un filtro por profesional no tendría nada que filtrar.
-   */
+  /** Para el filtro por profesional. Llega vacío para un entrenador: solo
+   *  tiene clientes suyos, así que no habría nada que separar. */
   profesionales?: Perfil[];
 }) {
-  const [filtro, setFiltro] = useState<Filtro>("activos");
-  const [quien, setQuien] = useState<string>("todos");
+  // Se abre en «activos», que es lo que se mira casi siempre. Un cancelado de
+  // hace medio año no debe aparecer sin haberlo pedido.
+  const [filtros, setFiltros] = useState<Filtros>(FILTROS_INICIALES);
+  const [busqueda, setBusqueda] = useState("");
+  const [soloPendientes, setSoloPendientes] = useState(false);
+  const [abierto, setAbierto] = useState(false);
 
-  // Solo se enseña si de verdad hay entre quién elegir.
-  const hayFiltroProfesional = profesionales.length > 1;
-  const suyo = (c: ClienteEnLista) => quien === "todos" || c.profesionalId === quien;
-
-  // Los contadores cuentan dentro del profesional elegido: si el número dice
-  // 3, tienen que verse 3 tarjetas.
-  const delFiltro = clientes.filter(suyo);
-  const conteos: Record<Filtro, number> = {
-    // Las dos cuentas de CrossFit cuentan aquí: el número tiene que coincidir
-    // con las tarjetas que se ven. Por eso el filtro se llama «Activos» y no
-    // «Clientes activos» — hay dos tarjetas que no son clientes.
-    activos: delFiltro.filter((c) => c.estado === "activo").length + (quien === "todos" ? cuentas.length : 0),
-    // Incluye a cualquiera que deba dinero, esté activo, pausado o cancelado.
-    pendientes: delFiltro.filter((c) => c.debe).length,
-    pausados: delFiltro.filter((c) => c.estado === "pausado").length,
-    cancelados: delFiltro.filter((c) => c.estado === "cancelado").length,
-  };
+  const deudores = clientes.filter((c) => c.debe).length;
+  const buscado = normalizar(busqueda.trim());
 
   const visible = (c: ClienteEnLista) =>
-    suyo(c) && (filtro === "pendientes" ? c.debe : c.estado === filtro.slice(0, -1));
+    coincide(
+      { ...c, profesionalId: c.profesionalId, modalidad: c.ficha.modalidad },
+      { busqueda, soloPendientes, filtros },
+    );
 
   const visibles = clientes.filter(visible);
 
+  const puestos = filtrosPuestos(filtros);
+
+  // Las cuentas de CrossFit no tienen dueño, ni deuda, ni modalidad. Se
+  // enseñan solo cuando no se está preguntando algo que ellas no pueden
+  // contestar; si no, saldrían siempre y mentirían sobre el filtro.
+  const verCuentas =
+    buscado === "" &&
+    !soloPendientes &&
+    filtros.profesional === "todos" &&
+    filtros.modalidades.length === 0 &&
+    filtros.estados.includes("activo");
+
+  const cuantos = visibles.length + (verCuentas ? cuentas.length : 0);
+
   return (
     <>
-      {hayFiltroProfesional && (
-        <div className="filtros filtros-profesional" role="group" aria-label="Filtrar por profesional">
-          {[{ id: "todos", nombre: "Todos" }, ...profesionales].map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              className={`filtro${quien === p.id ? " activo" : ""}`}
-              aria-pressed={quien === p.id}
-              onClick={() => setQuien(p.id)}
-            >
-              <span className="filtro-nombre">{p.nombre}</span>
-            </button>
-          ))}
-        </div>
-      )}
-
-      <div className="filtros" role="group" aria-label="Filtrar clientes">
-        {(Object.keys(NOMBRES) as Filtro[]).map((clave) => (
-          <button
-            key={clave}
-            type="button"
-            className={`filtro${filtro === clave ? " activo" : ""}${
-              clave === "pendientes" && conteos.pendientes ? " filtro-alerta" : ""
-            }`}
-            data-filtro={clave}
-            aria-pressed={filtro === clave}
-            onClick={() => setFiltro(clave)}
-          >
-            <span className="filtro-nombre">{NOMBRES[clave]}</span>
-            <span className="filtro-numero">{conteos[clave]}</span>
-          </button>
-        ))}
+      <div className="barra-busqueda">
+        <Icono nombre="i-search" pequeno />
+        <input
+          type="search"
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+          placeholder="Buscar cliente"
+          aria-label="Buscar cliente por nombre"
+        />
+        <button
+          type="button"
+          className={`boton-filtrar${puestos ? " con-filtros" : ""}`}
+          onClick={() => setAbierto(true)}
+          aria-label={puestos ? `Filtrar, ${puestos} puestos` : "Filtrar"}
+        >
+          <Icono nombre="i-filter" pequeno />
+          {puestos > 0 && <span className="boton-filtrar-numero">{puestos}</span>}
+        </button>
       </div>
 
+      {/* El único contador que se queda fuera del panel. Si alguien debe
+          dinero hay que verlo al abrir la app, no después de dos toques. */}
+      {deudores > 0 && (
+        <button
+          type="button"
+          className={`aviso-deuda${soloPendientes ? " activo" : ""}`}
+          aria-pressed={soloPendientes}
+          onClick={() => setSoloPendientes((v) => !v)}
+        >
+          <span className="aviso-deuda-numero">{deudores}</span>
+          <span>{deudores === 1 ? "cliente pendiente de pago" : "clientes pendientes de pago"}</span>
+        </button>
+      )}
+
+      <PanelFiltros
+        abierto={abierto}
+        alCerrar={() => setAbierto(false)}
+        filtros={filtros}
+        alCambiar={setFiltros}
+        profesionales={profesionales}
+        cuantos={cuantos}
+      />
+
       <div className="clientes-grid" id="lista-clientes">
-        {/* Las cuentas de actividad van primero y SOLO en «Activos»: no
-            tienen deuda, ni pausa, ni cancelación — esos tres estados
-            pertenecen a clientes de verdad. */}
         {cuentas.map((cuenta) => (
-          <TarjetaCuenta key={cuenta.tipo} cuenta={cuenta} oculta={filtro !== "activos" || quien !== "todos"} />
+          <TarjetaCuenta key={cuenta.tipo} cuenta={cuenta} oculta={!verCuentas} />
         ))}
 
         {clientes.map((cliente) => (
@@ -162,8 +171,8 @@ export function ListaClientes({
         ))}
       </div>
 
-      <p className="empty" hidden={visibles.length > 0 || (filtro === "activos" && quien === "todos" && cuentas.length > 0)}>
-        {VACIOS[filtro]}
+      <p className="empty" hidden={cuantos > 0}>
+        {buscado ? "No hay ningún cliente con ese nombre." : "No hay nada con esos filtros."}
       </p>
     </>
   );
