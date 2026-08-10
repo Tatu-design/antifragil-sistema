@@ -23,10 +23,14 @@ export function HistorialProgramas({
   clienteId,
   nombre,
   servicios,
+  verPrecioHora = true,
 }: {
   clienteId: string;
   nombre: string;
   servicios: Servicio[];
+  /** El precio por hora es cuenta del negocio: solo el administrador. Ver
+   *  `PerfilHero` para el porqué de la distinción. */
+  verPrecioHora?: boolean;
 }) {
   const [abierto, setAbierto] = useState(false);
   const [abiertos, setAbiertos] = useState<number[]>([]);
@@ -73,7 +77,7 @@ export function HistorialProgramas({
                 </span>
                 {/* La fotografía de las condiciones con las que se hizo ese
                     ciclo. Cambiar las condiciones de hoy no toca esto. */}
-                <span className="programa">{condiciones(servicio)}</span>
+                <span className="programa">{condiciones(servicio, verPrecioHora)}</span>
                 <span className="programa">
                   {servicio.fechaInicio ? `Desde ${fechaEs(servicio.fechaInicio)}` : "Sin sesiones todavía"}
                   {servicio.fechaFin ? ` — ${fechaEs(servicio.fechaFin)} · Cerrado` : ""}
@@ -131,12 +135,13 @@ export function HistorialProgramas({
 }
 
 /** La misma línea de condiciones que arma la plantilla, según la modalidad. */
-function condiciones(servicio: Servicio): string {
+function condiciones(servicio: Servicio, verPrecioHora: boolean): string {
   const n = servicio.sesiones.length;
   const sesiones = `${n} ${n === 1 ? "sesión" : "sesiones"}`;
 
   if (servicio.modalidad === "mensualidad") {
-    const efectivo = n && servicio.cuotaMensual ? ` · ${euros(servicio.cuotaMensual / n)}/h` : "";
+    const efectivo =
+      verPrecioHora && n && servicio.cuotaMensual ? ` · ${euros(servicio.cuotaMensual / n)}/h` : "";
     const referencia = servicio.sesionesReferencia ? ` · ref. ${servicio.sesionesReferencia}` : "";
     return `Cuota ${euros(servicio.cuotaMensual)} · ${sesiones}${efectivo}${referencia}`;
   }
@@ -145,7 +150,7 @@ function condiciones(servicio: Servicio): string {
     return `${euros(servicio.tarifa)}/sesión · ${sesiones} · total ${total}`;
   }
   const precio = servicio.precioTotal ? ` · ${euros(servicio.precioTotal)}` : "";
-  const porSesion = servicio.tarifa ? ` · ${euros(servicio.tarifa)}/sesión` : "";
+  const porSesion = verPrecioHora && servicio.tarifa ? ` · ${euros(servicio.tarifa)}/sesión` : "";
   return `${n} de ${servicio.sesionesTotales} sesiones${precio}${porSesion}`;
 }
 

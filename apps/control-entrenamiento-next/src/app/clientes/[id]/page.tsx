@@ -157,7 +157,12 @@ export default async function PaginaPerfil({
           confirmadas={confirmacion.confirmadas}
         />
 
-        <HistorialProgramas clienteId={cliente.id} nombre={cliente.nombre} servicios={servicios} />
+        <HistorialProgramas
+          clienteId={cliente.id}
+          nombre={cliente.nombre}
+          servicios={servicios}
+          verPrecioHora={verLtv}
+        />
       </div>
     </>
   );
