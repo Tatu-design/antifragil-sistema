@@ -1,7 +1,3 @@
-import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
-import path from "node:path";
-
 import type { Metadata, Viewport } from "next";
 
 import "./globals.css";
@@ -29,25 +25,6 @@ export const viewport: Viewport = {
  * Cada pantalla pone su propio contenedor (`page`, `page-ancha`, `sin-barra`),
  * como hacía cada plantilla.
  */
-/**
- * Ocho letras que cambian cuando cambia la hoja de estilos.
- *
- * Se calcula una vez al arrancar el servidor, no en cada petición: el archivo
- * no cambia mientras el servidor vive. Si no se pudiera leer —no debería
- * pasar—, se usa la fecha de arranque, que al menos cambia en cada despliegue.
- */
-let huella: string | null = null;
-function huellaEstilos(): string {
-  if (huella) return huella;
-  try {
-    const css = readFileSync(path.join(process.cwd(), "public", "style.css"));
-    huella = createHash("sha1").update(css).digest("hex").slice(0, 8);
-  } catch {
-    huella = String(Date.now());
-  }
-  return huella;
-}
-
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="es">
@@ -61,8 +38,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             versión que ya tiene: Fernando vio su perfil perfecto y el de Rafa
             descolocado, con el mismo código, porque uno tenía la hoja nueva y
             el otro la vieja. Con la huella, cada versión es una dirección
-            distinta y no hay nada que reutilizar. */}
-        <link rel="stylesheet" href={`/style.css?v=${huellaEstilos()}`} />
+            distinta y no hay nada que reutilizar.
+
+            Se calcula al COMPILAR (ver `next.config.ts`): `public/` no viaja
+            dentro del paquete de la función, así que leerlo al arrancar no
+            funciona en Vercel. */}
+        <link rel="stylesheet" href={`/style.css?v=${process.env.HUELLA_ESTILOS}`} />
         {/* Next ya emite `mobile-web-app-capable`, que es el nombre moderno.
             Este es el de siempre y lo entienden también los iPhone con iOS
             antiguo: sin él, la app añadida a la pantalla de inicio se abre
