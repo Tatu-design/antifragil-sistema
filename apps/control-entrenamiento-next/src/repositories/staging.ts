@@ -469,6 +469,16 @@ export class RepositorioStaging implements Repositorio {
     );
   }
 
+  async actualizarPerfil(id: string, datos: { nombre: string; foto: string | null }): Promise<void> {
+    const almacen = await cargar();
+    const perfil = almacen.perfiles.find((p) => p.id === id);
+    if (perfil) {
+      perfil.nombre = datos.nombre;
+      perfil.foto = datos.foto;
+    }
+    await volcar();
+  }
+
   async asignarProfesional(clienteId: string, profesionalId: string | null): Promise<void> {
     const datos = await cargar();
     const cliente = datos.clientes.find((c) => c.id === clienteId);

@@ -20,6 +20,8 @@ export interface Perfil {
   correo: string;
   nombre: string;
   rol: "admin" | "entrenador";
+  /** Data URI ya encogida por el navegador. `null` = se enseñan sus iniciales. */
+  foto?: string | null;
 }
 
 export interface SemanaEconomica {
@@ -150,6 +152,8 @@ export interface Repositorio {
   profesionalDelCliente(clienteId: string): Promise<string | null>;
   /** Todos los profesionales. Para el filtro del administrador. */
   listarProfesionales(): Promise<Perfil[]>;
+  /** Cambia el nombre y la foto de un perfil. Cada uno el suyo. */
+  actualizarPerfil(id: string, datos: { nombre: string; foto: string | null }): Promise<void>;
   /** Asigna el responsable de un cliente. Solo el administrador. */
   asignarProfesional(clienteId: string, profesionalId: string | null): Promise<void>;
 

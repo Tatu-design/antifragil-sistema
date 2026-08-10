@@ -589,8 +589,8 @@ export class RepositorioPostgres implements Repositorio {
    * cookie de sesión dura dos semanas y no debe sobrevivir a un bloqueo.
    */
   async perfilPorCorreo(correo: string): Promise<Perfil | null> {
-    const filas = await consultar<{ id: string; email: string; nombre: string; rol: string }>(
-      `select p.id, u.email, p.nombre, p.rol
+    const filas = await consultar<{ id: string; email: string; nombre: string; rol: string; foto: string | null }>(
+      `select p.id, u.email, p.nombre, p.rol, p.foto
          from public.perfiles p
          join auth.users u on u.id = p.id
         where lower(u.email) = $1
@@ -602,7 +602,9 @@ export class RepositorioPostgres implements Repositorio {
       [correo.trim().toLowerCase()],
     );
     const f = filas[0];
-    return f ? { id: f.id, correo: f.email, nombre: f.nombre, rol: f.rol as Perfil["rol"] } : null;
+    return f
+      ? { id: f.id, correo: f.email, nombre: f.nombre, rol: f.rol as Perfil["rol"], foto: f.foto ?? null }
+      : null;
   }
 
   async profesionalDelCliente(clienteId: string): Promise<string | null> {
@@ -614,13 +616,27 @@ export class RepositorioPostgres implements Repositorio {
   }
 
   async listarProfesionales(): Promise<Perfil[]> {
-    const filas = await consultar<{ id: string; email: string; nombre: string; rol: string }>(
-      `select p.id, u.email, p.nombre, p.rol
+    const filas = await consultar<{ id: string; email: string; nombre: string; rol: string; foto: string | null }>(
+      `select p.id, u.email, p.nombre, p.rol, p.foto
          from public.perfiles p
          join auth.users u on u.id = p.id
         order by (p.rol = 'admin') desc, p.nombre`,
     );
-    return filas.map((f) => ({ id: f.id, correo: f.email, nombre: f.nombre, rol: f.rol as Perfil["rol"] }));
+    return filas.map((f) => ({
+      id: f.id,
+      correo: f.email,
+      nombre: f.nombre,
+      rol: f.rol as Perfil["rol"],
+      foto: f.foto ?? null,
+    }));
+  }
+
+  async actualizarPerfil(id: string, datos: { nombre: string; foto: string | null }): Promise<void> {
+    await consultar("update perfiles set nombre = $2, foto = $3 where id = $1", [
+      id,
+      datos.nombre,
+      datos.foto,
+    ]);
   }
 
   async asignarProfesional(clienteId: string, profesionalId: string | null): Promise<void> {

@@ -71,14 +71,31 @@ describe("de quién es la contraseña que se cambia", () => {
     expect(bloque).toContain("exigirUsuario()");
   });
 
-  it("la pantalla la tienen los dos roles, no solo el administrador", () => {
-    // Rafa es justamente quien más la necesita.
-    const pagina = readFileSync(
-      path.join(process.cwd(), "src", "app", "cuenta", "page.tsx"),
+  it("el panel lo tienen los dos roles, no solo el administrador", () => {
+    // Rafa es justamente quien más lo necesita: entra con una contraseña
+    // temporal y tiene que poder estrenarla.
+    const panel = readFileSync(
+      path.join(process.cwd(), "src", "components", "PanelPerfil.tsx"),
       "utf8",
     );
-    expect(pagina).toContain("exigirUsuario");
-    expect(pagina).not.toContain("exigirAdmin");
+    expect(panel).not.toContain("esAdmin");
+    // Y se llega desde la cabecera de las tres pantallas con barra.
+    for (const pantalla of ["clientes", "avisos", "economia"]) {
+      const pagina = readFileSync(
+        path.join(process.cwd(), "src", "app", pantalla, "page.tsx"),
+        "utf8",
+      );
+      expect(pagina, pantalla).toContain("BotonPerfil");
+    }
+  });
+
+  it("el perfil que se edita sale de la sesión, no del formulario", () => {
+    const bloquePerfil = (() => {
+      const i = ACCION.indexOf("export async function accionGuardarPerfil");
+      return ACCION.slice(i, ACCION.indexOf("\n}\n", i));
+    })();
+    expect(bloquePerfil).toContain("quien.id");
+    expect(bloquePerfil).not.toMatch(/validado\.data\.(id|perfilId)/);
   });
 
   it("la contraseña no se cifra en JavaScript: la cifra la base de datos", () => {

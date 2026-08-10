@@ -1,8 +1,8 @@
 import Image from "next/image";
-import Link from "next/link";
 
 import { accionResolverAviso, accionResolverTipo } from "@/app/actions";
 import { BarraInferior } from "@/components/BarraInferior";
+import { BotonPerfil } from "@/components/BotonPerfil";
 import { Iconos } from "@/components/Iconos";
 import { SinConexion } from "@/components/SinConexion";
 import { BaseNoDisponible } from "@/repositories/postgres";
@@ -45,15 +45,9 @@ export default async function PaginaAvisos() {
         <header className="cabecera-app">
           <div className="cabecera-app-marca">
             <Image src="/logo-marca.png" alt="Antifrágil" className="logo-nav" width={120} height={32} priority />
-            {/* «Mi cuenta» sí puede ser `<Link>`: precargarla no hace nada.
-                «Salir» NO, porque el enrutador precarga los enlaces a la
-                vista y eso cerraba la sesión sola. */}
-            <Link className="chip-cabecera chip-cuenta" href="/cuenta">
-              Mi cuenta
-            </Link>
-            <a className="chip-cabecera" href="/salir">
-              Salir
-            </a>
+            {/* Tu foto abre «lo tuyo»: nombre, foto, contraseña y cerrar
+                sesión. Antes eran dos chips sueltos aquí mismo. */}
+            <BotonPerfil usuario={usuario} />
           </div>
         </header>
 

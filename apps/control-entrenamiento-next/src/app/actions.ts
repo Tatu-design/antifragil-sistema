@@ -21,6 +21,7 @@ import { ErrorDeNegocio } from "@/domain/modalidades";
 import { cerrarSesion, entrar, entrarConClaveUnica } from "@/lib/auth";
 import { cambiarClave, verificarCredenciales } from "@/repositories/usuarios";
 import { esAdmin, exigirAccesoACliente, exigirAdmin, exigirUsuario } from "@/lib/permisos";
+import { repositorio } from "@/repositories";
 import { listarProfesionales } from "@/repositories/perfiles";
 import {
   desdeFormulario,
@@ -37,6 +38,7 @@ import {
   esquemaKids,
   esquemaFirma,
   esquemaClave,
+  esquemaPerfil,
   esquemaClaveUnica,
   esquemaLogin,
   esquemaServicio,
@@ -499,4 +501,38 @@ export async function accionCambiarClave(
   // deseable; si algún día hace falta echar a todos los dispositivos, habrá
   // que numerar las sesiones y comprobarlo en `abrirCookie`.
   return { ok: true, mensaje: "Contraseña cambiada. Úsala la próxima vez que entres.", tono: "exito" };
+}
+
+/**
+ * Guardar el propio nombre y la propia foto.
+ *
+ * Como con la contraseña: **el perfil sale de la sesión, no del formulario**.
+ * Si el identificador viniera de fuera, cualquiera podría cambiarle el nombre
+ * y la foto a otro.
+ */
+export async function accionGuardarPerfil(
+  _previo: Resultado | null,
+  datos: FormData,
+): Promise<Resultado> {
+  const quien = await exigirUsuario();
+
+  const validado = esquemaPerfil.safeParse(desdeFormulario(datos));
+  if (!validado.success) {
+    return { ok: false, mensaje: validado.error.issues[0]?.message ?? "Revisa los datos", tono: "error" };
+  }
+
+  try {
+    await repositorio().actualizarPerfil(quien.id, {
+      nombre: validado.data.nombre,
+      foto: validado.data.foto || null,
+    });
+  } catch {
+    return { ok: false, mensaje: "No se ha podido guardar ahora mismo.", tono: "error" };
+  }
+
+  // El nombre sale en el filtro por profesional y en la propia cabecera.
+  revalidatePath("/clientes");
+  revalidatePath("/avisos");
+  revalidatePath("/economia");
+  return { ok: true, mensaje: "Guardado.", tono: "exito" };
 }

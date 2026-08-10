@@ -160,3 +160,19 @@ export const esquemaClave = z
     message: "La contraseña nueva tiene que ser distinta de la actual",
     path: ["nueva"],
   });
+
+/**
+ * Los datos propios: nombre y foto.
+ *
+ * La foto llega como data URI ya encogida por el navegador. Se limita el
+ * tamaño por si alguien intentara mandar una imagen entera saltándose el
+ * encogido: 300 KB es de sobra para 160×160 y corta cualquier abuso.
+ */
+export const esquemaPerfil = z.object({
+  nombre: z.string().trim().min(1, "Tu nombre no puede estar vacío").max(40),
+  foto: z
+    .string()
+    .max(300_000, "La foto es demasiado grande")
+    .refine((v) => v === "" || v.startsWith("data:image/"), "Eso no es una imagen")
+    .default(""),
+});
