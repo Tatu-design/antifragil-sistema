@@ -175,7 +175,18 @@ describe("cómo se ve el bloque de LTV", () => {
 
     expect(html).not.toContain("1.485");
     expect(html).toContain("LTV");
-    expect(html).toContain("Pulsa para ver");
+    // El ojo tachado: se ve que hay algo tapado, sin decirlo con un párrafo.
+    expect(html).toContain("i-eye-off");
+  });
+
+  it("es discreto: la sigla y un icono, nada más", () => {
+    // Era una tarjeta con recuadro y frase explicativa, y pesaba tanto como
+    // el servicio del cliente. Ahora no compite con nada (2026-08-10).
+    const html = pintar(1485);
+    expect(html).not.toContain("Valor acumulado");
+    expect(html).not.toContain("Pulsa para");
+    // Pero quien use lector de pantalla sí oye qué es.
+    expect(html).toContain("valor acumulado del cliente");
   });
 
   it("y ninguna cifra se cuela en el marcado mientras está tapado", () => {
@@ -204,16 +215,9 @@ describe("cómo se ve el bloque de LTV", () => {
     expect(soloCuenta).toBe(soloBono);
   });
 
-  it("se puede destapar y volver a tapar", () => {
-    // El texto lo dice: pulsar la primera vez enseña, pulsar otra vez esconde.
-    expect(pintar(1485)).toContain("Pulsa para ver");
-  });
-
-  it("no depende del color ni de un icono para entenderse", () => {
-    const html = pintar(1485);
-    // Sin `<svg>`, sin `<img>`: todo lo que dice el bloque es texto.
-    expect(html).not.toContain("<svg");
-    expect(html).not.toContain("<img");
+  it("dice si está tapado sin depender solo del icono", () => {
+    // `aria-pressed` para quien no ve el ojo tachado.
+    expect(pintar(1485)).toContain('aria-pressed="false"');
   });
 });
 
