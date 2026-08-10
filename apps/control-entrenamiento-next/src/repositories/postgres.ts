@@ -615,6 +615,21 @@ export class RepositorioPostgres implements Repositorio {
     return filas[0]?.entrenador_id ?? null;
   }
 
+  async perfilPorId(id: string | null): Promise<Perfil | null> {
+    if (!id) return null;
+    const filas = await consultar<{ id: string; email: string; nombre: string; rol: string; foto: string | null }>(
+      `select p.id, u.email, p.nombre, p.rol, p.foto
+         from public.perfiles p
+         join auth.users u on u.id = p.id
+        where p.id = $1`,
+      [id],
+    );
+    const f = filas[0];
+    return f
+      ? { id: f.id, correo: f.email, nombre: f.nombre, rol: f.rol as Perfil["rol"], foto: f.foto ?? null }
+      : null;
+  }
+
   async listarProfesionales(): Promise<Perfil[]> {
     const filas = await consultar<{ id: string; email: string; nombre: string; rol: string; foto: string | null }>(
       `select p.id, u.email, p.nombre, p.rol, p.foto

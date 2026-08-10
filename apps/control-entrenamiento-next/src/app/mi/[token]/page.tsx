@@ -1,7 +1,9 @@
 import Image from "next/image";
 import { notFound } from "next/navigation";
 
-import { euros, fechaEs, mesMinuscula } from "@/lib/formato";
+import { HistorialPublico } from "@/components/HistorialPublico";
+import { Avatar } from "@/components/PanelPerfil";
+import { euros, mesMinuscula } from "@/lib/formato";
 import { obtenerPerfilPublico } from "@/services/publico";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +21,7 @@ export default async function PaginaMiPerfil({ params }: { params: Promise<{ tok
   const perfil = await obtenerPerfilPublico(token);
   if (!perfil) notFound();
 
-  const { nombre, ficha, historial, confirmadasHoy, hoy } = perfil;
+  const { nombre, ficha, historial, confirmadasHoy, hoy, profesional } = perfil;
   const plural = (n: number) => (n === 1 ? "sesión" : "sesiones");
   const cuandoMes = ficha.mes ? ` en ${mesMinuscula(ficha.mes)}` : " este mes";
 
@@ -33,7 +35,7 @@ export default async function PaginaMiPerfil({ params }: { params: Promise<{ tok
             ? "Así va tu mes"
             : ficha.modalidad === "cuenta"
               ? "Así va tu cuenta"
-              : "Así va tu bono ahora mismo"}
+              : "Así va tu programa ahora mismo"}
         </p>
       </div>
 
@@ -119,31 +121,22 @@ export default async function PaginaMiPerfil({ params }: { params: Promise<{ tok
         </div>
       ))}
 
-      <div className="lista">
-        <div className="cabecera-seccion">
-          <span>Historial de sesiones</span>
-        </div>
-
-        {historial.length === 0 ? (
-          <p className="empty">Todavía no hay sesiones registradas con fecha.</p>
-        ) : (
-          historial.map((sesion) => (
-            <div className="fila" key={sesion.id}>
-              <div className="sesion-fila">
-                <div className="sesion-badge">{sesion.numeroSesion}</div>
-                <div className="sesion-info">
-                  <div className="fecha">{fechaEs(sesion.fecha)}</div>
-                  <div className="tipo">
-                    {sesion.servicio} · sesión {sesion.numeroSesion}
-                    {sesion.sesionesTotales ? ` de ${sesion.sesionesTotales}` : ""}
-                    {sesion.hora ? ` · ${sesion.hora}` : ""}
-                  </div>
-                </div>
-              </div>
+      {/* Quién le entrena. Solo nombre y foto: esta pantalla la abre
+          cualquiera que tenga el enlace, así que del profesional sale lo justo
+          para que el cliente sepa con quién trata. */}
+      {profesional && (
+        <div className="lista">
+          <div className="fila fila-profesional">
+            <Avatar nombre={profesional.nombre} foto={profesional.foto} />
+            <div className="sesion-info">
+              <div className="cabecera-seccion">Profesional</div>
+              <div className="fecha">{profesional.nombre}</div>
             </div>
-          ))
-        )}
-      </div>
+          </div>
+        </div>
+      )}
+
+      <HistorialPublico sesiones={historial} />
     </div>
   );
 }

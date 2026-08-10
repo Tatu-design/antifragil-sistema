@@ -1610,3 +1610,35 @@ a.pill { text-decoration: none; }
   border: 1px solid rgba(245, 158, 11, 0.28);
   letter-spacing: 0.04em;
 }
+
+/* ----- Quién entrena al cliente, en su enlace personal ----- */
+
+.fila-profesional {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.fila-profesional .avatar { flex: none; }
+
+/* Una cabecera de sección dentro de una fila no lleva el hueco de las de
+   arriba: aquí es la etiqueta de un dato, no el título de un bloque. */
+.fila-profesional .cabecera-seccion { padding: 0; margin: 0; }
+
+/* La cabecera del historial es pulsable: ocupa toda la fila y la flecha se va
+   al extremo, para que se vea que se abre. */
+.cabecera-plegable {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--tinta-suave);
+  cursor: pointer;
+}

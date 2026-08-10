@@ -61,7 +61,15 @@ function contarConsultas(): { total: () => number; porMetodo: () => Record<strin
 const PRESUPUESTO = {
   "lista de clientes": 3,
   "perfil de un cliente": 4,
-  "perfil público del cliente": 5,
+  /**
+   * Subió de 5 a 6 el 2026-08-10: la pantalla dice ahora quién le entrena, y
+   * eso es una lectura más del perfil del profesional.
+   *
+   * Compensa porque **no cuesta espera**: va dentro de la misma tanda en
+   * paralelo que las otras cuatro, que ya estaban ahí. Un viaje más de red que
+   * ocurre a la vez que los demás no alarga la pantalla ni un milisegundo.
+   */
+  "perfil público del cliente": 6,
   /**
    * Bajó de 8 a 5 y de 5 a 1 el 2026-08-08.
    *

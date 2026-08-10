@@ -23,6 +23,13 @@ import { repositorio } from "@/repositories";
 
 export interface PerfilPublico {
   nombre: string;
+  /**
+   * Quién le entrena: solo su nombre y su foto.
+   *
+   * NO va el correo ni el rol. Esta pantalla la abre cualquiera que tenga el
+   * enlace, así que sale lo justo para que el cliente sepa con quién trata.
+   */
+  profesional: { nombre: string; foto: string | null } | null;
   ficha: FichaServicio;
   /** Su historial entero, como en la página pública de Flask. */
   historial: Sesion[];
@@ -44,17 +51,21 @@ export async function obtenerPerfilPublico(token: string): Promise<PerfilPublico
   // las que ya tenemos en vez de pedirlas aparte (2026-08-05). Antes eran
   // siete viajes de red encadenados para una pantalla que el cliente abre
   // desde el móvil, muchas veces con mala cobertura.
-  const [ciclos, sesiones, pendientesHoy, confirmadasHoy] = await Promise.all([
+  const [ciclos, sesiones, pendientesHoy, confirmadasHoy, profesional] = await Promise.all([
     repo.listarCiclos(cliente.id),
     repo.listarSesiones(cliente.id),
     repo.sesionesSinConfirmarHoy(cliente.id, hoy),
     repo.confirmacionesDeHoy(cliente.id, hoy),
+    // Va en la MISMA tanda: el cliente ya está leído, así que preguntarlo aquí
+    // no añade ni un milisegundo de espera.
+    repo.perfilPorId(cliente.profesionalId),
   ]);
 
   const ciclo = ciclos.find((c) => c.ciclo === cliente.cicloActual) ?? null;
 
   return {
     nombre: cliente.nombre,
+    profesional: profesional ? { nombre: profesional.nombre, foto: profesional.foto ?? null } : null,
     ficha: fichaServicio({
       ciclo,
       sesionesDelCiclo: sesiones.filter((s) => s.ciclo === cliente.cicloActual).length,

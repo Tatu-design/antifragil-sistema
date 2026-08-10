@@ -460,6 +460,12 @@ export class RepositorioStaging implements Repositorio {
     return datos.clientes.find((c) => c.id === clienteId)?.profesionalId ?? null;
   }
 
+  async perfilPorId(id: string | null): Promise<Perfil | null> {
+    if (!id) return null;
+    const datos = await cargar();
+    return clonar(datos.perfiles.find((p) => p.id === id) ?? null);
+  }
+
   async listarProfesionales(): Promise<Perfil[]> {
     const datos = await cargar();
     return clonar(

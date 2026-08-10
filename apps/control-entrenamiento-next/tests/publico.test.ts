@@ -6,6 +6,8 @@
  * que confirmar cree una sesión, o que escanear dos veces cuente doble.
  */
 
+import { readFileSync } from "node:fs";
+
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { repositorio } from "@/repositories";
@@ -126,5 +128,67 @@ describe("confirmar la sesión de hoy", () => {
     const antes = await repositorio().listarSesiones("cli-a");
     await confirmarSesion(TOKEN_A);
     expect(await repositorio().listarSesiones("cli-a")).toEqual(antes);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Lo que ve el cliente en su pantalla (2026-08-10)
+// ---------------------------------------------------------------------------
+
+describe("la pantalla del cliente", () => {
+  beforeEach(() => reiniciarStagingParaPruebas());
+
+  it("le dice quién le entrena: nombre y foto, nada más", async () => {
+    const perfil = await obtenerPerfilPublico(TOKEN_A);
+
+    expect(perfil!.profesional).not.toBeNull();
+    expect(perfil!.profesional!.nombre).toBe("Administrador");
+    // NI el correo NI el rol: esta pantalla la abre cualquiera con el enlace.
+    expect(Object.keys(perfil!.profesional!).sort()).toEqual(["foto", "nombre"]);
+  });
+
+  it("un cliente sin profesional asignado no rompe la pantalla", async () => {
+    const repo = repositorio();
+    await repo.asignarProfesional("cli-a", null);
+
+    const perfil = await obtenerPerfilPublico(TOKEN_A);
+    expect(perfil!.profesional).toBeNull();
+  });
+
+  it("el historial NO le enseña su tarifa", async () => {
+    // Era el fallo de fondo: cada línea decía el nombre del servicio, y el
+    // nombre lleva el precio dentro («Antiguo 35€ x16»). El cliente estaba
+    // viendo su tarifa en cada línea sin que nadie lo hubiera decidido.
+    const pagina = readFileSync("src/components/HistorialPublico.tsx", "utf8");
+    expect(pagina).not.toContain("sesion.servicio");
+    expect(pagina).not.toContain("sesion.tarifa");
+  });
+
+  it("y en el historial solo van la fecha y la hora", async () => {
+    const pagina = readFileSync("src/components/HistorialPublico.tsx", "utf8");
+    expect(pagina).toContain("fechaEs(sesion.fecha)");
+    expect(pagina).toContain("sesion.hora");
+    expect(pagina).not.toContain("sesionesTotales");
+  });
+
+  it("el historial nace plegado", async () => {
+    // Con dieciseis sesiones, la lista entera empujaba hacia abajo lo que el
+    // cliente abre a mirar: cuántas lleva y cuántas le quedan.
+    const pagina = readFileSync("src/components/HistorialPublico.tsx", "utf8");
+    expect(pagina).toContain("useState(false)");
+  });
+
+  it("no se le habla de «bono», sino de su programa", async () => {
+    const pagina = readFileSync("src/app/mi/[token]/page.tsx", "utf8");
+    expect(pagina).not.toContain("Así va tu bono");
+    expect(pagina).toContain("Así va tu programa");
+  });
+
+  it("y sigue sin colársele nada del negocio", async () => {
+    const perfil = await obtenerPerfilPublico(TOKEN_A);
+    const texto = JSON.stringify(perfil).toLowerCase();
+    for (const prohibido of ["ltv", "correo", "email", "entrenador_id", "rol"]) {
+      expect(texto, prohibido).not.toContain(prohibido);
+    }
   });
 });

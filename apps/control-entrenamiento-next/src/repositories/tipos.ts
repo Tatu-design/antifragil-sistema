@@ -150,6 +150,9 @@ export interface Repositorio {
   perfilPorCorreo(correo: string): Promise<Perfil | null>;
   /** De quién es ese cliente. `null` si no existe o si no tiene responsable. */
   profesionalDelCliente(clienteId: string): Promise<string | null>;
+  /** Un profesional por su identificador. Lo usa la página del cliente para
+   *  decirle quién le entrena. */
+  perfilPorId(id: string | null): Promise<Perfil | null>;
   /** Todos los profesionales. Para el filtro del administrador. */
   listarProfesionales(): Promise<Perfil[]>;
   /** Cambia el nombre y la foto de un perfil. Cada uno el suyo. */
