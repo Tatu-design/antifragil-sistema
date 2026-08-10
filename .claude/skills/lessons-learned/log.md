@@ -716,3 +716,33 @@ Y las pruebas contra Supabase se saltan solas cuando detectan datos reales
 3. Antes de decir «verificado» sobre algo que escribe datos, comprobar el dato
    **en la base**, no solo que la pantalla no dé error.
 
+---
+
+## 2026-08-10 (3) — Un arreglo de Flask que no se porté con la app
+
+**Qué pasó:** Fernando vio su perfil perfecto y el de Rafa descolocado, con el
+mismo código. No era un fallo del panel: el móvil de Rafa seguía con la hoja de
+estilos anterior. Se enlazaba como `/style.css` a secas, así que el navegador
+reutiliza la que ya tiene y las reglas nuevas no llegan hasta que alguien vacía
+la caché a mano.
+
+**Por qué pasó:** esto YA se había resuelto en Flask el 2026-07-31, con una
+huella de versión en el enlace. Al migrar a Next se portaron las pantallas y la
+hoja de estilos, pero no ese arreglo: era una línea en una plantilla, no una
+funcionalidad con nombre, y no estaba en ninguna lista.
+
+Es la misma familia que el error de portar sin portar los supuestos de coste
+(2026-08-05): **lo que se porta no son solo las funcionalidades, son también
+las cicatrices.**
+
+**Qué se hace distinto:** al portar una pantalla, revisar el historial de esa
+misma pantalla en la aplicación de origen buscando arreglos que no se vean en
+el código —cachés, cabeceras, precargas, órdenes de carga—. Son invisibles al
+leer el resultado final y solo aparecen en los commits que los añadieron.
+
+**Y un aviso sobre comprobar huellas desde Windows:** mi verificación dijo que
+la huella «no coincidía» cuando estaba bien. Mi copia local tiene saltos de
+línea de Windows y la de Vercel los de Unix, así que el mismo archivo da
+huellas distintas. Comparar hashes de archivos entre local y servidor no vale;
+hay que comparar contra lo que el servidor sirve.
+
