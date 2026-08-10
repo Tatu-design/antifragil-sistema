@@ -19,12 +19,23 @@ export function FormularioDatos({
   clienteId,
   nombre,
   estado,
+  profesionalId = "",
+  profesionales = [],
 }: {
   clienteId: string;
   nombre: string;
   estado: Estado;
+  /** Quién lo lleva ahora. */
+  profesionalId?: string | null;
+  /**
+   * Entre quiénes se puede elegir. Llega vacío para un entrenador: cambiar de
+   * profesional es traspasar un cliente, y eso lo decide el administrador.
+   */
+  profesionales?: Array<{ id: string; nombre: string }>;
 }) {
-  const [valores, setValores] = useState({ nombre, estado });
+  const [valores, setValores] = useState({ nombre, estado, profesionalId: profesionalId ?? "" });
+  const puedeTraspasar = profesionales.length > 1;
+  const comoSeLlama = (id: string) => profesionales.find((p) => p.id === id)?.nombre ?? "sin asignar";
   const [revisando, setRevisando] = useState(false);
 
   if (!revisando) {
@@ -70,6 +81,26 @@ export function FormularioDatos({
             </span>
           </label>
 
+          {puedeTraspasar && (
+            <label className="campo">
+              <span>Profesional</span>
+              <select
+                value={valores.profesionalId}
+                onChange={(e) => setValores({ ...valores, profesionalId: e.target.value })}
+              >
+                {profesionales.map((p) => (
+                  <option value={p.id} key={p.id}>
+                    {p.nombre}
+                  </option>
+                ))}
+              </select>
+              <span className="meta">
+                Cambiarlo traspasa el cliente: pasará a verlo el profesional nuevo y dejará de verlo el
+                anterior. No se pierde nada — bono, sesiones, historial y enlace personal siguen igual.
+              </span>
+            </label>
+          )}
+
           <button type="submit" className="boton">
             Revisar cambios
           </button>
@@ -96,7 +127,22 @@ export function FormularioDatos({
           <span className="flecha">→</span>
           <span className="despues">{mayuscula(valores.estado)}</span>
         </div>
+        {puedeTraspasar && (
+          <div className="fila">
+            <span className="etiqueta">Profesional</span>
+            <span className="antes">{comoSeLlama(profesionalId ?? "")}</span>
+            <span className="flecha">→</span>
+            <span className="despues">{comoSeLlama(valores.profesionalId)}</span>
+          </div>
+        )}
       </div>
+
+      {puedeTraspasar && (profesionalId ?? "") !== valores.profesionalId && (
+        <p className="aviso-texto">
+          ⚠ Vas a traspasar este cliente a {comoSeLlama(valores.profesionalId)}. Dejará de aparecer en la
+          lista de {comoSeLlama(profesionalId ?? "")} y aparecerá en la suya, con todo su historial.
+        </p>
+      )}
 
       {estado !== valores.estado && valores.estado !== "activo" && (
         <p className="aviso-texto">
@@ -115,6 +161,7 @@ export function FormularioDatos({
         <input type="hidden" name="clienteId" value={clienteId} />
         <input type="hidden" name="nombre" value={valores.nombre} />
         <input type="hidden" name="estado" value={valores.estado} />
+        <input type="hidden" name="profesionalId" value={valores.profesionalId} />
         <Guardar />
       </form>
 

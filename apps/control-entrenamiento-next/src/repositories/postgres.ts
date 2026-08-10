@@ -243,11 +243,17 @@ export class RepositorioPostgres implements Repositorio {
 
   async crearCliente(cliente: Cliente, cicloInicial: Ciclo): Promise<void> {
     await consultar(
-      `insert into clientes (id, nombre, estado, token, pendiente_pago, sesiones_completadas, ciclo_actual)
-       values ($1, $2, $3, $4, $5, $6, $7)`,
+      `insert into clientes (id, nombre, estado, token, pendiente_pago, sesiones_completadas,
+                             ciclo_actual, entrenador_id)
+       values ($1, $2, $3, $4, $5, $6, $7, $8)`,
       [
         cliente.id, cliente.nombre, cliente.estado, cliente.token,
         cliente.pendientePago, cliente.sesionesCompletadas, cliente.cicloActual,
+        // Faltaba, y el cliente nacia sin profesional aunque se hubiera
+        // elegido uno (2026-08-10). El fallo no lo vieron las pruebas porque
+        // el repositorio de pruebas guarda el objeto entero y esta columna
+        // sobrevivia sola; aqui habia que nombrarla y no estaba.
+        cliente.profesionalId ?? null,
       ],
     ).catch((error: { code?: string }) => {
       // El índice único sobre el nombre en minúsculas.
@@ -260,11 +266,11 @@ export class RepositorioPostgres implements Repositorio {
   async actualizarCliente(cliente: Cliente): Promise<void> {
     await consultar(
       `update clientes set nombre = $2, estado = $3, pendiente_pago = $4,
-              sesiones_completadas = $5, ciclo_actual = $6
+              sesiones_completadas = $5, ciclo_actual = $6, entrenador_id = $7
         where id = $1`,
       [
         cliente.id, cliente.nombre, cliente.estado, cliente.pendientePago,
-        cliente.sesionesCompletadas, cliente.cicloActual,
+        cliente.sesionesCompletadas, cliente.cicloActual, cliente.profesionalId ?? null,
       ],
     );
   }

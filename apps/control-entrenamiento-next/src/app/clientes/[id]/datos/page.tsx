@@ -7,7 +7,8 @@ import { SinConexion } from "@/components/SinConexion";
 import { BaseNoDisponible } from "@/repositories/postgres";
 import { obtenerPerfil } from "@/services/clientes";
 
-import { exigirAccesoACliente } from "@/lib/permisos";
+import { esAdmin, exigirAccesoACliente } from "@/lib/permisos";
+import { listarProfesionales } from "@/repositories/perfiles";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Editar datos — Antifrágil" };
@@ -24,7 +25,9 @@ export default async function PaginaDatos({
 
   // El candado. Antes de leer nada de este cliente: un entrenador que
   // escriba la dirección a mano de un cliente ajeno recibe «no existe».
-  await exigirAccesoACliente(id);
+  const usuario = await exigirAccesoACliente(id);
+  // Solo el administrador traspasa clientes entre profesionales.
+  const profesionales = esAdmin(usuario) ? await listarProfesionales() : [];
   let perfil;
   try {
     perfil = await obtenerPerfil(id);
@@ -52,7 +55,13 @@ export default async function PaginaDatos({
 
         {fallo && <div className="aviso-error">{fallo}</div>}
 
-        <FormularioDatos clienteId={cliente.id} nombre={cliente.nombre} estado={cliente.estado} />
+        <FormularioDatos
+          clienteId={cliente.id}
+          nombre={cliente.nombre}
+          estado={cliente.estado}
+          profesionalId={cliente.profesionalId}
+          profesionales={profesionales}
+        />
 
         <div className="zona-peligrosa">
           <p className="zona-peligrosa-titulo">Zona peligrosa</p>

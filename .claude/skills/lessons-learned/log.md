@@ -681,3 +681,38 @@ protegido» de «no funciona en absoluto».
    sale—, **mirar primero si la pantalla es la que se cree**, antes de tocar
    el botón.
 
+---
+
+## 2026-08-10 (2) — El repositorio real perdía una columna en silencio
+
+**Qué pasó:** Fernando dio de alta a un cliente eligiendo a Rafa como
+profesional. El cliente se creó **sin profesional ninguno** y no aparecía en la
+lista de nadie. Lo encontró él, no yo, y encima justo después de que yo dijera
+que estaba verificado.
+
+**Por qué pasó:** el servicio ponía el dato en el objeto, pero la consulta
+`insert into clientes (...)` no nombraba la columna. El `update` tampoco. Se
+perdía sin dar ningún error.
+
+**Por qué no lo vio ninguna prueba, que es lo importante:** las pruebas corren
+contra el repositorio de staging, que **guarda el objeto entero en un
+archivo**. Ahí un campo nuevo sobrevive solo, sin que nadie lo nombre. En
+PostgreSQL hay que escribirlo columna por columna. Las dos implementaciones
+tienen contratos idénticos y comportamientos distintos justo en esto.
+
+Y las pruebas contra Supabase se saltan solas cuando detectan datos reales
+—que es lo correcto—, así que tampoco iban a cazarlo nunca.
+
+**Qué se hace distinto:**
+
+1. Existe `tests/repositorio-coherente.test.ts`, que **lee el código fuente**
+   y exige que toda columna que el repositorio sepa LEER la sepa también
+   ESCRIBIR. Un campo que se lee y no se escribe siempre vale `null`: eso no
+   es un dato, es un error esperando. Comprobado que falla al reintroducir el
+   fallo a propósito.
+2. **Al añadir un campo a una entidad, tocar SIEMPRE tres sitios en el
+   repositorio de PostgreSQL**: la lectura, el `insert` y el `update`. Que el
+   de staging funcione no demuestra nada sobre el real.
+3. Antes de decir «verificado» sobre algo que escribe datos, comprobar el dato
+   **en la base**, no solo que la pantalla no dé error.
+

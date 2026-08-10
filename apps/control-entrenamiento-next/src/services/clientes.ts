@@ -436,3 +436,14 @@ export async function marcarCobro(clienteId: string, ciclo: number, pagado: bool
     }
   });
 }
+
+/**
+ * Cambia de profesional responsable.
+ *
+ * No toca nada más: el bono, las sesiones, el historial, la deuda y el enlace
+ * personal del cliente siguen exactamente igual. Solo cambia en la lista de
+ * quién aparece.
+ */
+export async function traspasarCliente(clienteId: string, profesionalId: string): Promise<void> {
+  await repositorio().asignarProfesional(clienteId, profesionalId);
+}

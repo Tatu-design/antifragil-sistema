@@ -45,6 +45,7 @@ import {
   crearCliente,
   marcarCobro,
   renombrarCliente,
+  traspasarCliente,
 } from "@/services/clientes";
 import {
   editarSesion,
@@ -234,10 +235,21 @@ export async function accionGuardarDatos(datos: FormData): Promise<void> {
   if (!validado.success) redirect("/clientes");
 
   const id = validado.data.clienteId;
-  await exigirAccesoACliente(id);
+  const quien = await exigirAccesoACliente(id);
   try {
     await renombrarCliente(id, validado.data.nombre);
     await cambiarEstado(id, validado.data.estado);
+
+    // Traspasar un cliente a otro profesional es cosa del administrador: un
+    // entrenador podría quitárselo a un compañero, o quedárselo. Se comprueba
+    // aquí y no solo escondiendo el desplegable.
+    const traspaso = validado.data.profesionalId;
+    if (traspaso && esAdmin(quien)) {
+      const profesionales = await listarProfesionales();
+      if (profesionales.some((p) => p.id === traspaso)) {
+        await traspasarCliente(id, traspaso);
+      }
+    }
   } catch (error) {
     const texto = error instanceof Error ? error.message : "no se ha podido guardar";
     redirect(`/clientes/${id}/datos?error=${encodeURIComponent(texto)}`);

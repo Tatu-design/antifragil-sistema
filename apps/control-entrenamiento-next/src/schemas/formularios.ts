@@ -110,6 +110,8 @@ export const esquemaDatos = z.object({
   clienteId: z.string().min(1),
   nombre: z.string().trim().min(1, "El nombre del cliente no puede estar vacío").max(80),
   estado: z.enum(ESTADOS),
+  /** Traspasar el cliente a otro profesional. Vacío = no se toca. */
+  profesionalId: z.string().trim().default(""),
 });
 
 /** La pantalla de borrado ES la confirmación, como en Flask: no se pide además
