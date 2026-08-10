@@ -693,7 +693,13 @@ h1 {
 .logo-login { display: block; height: 34px; width: auto; margin: 0 auto 1rem; }
 
 /* La cápsula de la derecha en la cabecera (en el diseño, «Semana 31»). */
+/* «Mi cuenta» va antes de «Salir», así que es el que empuja; el de salir se
+   queda pegado a su lado. */
+.chip-cuenta + .chip-cabecera { margin-left: 0.4rem; }
+
 .chip-cabecera {
+  /* Empujan los dos juntos a la derecha: el primero se separa y el segundo
+     va pegado a él. */
   margin-left: auto;
   display: inline-flex;
   align-items: center;

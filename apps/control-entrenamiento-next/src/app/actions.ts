@@ -19,6 +19,7 @@ import { redirect } from "next/navigation";
 
 import { ErrorDeNegocio } from "@/domain/modalidades";
 import { cerrarSesion, entrar, entrarConClaveUnica } from "@/lib/auth";
+import { cambiarClave, verificarCredenciales } from "@/repositories/usuarios";
 import { esAdmin, exigirAccesoACliente, exigirAdmin, exigirUsuario } from "@/lib/permisos";
 import { listarProfesionales } from "@/repositories/perfiles";
 import {
@@ -35,6 +36,7 @@ import {
   esquemaTipoAviso,
   esquemaKids,
   esquemaFirma,
+  esquemaClave,
   esquemaClaveUnica,
   esquemaLogin,
   esquemaServicio,
@@ -457,4 +459,44 @@ export async function accionBorrarCliente(datos: FormData): Promise<void> {
   revalidatePath("/clientes");
   revalidatePath("/economia");
   redirect("/clientes");
+}
+
+/**
+ * Cambiar la propia contraseña.
+ *
+ * Cada uno la suya y solo la suya: el correo sale de la sesión, NO del
+ * formulario. Si viniera del formulario, cualquiera podría cambiarle la
+ * contraseña a otro escribiendo su correo.
+ *
+ * Se exige la actual aunque ya haya sesión iniciada: una sesión olvidada en un
+ * móvil no debe bastar para quedarse con la cuenta.
+ */
+export async function accionCambiarClave(
+  _previo: Resultado | null,
+  datos: FormData,
+): Promise<Resultado> {
+  const quien = await exigirUsuario();
+
+  const validado = esquemaClave.safeParse(desdeFormulario(datos));
+  if (!validado.success) {
+    return { ok: false, mensaje: validado.error.issues[0]?.message ?? "Revisa los datos", tono: "error" };
+  }
+
+  try {
+    const correcta = await verificarCredenciales(quien.correo, validado.data.actual);
+    if (!correcta) {
+      return { ok: false, mensaje: "La contraseña actual no es correcta.", tono: "error" };
+    }
+
+    await cambiarClave(quien.correo, validado.data.nueva);
+  } catch {
+    return { ok: false, mensaje: "No se ha podido cambiar ahora mismo. Inténtalo en un minuto.", tono: "error" };
+  }
+
+  // Sobre la sesión: no se cierra. La cookie no depende de la contraseña, así
+  // que quien ya estuviera dentro en otro dispositivo sigue dentro hasta que
+  // caduque. Para el caso normal —estrenar una contraseña temporal— es lo
+  // deseable; si algún día hace falta echar a todos los dispositivos, habrá
+  // que numerar las sesiones y comprobarlo en `abrirCookie`.
+  return { ok: true, mensaje: "Contraseña cambiada. Úsala la próxima vez que entres.", tono: "exito" };
 }

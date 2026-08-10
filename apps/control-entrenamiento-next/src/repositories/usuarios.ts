@@ -63,3 +63,24 @@ export async function verificarCredenciales(correo: string, clave: string): Prom
   );
   return rows[0] ? { id: rows[0].id as string, correo: rows[0].email as string } : null;
 }
+
+/**
+ * Cambia la contraseña de una cuenta.
+ *
+ * La cifra la propia base de datos con `crypt` + `gen_salt('bf')`, igual que
+ * hace Supabase: la contraseña nunca se cifra en JavaScript ni viaja a ningún
+ * sitio más.
+ *
+ * **Quien llama a esto ya ha comprobado la contraseña actual.** Se hace fuera
+ * y no aquí para que esta función siga sirviendo también cuando el
+ * administrador tenga que reponerle el acceso a alguien que la ha perdido.
+ */
+export async function cambiarClave(correo: string, nueva: string): Promise<boolean> {
+  const { rowCount } = await pool().query(
+    `update auth.users
+        set encrypted_password = crypt($2, gen_salt('bf')), updated_at = now()
+      where lower(email) = $1`,
+    [correo.trim().toLowerCase(), nueva],
+  );
+  return (rowCount ?? 0) > 0;
+}

@@ -73,8 +73,12 @@ export default async function PaginaClientes({
         <header className="cabecera-app">
           <div className="cabecera-app-marca">
             <Image src="/logo-marca.png" alt="Antifrágil" className="logo-nav" width={120} height={32} priority />
-            {/* Enlace normal, no `<Link>`: el enrutador precarga los enlaces
-                a la vista, y precargar «Salir» cerraba la sesión sola. */}
+            {/* «Mi cuenta» sí puede ser `<Link>`: precargarla no hace nada.
+                «Salir» NO, porque el enrutador precarga los enlaces a la
+                vista y eso cerraba la sesión sola. */}
+            <Link className="chip-cabecera chip-cuenta" href="/cuenta">
+              Mi cuenta
+            </Link>
             <a className="chip-cabecera" href="/salir">
               Salir
             </a>

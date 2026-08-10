@@ -139,3 +139,24 @@ export function desdeFormulario(datos: FormData): Record<string, string> {
   }
   return objeto;
 }
+
+/**
+ * Cambiar la propia contraseña.
+ *
+ * Se pide la actual a propósito: si alguien se dejara la sesión abierta en un
+ * móvil, no debería poder quedarse con la cuenta sin saber la contraseña.
+ */
+export const esquemaClave = z
+  .object({
+    actual: z.string().min(1, "Escribe tu contraseña actual"),
+    nueva: z.string().min(8, "La contraseña nueva tiene que tener al menos 8 caracteres").max(200),
+    repetir: z.string().min(1, "Repite la contraseña nueva"),
+  })
+  .refine((d) => d.nueva === d.repetir, {
+    message: "Las dos contraseñas nuevas no coinciden",
+    path: ["repetir"],
+  })
+  .refine((d) => d.nueva !== d.actual, {
+    message: "La contraseña nueva tiene que ser distinta de la actual",
+    path: ["nueva"],
+  });
