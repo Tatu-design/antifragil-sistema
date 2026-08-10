@@ -23,13 +23,10 @@ export function HistorialProgramas({
   clienteId,
   nombre,
   servicios,
-  verImportes = true,
 }: {
   clienteId: string;
   nombre: string;
   servicios: Servicio[];
-  /** El entrenador ve el historial de sesiones, no el tarifario. */
-  verImportes?: boolean;
 }) {
   const [abierto, setAbierto] = useState(false);
   const [abiertos, setAbiertos] = useState<number[]>([]);
@@ -76,7 +73,7 @@ export function HistorialProgramas({
                 </span>
                 {/* La fotografía de las condiciones con las que se hizo ese
                     ciclo. Cambiar las condiciones de hoy no toca esto. */}
-                <span className="programa">{condiciones(servicio, verImportes)}</span>
+                <span className="programa">{condiciones(servicio)}</span>
                 <span className="programa">
                   {servicio.fechaInicio ? `Desde ${fechaEs(servicio.fechaInicio)}` : "Sin sesiones todavía"}
                   {servicio.fechaFin ? ` — ${fechaEs(servicio.fechaFin)} · Cerrado` : ""}
@@ -133,23 +130,10 @@ export function HistorialProgramas({
   );
 }
 
-/**
- * La misma línea de condiciones que arma la plantilla, según la modalidad.
- *
- * Sin `verImportes` dice lo mismo pero sin cifras: cuántas sesiones lleva ese
- * servicio y poco más. Un entrenador necesita saber en qué punto va su
- * cliente, no cuánto paga.
- */
-function condiciones(servicio: Servicio, verImportes: boolean): string {
+/** La misma línea de condiciones que arma la plantilla, según la modalidad. */
+function condiciones(servicio: Servicio): string {
   const n = servicio.sesiones.length;
   const sesiones = `${n} ${n === 1 ? "sesión" : "sesiones"}`;
-
-  if (!verImportes) {
-    if (servicio.modalidad === "bono" && servicio.sesionesTotales) {
-      return `${n} de ${servicio.sesionesTotales} sesiones`;
-    }
-    return sesiones;
-  }
 
   if (servicio.modalidad === "mensualidad") {
     const efectivo = n && servicio.cuotaMensual ? ` · ${euros(servicio.cuotaMensual / n)}/h` : "";

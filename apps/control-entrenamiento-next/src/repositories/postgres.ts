@@ -212,6 +212,10 @@ function aSesion(f: Record<string, unknown>): Sesion {
   };
 }
 
+/** «Este aviso es de un cliente de ese profesional». Se escribe una vez. */
+const SUYOS =
+  "cliente_id in (select id from clientes where entrenador_id = $1)";
+
 const CAMPOS_CICLO = `cliente_id, ciclo, modalidad, servicio, tarifa, sesiones_totales,
   precio_total, cuota_mensual, sesiones_referencia, anio, mes, fecha_inicio, fecha_fin, pagado`;
 
@@ -807,19 +811,33 @@ export class RepositorioPostgres implements Repositorio {
     );
   }
 
-  async registrarAviso(aviso: { fecha: string; tipo: string; detalle: string }): Promise<void> {
+  async registrarAviso(aviso: {
+    fecha: string;
+    tipo: string;
+    detalle: string;
+    clienteId?: string | null;
+  }): Promise<void> {
     // El índice único sobre (tipo, detalle) de los no resueltos impide llenar
     // la bandeja de copias del mismo aviso mientras su causa siga ahí.
     await consultar(
-      `insert into avisos (fecha, tipo, detalle) values ($1,$2,$3)
+      `insert into avisos (fecha, tipo, detalle, cliente_id) values ($1,$2,$3,$4)
        on conflict do nothing`,
-      [aviso.fecha, aviso.tipo, aviso.detalle],
+      [aviso.fecha, aviso.tipo, aviso.detalle, aviso.clienteId ?? null],
     );
   }
 
-  async listarAvisos(): Promise<Aviso[]> {
+  /**
+   * Un entrenador ve los avisos de SUS clientes y ninguno más.
+   *
+   * Los avisos del sistema (`cliente_id` nulo) quedan fuera: hablan del
+   * conjunto del negocio, no de su trabajo.
+   */
+  async listarAvisos(soloDe?: string | null): Promise<Aviso[]> {
     const filas = await consultar(
-      "select id, fecha, tipo, detalle, leido from avisos where not resuelto order by creado desc",
+      `select id, fecha, tipo, detalle, leido from avisos
+        where not resuelto ${soloDe ? "and " + SUYOS : ""}
+        order by creado desc`,
+      soloDe ? [soloDe] : [],
     );
     return filas.map((f) => ({
       id: f.id as string,
@@ -830,25 +848,45 @@ export class RepositorioPostgres implements Repositorio {
     }));
   }
 
-  async contarNoLeidos(): Promise<number> {
+  async contarNoLeidos(soloDe?: string | null): Promise<number> {
     const filas = await consultar<{ n: string }>(
-      "select count(*)::int as n from avisos where not resuelto and not leido",
+      `select count(*)::int as n from avisos
+        where not resuelto and not leido ${soloDe ? "and " + SUYOS : ""}`,
+      soloDe ? [soloDe] : [],
     );
     return Number(filas[0]?.n ?? 0);
   }
 
-  async marcarTodosLeidos(): Promise<void> {
-    await consultar("update avisos set leido = true where not resuelto and not leido");
+  async marcarTodosLeidos(soloDe?: string | null): Promise<void> {
+    await consultar(
+      `update avisos set leido = true
+        where not resuelto and not leido ${soloDe ? "and " + SUYOS : ""}`,
+      soloDe ? [soloDe] : [],
+    );
   }
 
-  async resolverAviso(id: string): Promise<void> {
-    await consultar("update avisos set resuelto = true where id = $1", [id]);
-  }
-
-  async resolverPorTipo(tipo: string): Promise<number> {
+  /**
+   * Resolver un aviso ajeno no hace nada y lo dice: el `where` incluye la
+   * condición del profesional, así que la base de datos no llega a tocar la
+   * fila. No se comprueba antes y se escribe después — se comprueba AL
+   * escribir, que es lo único que no se puede esquivar.
+   */
+  async resolverAviso(id: string, soloDe?: string | null): Promise<boolean> {
     const filas = await consultar(
-      "update avisos set resuelto = true where tipo = $1 and not resuelto returning id",
-      [tipo],
+      `update avisos set resuelto = true
+        where id = $1 ${soloDe ? "and " + SUYOS.replace("$1", "$2") : ""}
+        returning id`,
+      soloDe ? [id, soloDe] : [id],
+    );
+    return filas.length > 0;
+  }
+
+  async resolverPorTipo(tipo: string, soloDe?: string | null): Promise<number> {
+    const filas = await consultar(
+      `update avisos set resuelto = true
+        where tipo = $1 and not resuelto ${soloDe ? "and " + SUYOS.replace("$1", "$2") : ""}
+        returning id`,
+      soloDe ? [tipo, soloDe] : [tipo],
     );
     return filas.length;
   }

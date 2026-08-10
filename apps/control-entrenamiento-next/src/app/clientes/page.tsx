@@ -49,7 +49,14 @@ export default async function PaginaClientes({
       cuentas = [lidomare.ficha, kids.ficha];
       profesionales = await listarProfesionales();
     } else {
-      clientes = await listarClientes(usuario.id);
+      // El entrenador tampoco pide las cuentas de CrossFit —no son suyas—
+      // pero sí sus avisos: necesita el punto rojo de la barra.
+      const [lista, avisos] = await Promise.all([
+        listarClientes(usuario.id),
+        contarNoLeidos(usuario.id),
+      ]);
+      clientes = lista;
+      sinLeer = avisos;
       cuentas = [];
     }
   } catch (error) {

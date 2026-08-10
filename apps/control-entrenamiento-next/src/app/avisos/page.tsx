@@ -7,24 +7,28 @@ import { SinConexion } from "@/components/SinConexion";
 import { BaseNoDisponible } from "@/repositories/postgres";
 import { contarNoLeidos, listarAvisos, marcarTodosLeidos } from "@/services/avisos";
 
-import { exigirAdmin } from "@/lib/permisos";
+import { esAdmin, exigirUsuario } from "@/lib/permisos";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Antifrágil — Avisos" };
 
 /** Misma estructura que `webapp/templates/avisos.html`. */
 export default async function PaginaAvisos() {
-  await exigirAdmin();
+  const usuario = await exigirUsuario();
+  // Un entrenador ve los avisos de SUS clientes (2026-08-10). Los del sistema
+  // —un descuadre con Calendar— no son de nadie y quedan para el
+  // administrador. El alcance viaja hasta el SQL, no se filtra después.
+  const alcance = esAdmin(usuario) ? null : usuario.id;
 
   let avisos;
   let sinLeer = 0;
   try {
-    avisos = await listarAvisos();
+    avisos = await listarAvisos(alcance);
     // El punto de la barra se lee ANTES de marcarlos: si no, entrar aquí lo
     // apagaría antes de dibujarlo.
-    sinLeer = await contarNoLeidos();
+    sinLeer = await contarNoLeidos(alcance);
     // Entrar aquí los marca como VISTOS, no como resueltos: verlo no lo arregla.
-    await marcarTodosLeidos();
+    await marcarTodosLeidos(alcance);
   } catch (error) {
     if (error instanceof BaseNoDisponible) return <SinConexion />;
     throw error;
@@ -96,7 +100,7 @@ export default async function PaginaAvisos() {
         </div>
       </div>
 
-      <BarraInferior activa="avisos" sinLeer={sinLeer} />
+      <BarraInferior activa="avisos" sinLeer={sinLeer} soloClientes={!esAdmin(usuario)} />
     </>
   );
 }

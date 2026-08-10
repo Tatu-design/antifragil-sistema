@@ -151,12 +151,14 @@ export async function firmarSesion(clienteId: string, opciones: OpcionesFirma = 
         fecha,
         tipo: "servicio_terminado",
         detalle: `«${cliente.nombre}» ha terminado su servicio y el nuevo queda pendiente de pago`,
+        clienteId: cliente.id,
       });
     } else if (avisoUltimaSesion) {
       await repo.registrarAviso({
         fecha,
         tipo: "ultima_sesion",
         detalle: `A «${cliente.nombre}» le queda 1 sesión: la próxima toca renovar`,
+        clienteId: cliente.id,
       });
     }
 

@@ -31,9 +31,18 @@ export default async function PaginaPerfil({
   // El candado. Antes de leer nada de este cliente: un entrenador que
   // escriba la dirección a mano de un cliente ajeno recibe «no existe».
   const usuario = await exigirAccesoACliente(id);
-  // El dinero es del administrador. Un entrenador ve el servicio y las
-  // sesiones, no el tarifario ni el valor acumulado del cliente.
-  const verImportes = esAdmin(usuario);
+
+  // Qué ve cada uno del dinero, que NO es todo o nada (Fernando, 2026-08-10):
+  //
+  //   Los importes de ESTE cliente —su tarifa, su programa, lo que paga—
+  //     los ve todo el mundo que tenga acceso a él. Un entrenador los
+  //     necesita: es él quien le pone el precio al darlo de alta, y quien
+  //     responde si el cliente pregunta.
+  //
+  //   verLtv → el valor acumulado. Eso ya es finanzas del negocio, no del
+  //     servicio, y se queda para el administrador. Lo único de finanzas que
+  //     ve un entrenador es si su cliente está o no al día.
+  const verLtv = esAdmin(usuario);
   let perfil;
   try {
     perfil = await obtenerPerfil(id);
@@ -106,7 +115,7 @@ export default async function PaginaPerfil({
           )
         )}
 
-        <PerfilHero clienteId={cliente.id} ficha={ficha} verImportes={verImportes} />
+        <PerfilHero clienteId={cliente.id} ficha={ficha} />
 
         {/* Acción principal. Depende de `ficha.puedeFirmar`, que mira el estado
             del cliente y los datos que SU modalidad necesita. */}
@@ -124,7 +133,7 @@ export default async function PaginaPerfil({
             las secundarias, por dos motivos: no empuja hacia abajo el botón de
             firmar —que es lo que se usa a diario— y queda a la altura de lo
             que de verdad es, un dato de consulta. */}
-        {verImportes && <Ltv ltv={ltv} />}
+        {verLtv && <Ltv ltv={ltv} />}
 
         {/* Acciones secundarias, del mismo tamaño. */}
         <div className="acciones-perfil">
@@ -134,7 +143,7 @@ export default async function PaginaPerfil({
           {/* Cambiar el programa es cambiar tarifas: solo el administrador.
               La pantalla lo exige por su cuenta, esto solo evita enseñar un
               botón que respondería «no existe». */}
-          {verImportes && (
+          {esAdmin(usuario) && (
             <Link className="boton-secundario" href={`/clientes/${cliente.id}/programa`}>
               Editar programa
             </Link>
@@ -149,12 +158,7 @@ export default async function PaginaPerfil({
           confirmadas={confirmacion.confirmadas}
         />
 
-        <HistorialProgramas
-          clienteId={cliente.id}
-          nombre={cliente.nombre}
-          servicios={servicios}
-          verImportes={verImportes}
-        />
+        <HistorialProgramas clienteId={cliente.id} nombre={cliente.nombre} servicios={servicios} />
       </div>
     </>
   );

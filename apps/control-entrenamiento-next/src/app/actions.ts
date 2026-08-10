@@ -384,17 +384,21 @@ export async function accionFacturacionKids(_previo: Resultado | null, datos: Fo
 /** Descartar vuelve a la bandeja, igual que Flask: sin mensaje, la lista ya
  *  enseña el resultado. */
 export async function accionResolverAviso(datos: FormData): Promise<void> {
-  await exigirAdmin();
+  const quien = await exigirUsuario();
+  // La condición del profesional va DENTRO del `update`: resolver un aviso
+  // ajeno no toca la fila, en vez de comprobarlo antes y escribir después.
+  const alcance = esAdmin(quien) ? null : quien.id;
   const validado = esquemaAviso.safeParse(desdeFormulario(datos));
-  if (validado.success) await resolverAviso(validado.data.id);
+  if (validado.success) await resolverAviso(validado.data.id, alcance);
   revalidatePath("/avisos");
   redirect("/avisos");
 }
 
 export async function accionResolverTipo(datos: FormData): Promise<void> {
-  await exigirAdmin();
+  const quien = await exigirUsuario();
+  const alcance = esAdmin(quien) ? null : quien.id;
   const validado = esquemaTipoAviso.safeParse(desdeFormulario(datos));
-  if (validado.success) await resolverPorTipo(validado.data.tipo);
+  if (validado.success) await resolverPorTipo(validado.data.tipo, alcance);
   revalidatePath("/avisos");
   redirect("/avisos");
 }

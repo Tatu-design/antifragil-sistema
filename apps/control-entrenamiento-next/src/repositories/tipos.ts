@@ -178,12 +178,26 @@ export interface Repositorio {
   confirmarSesion(clienteId: string, sesionId: string, hoy: string, hora: string): Promise<void>;
 
   /** Avisos: lo que Fernando debería mirar. */
-  registrarAviso(aviso: { fecha: string; tipo: string; detalle: string }): Promise<void>;
-  listarAvisos(): Promise<Aviso[]>;
-  contarNoLeidos(): Promise<number>;
-  marcarTodosLeidos(): Promise<void>;
-  resolverAviso(id: string): Promise<void>;
-  resolverPorTipo(tipo: string): Promise<number>;
+  /**
+   * Anota un aviso. `clienteId` dice de quién es; sin él, es del sistema y
+   * solo lo ve el administrador (un descuadre con Calendar, por ejemplo).
+   */
+  registrarAviso(aviso: {
+    fecha: string;
+    tipo: string;
+    detalle: string;
+    clienteId?: string | null;
+  }): Promise<void>;
+  /**
+   * Los avisos pendientes. Con `soloDe`, únicamente los de los clientes de ese
+   * profesional — los del sistema quedan fuera: no son suyos.
+   */
+  listarAvisos(soloDe?: string | null): Promise<Aviso[]>;
+  contarNoLeidos(soloDe?: string | null): Promise<number>;
+  marcarTodosLeidos(soloDe?: string | null): Promise<void>;
+  /** Devuelve `false` si ese aviso no es de ese profesional: no se resuelve. */
+  resolverAviso(id: string, soloDe?: string | null): Promise<boolean>;
+  resolverPorTipo(tipo: string, soloDe?: string | null): Promise<number>;
 
   /** ¿Ya se procesó esta petición? Cuarta capa contra duplicados. */
   registrarIdempotencia(clave: string): Promise<boolean>;

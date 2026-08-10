@@ -17,15 +17,17 @@ export function BarraInferior({
   activa: "clientes" | "economia" | "avisos";
   sinLeer?: number;
   /**
-   * Un entrenador no tiene Economía ni Avisos: son del administrador. Sin
-   * esto vería dos pestañas que le responderían «no existe» al pulsarlas.
+   * Un entrenador no tiene Economía: el dinero del negocio es del
+   * administrador. Avisos SÍ tiene desde el 2026-08-10 — necesita enterarse
+   * de que a su cliente le queda una sesión o de que ha pasado a deber, y son
+   * avisos de SUS clientes, no de todo el negocio.
    *
-   * Esconderlas es cortesía, no seguridad: lo que impide entrar es
-   * `exigirAdmin()` en cada una de esas pantallas.
+   * Esconder la pestaña es cortesía, no seguridad: lo que impide entrar en
+   * Economía es `exigirAdmin()` en esa pantalla.
    */
   soloClientes?: boolean;
 }) {
-  const pestanas = soloClientes ? PESTANAS.filter((p) => p.clave === "clientes") : PESTANAS;
+  const pestanas = soloClientes ? PESTANAS.filter((p) => p.clave !== "economia") : PESTANAS;
 
   return (
     <nav className="barra" aria-label="Secciones">

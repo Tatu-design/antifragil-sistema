@@ -215,6 +215,97 @@ describe("qué datos salen de la base", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Los avisos, que también son de alguien
+// ---------------------------------------------------------------------------
+
+describe("los avisos de cada profesional", () => {
+  beforeEach(() => reiniciarStagingParaPruebas());
+
+  it("un entrenador ve los de SUS clientes", async () => {
+    const repo = repositorio();
+    await repo.registrarAviso({
+      fecha: "2026-08-10",
+      tipo: "ultima_sesion",
+      detalle: "A su cliente le queda 1 sesion",
+      clienteId: SUYO,
+    });
+
+    const suyos = await repo.listarAvisos(RAFA.id);
+    expect(suyos.map((a) => a.detalle)).toContain("A su cliente le queda 1 sesion");
+  });
+
+  it("y NO los de los clientes de otro", async () => {
+    const repo = repositorio();
+    await repo.registrarAviso({
+      fecha: "2026-08-10",
+      tipo: "ultima_sesion",
+      detalle: "A un cliente ajeno le queda 1 sesion",
+      clienteId: AJENO,
+    });
+
+    const suyos = await repo.listarAvisos(RAFA.id);
+    expect(suyos.map((a) => a.detalle)).not.toContain("A un cliente ajeno le queda 1 sesion");
+    // El administrador sí lo ve.
+    expect((await repo.listarAvisos()).map((a) => a.detalle)).toContain(
+      "A un cliente ajeno le queda 1 sesion",
+    );
+  });
+
+  it("los avisos del sistema son del administrador, de nadie mas", async () => {
+    // Un descuadre con Calendar no es de ningun cliente: no tiene por que
+    // preocupar a un entrenador ni decirle nada del resto del negocio.
+    const repo = repositorio();
+    await repo.registrarAviso({ fecha: "2026-08-10", tipo: "descuadre", detalle: "Descuadre semanal" });
+
+    expect((await repo.listarAvisos(RAFA.id)).map((a) => a.detalle)).not.toContain("Descuadre semanal");
+    expect((await repo.listarAvisos()).map((a) => a.detalle)).toContain("Descuadre semanal");
+  });
+
+  it("el punto de la barra cuenta solo los suyos", async () => {
+    const repo = repositorio();
+    await repo.marcarTodosLeidos();
+    await repo.registrarAviso({ fecha: "2026-08-10", tipo: "ultima_sesion", detalle: "Suyo", clienteId: SUYO });
+    await repo.registrarAviso({ fecha: "2026-08-10", tipo: "ultima_sesion", detalle: "Ajeno", clienteId: AJENO });
+
+    expect(await repo.contarNoLeidos(RAFA.id)).toBe(1);
+    expect(await repo.contarNoLeidos()).toBe(2);
+  });
+
+  it("resolver un aviso ajeno no hace nada", async () => {
+    const repo = repositorio();
+    await repo.registrarAviso({ fecha: "2026-08-10", tipo: "ultima_sesion", detalle: "Ajeno", clienteId: AJENO });
+    const aviso = (await repo.listarAvisos()).find((a) => a.detalle === "Ajeno")!;
+
+    expect(await repo.resolverAviso(aviso.id, RAFA.id)).toBe(false);
+    // Y sigue ahi para su dueno.
+    expect((await repo.listarAvisos()).map((a) => a.id)).toContain(aviso.id);
+  });
+
+  it("resolver por tipo solo limpia los suyos", async () => {
+    const repo = repositorio();
+    await repo.registrarAviso({ fecha: "2026-08-10", tipo: "ultima_sesion", detalle: "Suyo", clienteId: SUYO });
+    await repo.registrarAviso({ fecha: "2026-08-10", tipo: "ultima_sesion", detalle: "Ajeno", clienteId: AJENO });
+
+    expect(await repo.resolverPorTipo("ultima_sesion", RAFA.id)).toBe(1);
+    expect((await repo.listarAvisos()).map((a) => a.detalle)).toContain("Ajeno");
+  });
+
+  it("firmar la penultima sesion deja el aviso a nombre del cliente", async () => {
+    // El aviso que Fernando pidio para Rafa: «le queda 1 sesion». Tiene que
+    // nacer con su cliente dentro, o Rafa no lo veria.
+    const { firmarSesion } = await import("@/services/sesiones");
+    const repo = repositorio();
+    await repo.asignarProfesional("cli-a", RAFA.id);
+
+    // «cli-a» es un bono de 8 con 6 firmadas: la septima deja una.
+    await firmarSesion("cli-a");
+
+    const suyos = await repo.listarAvisos(RAFA.id);
+    expect(suyos.some((a) => a.tipo === "ultima_sesion")).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // 3. La cobertura: que no se quede nada sin candado
 // ---------------------------------------------------------------------------
 
@@ -274,7 +365,6 @@ describe("ninguna puerta se queda abierta", () => {
   it("las pantallas de dinero y de administración exigen ser administrador", () => {
     const SOLO_ADMIN = [
       "economia/page.tsx",
-      "avisos/page.tsx",
       "clientes/[id]/programa/page.tsx",
       "clientes/[id]/eliminar/page.tsx",
       "clases/[tipo]/page.tsx",

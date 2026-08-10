@@ -34,7 +34,16 @@ interface Almacen {
   facturacionKids: Array<{ anio: number; mes: number; importe: number }>;
   ajustes: Array<{ anio: number; mes: number; origen: string; importe: number; horas: number; motivo: string }>;
   confirmaciones: Array<{ clienteId: string; sesionId: string; fecha: string; hora: string }>;
-  avisos: Array<{ id: string; fecha: string; tipo: string; detalle: string; leido: boolean; resuelto: boolean }>;
+  avisos: Array<{
+    id: string;
+    fecha: string;
+    tipo: string;
+    detalle: string;
+    leido: boolean;
+    resuelto: boolean;
+    /** De qué cliente es. Nulo = del sistema, y esos son del administrador. */
+    clienteId?: string | null;
+  }>;
   idempotencia: string[];
   siguienteSesion: number;
 }
@@ -582,22 +591,53 @@ export class RepositorioStaging implements Repositorio {
     await volcar();
   }
 
-  async registrarAviso(aviso: { fecha: string; tipo: string; detalle: string }): Promise<void> {
+  async registrarAviso(aviso: {
+    fecha: string;
+    tipo: string;
+    detalle: string;
+    clienteId?: string | null;
+  }): Promise<void> {
     const datos = await cargar();
     // No se repite el mismo aviso mientras siga sin resolver.
     const repetido = datos.avisos.some(
       (a) => !a.resuelto && a.tipo === aviso.tipo && a.detalle === aviso.detalle,
     );
     if (repetido) return;
-    datos.avisos.unshift({ id: `avi-${Date.now()}-${datos.avisos.length}`, ...aviso, leido: false, resuelto: false });
+    datos.avisos.unshift({
+      id: `avi-${Date.now()}-${datos.avisos.length}`,
+      fecha: aviso.fecha,
+      tipo: aviso.tipo,
+      detalle: aviso.detalle,
+      clienteId: aviso.clienteId ?? null,
+      leido: false,
+      resuelto: false,
+    });
     await volcar();
   }
 
-  async listarAvisos(): Promise<Aviso[]> {
+  /**
+   * «Este aviso es de un cliente de ese profesional».
+   *
+   * Sin `soloDe` pasan todos, que es lo que ve el administrador. Los avisos
+   * del sistema (sin cliente) NO son de ningún entrenador.
+   */
+  private async esSuyo(clienteId: string | null | undefined, soloDe?: string | null) {
+    if (!soloDe) return true;
+    if (!clienteId) return false;
     const datos = await cargar();
+    return datos.clientes.some((c) => c.id === clienteId && c.profesionalId === soloDe);
+  }
+
+  async listarAvisos(soloDe?: string | null): Promise<Aviso[]> {
+    const datos = await cargar();
+    const pendientes = datos.avisos.filter((a) => !a.resuelto);
+    const suyos = [];
+    for (const a of pendientes) {
+      if (await this.esSuyo(a.clienteId, soloDe)) suyos.push(a);
+    }
     // `resuelto` no sale hacia fuera: quien lee la bandeja solo ve los que
     // siguen pendientes, así que el dato sobra.
-    return clonar(datos.avisos.filter((a) => !a.resuelto)).map((a) => ({
+    return clonar(suyos).map((a) => ({
       id: a.id,
       fecha: a.fecha,
       tipo: a.tipo,
@@ -606,27 +646,39 @@ export class RepositorioStaging implements Repositorio {
     }));
   }
 
-  async contarNoLeidos(): Promise<number> {
+  async contarNoLeidos(soloDe?: string | null): Promise<number> {
     const datos = await cargar();
-    return datos.avisos.filter((a) => !a.resuelto && !a.leido).length;
+    let n = 0;
+    for (const a of datos.avisos) {
+      if (!a.resuelto && !a.leido && (await this.esSuyo(a.clienteId, soloDe))) n += 1;
+    }
+    return n;
   }
 
-  async marcarTodosLeidos(): Promise<void> {
+  async marcarTodosLeidos(soloDe?: string | null): Promise<void> {
     const datos = await cargar();
-    for (const a of datos.avisos) if (!a.resuelto) a.leido = true;
+    for (const a of datos.avisos) {
+      if (!a.resuelto && (await this.esSuyo(a.clienteId, soloDe))) a.leido = true;
+    }
     await volcar();
   }
 
-  async resolverAviso(id: string): Promise<void> {
+  async resolverAviso(id: string, soloDe?: string | null): Promise<boolean> {
     const datos = await cargar();
     const aviso = datos.avisos.find((a) => a.id === id);
-    if (aviso) aviso.resuelto = true;
+    // Resolver un aviso ajeno no hace nada, y se dice.
+    if (!aviso || !(await this.esSuyo(aviso.clienteId, soloDe))) return false;
+    aviso.resuelto = true;
     await volcar();
+    return true;
   }
 
-  async resolverPorTipo(tipo: string): Promise<number> {
+  async resolverPorTipo(tipo: string, soloDe?: string | null): Promise<number> {
     const datos = await cargar();
-    const afectados = datos.avisos.filter((a) => a.tipo === tipo && !a.resuelto);
+    const afectados = [];
+    for (const a of datos.avisos) {
+      if (a.tipo === tipo && !a.resuelto && (await this.esSuyo(a.clienteId, soloDe))) afectados.push(a);
+    }
     for (const a of afectados) a.resuelto = true;
     await volcar();
     return afectados.length;
