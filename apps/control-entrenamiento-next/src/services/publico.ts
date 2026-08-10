@@ -17,7 +17,7 @@
  */
 
 import { fichaServicio } from "@/domain/ficha";
-import type { FichaServicio, Sesion } from "@/domain/tipos";
+import type { Ciclo, FichaServicio, Sesion } from "@/domain/tipos";
 import { hoyNegocio, horaNegocio } from "@/lib/fechas";
 import { repositorio } from "@/repositories";
 
@@ -38,6 +38,26 @@ export interface SesionPublica {
   hora: string | null;
 }
 
+/**
+ * Un programa contratado, tal y como se le enseña al cliente.
+ *
+ * **No lleva el nombre del programa, y es deliberado.** Los nombres son
+ * etiquetas internas de Fernando y llevan la tarifa dentro: «Nuevo 45€ x4»,
+ * «Pareja 60€ x16», «Antiguo 35€ x8». Enseñárselos al cliente es enseñarle su
+ * precio (encontrado el 2026-08-10: le pasaba a 7 de 9 clientes).
+ *
+ * Un programa se identifica para el cliente por lo que sí le dice algo: cuándo
+ * empezó, cuándo terminó y cuántas sesiones tuvo.
+ */
+export interface ProgramaPublico {
+  ciclo: number;
+  esActual: boolean;
+  /** `null` en programas migrados sin fecha. No se inventa ninguna. */
+  desde: string | null;
+  hasta: string | null;
+  sesiones: SesionPublica[];
+}
+
 export interface PerfilPublico {
   nombre: string;
   /**
@@ -48,8 +68,11 @@ export interface PerfilPublico {
    */
   profesional: { nombre: string; foto: string | null } | null;
   ficha: FichaServicio;
-  /** Su historial entero, recortado a lo que se le enseña: fecha y hora. */
-  historial: SesionPublica[];
+  /**
+   * Su historial, agrupado por programa: primero el que tiene en curso y
+   * después los anteriores, del más reciente al más antiguo.
+   */
+  programas: ProgramaPublico[];
   /** Sesiones de hoy que aún puede confirmar. Vacío = nada que confirmar. */
   pendientesHoy: Sesion[];
   confirmadasHoy: Array<{ hora: string }>;
@@ -91,9 +114,7 @@ export async function obtenerPerfilPublico(token: string): Promise<PerfilPublico
       // El estado de cobro sale del ciclo, igual que en la ficha de Fernando.
       pendientePago: ciclo ? !ciclo.pagado : cliente.pendientePago,
     }),
-    // Recortadas ANTES de salir del servicio: así ningún componente puede
-    // recibir por error lo que no debe llegar al navegador.
-    historial: sesiones.map(soloLoVisible),
+    programas: agruparPorPrograma(ciclos, sesiones, cliente.cicloActual),
     pendientesHoy,
     confirmadasHoy,
     hoy,
@@ -140,4 +161,36 @@ function soloLoVisible(sesion: Sesion): SesionPublica {
     fecha: sesion.fecha,
     hora: sesion.hora,
   };
+}
+
+/**
+ * Agrupa las sesiones por el programa al que pertenecen.
+ *
+ * El programa en curso va primero aunque no sea el más reciente por fecha: es
+ * lo que el cliente viene a mirar. Los demás, del más nuevo al más viejo.
+ *
+ * Un programa sin ninguna sesión no se enseña: para el cliente no ha pasado
+ * nada en él, y una tarjeta vacía solo genera la duda de qué falta ahí.
+ */
+function agruparPorPrograma(
+  ciclos: Ciclo[],
+  sesiones: Sesion[],
+  cicloActual: number,
+): ProgramaPublico[] {
+  return ciclos
+    .map((ciclo) => ({
+      ciclo: ciclo.ciclo,
+      esActual: ciclo.ciclo === cicloActual,
+      desde: ciclo.fechaInicio,
+      hasta: ciclo.fechaFin,
+      sesiones: sesiones
+        .filter((s) => s.ciclo === ciclo.ciclo)
+        // De la más reciente a la más antigua, como se mira un historial.
+        .sort((a, b) => b.fecha.localeCompare(a.fecha) || b.numeroSesion - a.numeroSesion)
+        // Recortadas ANTES de salir del servicio: así ningún componente puede
+        // recibir por error lo que no debe llegar al navegador.
+        .map(soloLoVisible),
+    }))
+    .filter((p) => p.esActual || p.sesiones.length > 0)
+    .sort((a, b) => Number(b.esActual) - Number(a.esActual) || b.ciclo - a.ciclo);
 }

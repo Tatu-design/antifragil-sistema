@@ -26,7 +26,7 @@ describe("lo que ve el cliente", () => {
     const perfil = await obtenerPerfilPublico(TOKEN_A);
     expect(perfil!.nombre).toBe("Cliente A");
     expect(perfil!.ficha.sesionesRestantes).toBe(2);
-    expect(perfil!.historial.length).toBeGreaterThan(0);
+    expect(perfil!.programas.length).toBeGreaterThan(0);
   });
 
   it("un token no destapa a ningún otro cliente", async () => {
@@ -48,10 +48,11 @@ describe("lo que ve el cliente", () => {
   it("en su historial solo hay sesiones suyas", async () => {
     const perfil = await obtenerPerfilPublico(TOKEN_A);
     const suyas = await repositorio().listarSesiones("cli-a");
+    const enPantalla = perfil!.programas.flatMap((p) => p.sesiones);
 
-    expect(perfil!.historial).toHaveLength(suyas.length);
+    expect(enPantalla).toHaveLength(suyas.length);
     const idsSuyos = new Set(suyas.map((s) => s.id));
-    for (const sesion of perfil!.historial) expect(idsSuyos.has(sesion.id)).toBe(true);
+    for (const sesion of enPantalla) expect(idsSuyos.has(sesion.id)).toBe(true);
   });
 });
 
@@ -165,10 +166,11 @@ describe("la pantalla del cliente", () => {
     // la pantalla: es lo único que demuestra que no viaja.
     const perfil = await obtenerPerfilPublico(TOKEN_A);
 
-    for (const sesion of perfil!.historial) {
+    for (const sesion of perfil!.programas.flatMap((p) => p.sesiones)) {
       expect(Object.keys(sesion).sort()).toEqual(["fecha", "hora", "id", "numeroSesion"]);
     }
-    const texto = JSON.stringify(perfil!.historial);
+    // Ni la tarifa ni el NOMBRE del programa, que la lleva dentro.
+    const texto = JSON.stringify(perfil!.programas);
     expect(texto).not.toContain("tarifa");
     expect(texto).not.toContain("servicio");
   });
@@ -178,6 +180,44 @@ describe("la pantalla del cliente", () => {
     expect(pagina).toContain("fechaEs(sesion.fecha)");
     expect(pagina).toContain("sesion.hora");
     expect(pagina).not.toContain("sesionesTotales");
+  });
+
+  it("el historial va agrupado por programa, el actual primero", async () => {
+    const repo = repositorio();
+    // Se cierra el bono en curso y se abre otro: dos programas.
+    const ciclo = (await repo.listarCiclos("cli-a")).find((c) => c.ciclo === 1)!;
+    await repo.guardarCiclo({ ...ciclo, fechaFin: "2026-07-29" });
+    await repo.guardarCiclo({ ...ciclo, ciclo: 2, fechaInicio: "2026-08-01", fechaFin: null });
+    const cliente = (await repo.obtenerCliente("cli-a"))!;
+    await repo.actualizarCliente({ ...cliente, cicloActual: 2 });
+
+    const { programas } = (await obtenerPerfilPublico(TOKEN_A))!;
+
+    expect(programas.length).toBeGreaterThan(1);
+    expect(programas[0]!.esActual).toBe(true);
+    expect(programas.filter((p) => p.esActual)).toHaveLength(1);
+    // Y cada programa trae sus fechas, que es como se identifica sin nombre.
+    const anterior = programas.find((p) => !p.esActual)!;
+    expect(anterior.hasta).toBe("2026-07-29");
+    expect(anterior.sesiones.length).toBeGreaterThan(0);
+  });
+
+  it("dentro de cada programa, la sesión más reciente arriba", async () => {
+    const { programas } = (await obtenerPerfilPublico(TOKEN_A))!;
+    for (const programa of programas) {
+      const fechas = programa.sesiones.map((s) => s.fecha);
+      expect([...fechas].sort((a, b) => b.localeCompare(a))).toEqual(fechas);
+    }
+  });
+
+  it("NO se le enseña el nombre del programa: lleva su tarifa dentro", async () => {
+    // «Nuevo 45€ x4», «Pareja 60€ x16», «Antiguo 35€ x8»… son etiquetas
+    // internas. Se lo estaban viendo 7 de 9 clientes (2026-08-10).
+    const pagina = readFileSync("src/app/mi/[token]/page.tsx", "utf8");
+    expect(pagina).not.toContain("ficha.servicio");
+
+    const perfil = await obtenerPerfilPublico(TOKEN_A);
+    expect(JSON.stringify(perfil!.programas)).not.toContain("Bono 8 sesiones");
   });
 
   it("el historial nace plegado", async () => {

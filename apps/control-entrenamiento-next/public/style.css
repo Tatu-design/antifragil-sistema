@@ -1674,4 +1674,37 @@ a.pill { text-decoration: none; }
    botón, que ya se separa sola. */
 .historial-cliente { padding: 0; overflow: hidden; }
 .historial-cliente .fila { padding: 0.85rem 1.15rem; }
-.historial-cliente .fila:first-of-type { border-top: 1px solid var(--cristal-borde); }
+
+/* Cada programa dentro del historial del cliente. */
+.grupo-programa-cabecera {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.9rem 1.15rem 0.6rem;
+  border-top: 1px solid var(--cristal-borde);
+}
+
+.grupo-programa-fechas {
+  font-size: 0.8125rem;
+  color: var(--tinta-media);
+  font-variant-numeric: tabular-nums;
+}
+
+.grupo-programa-vacio { padding: 0 1.15rem 0.9rem; margin: 0; }
+
+/* Dónde acaba lo de ahora y empieza lo de antes. */
+.separador-programas {
+  padding: 1rem 1.15rem 0.2rem;
+  border-top: 1px solid var(--cristal-borde);
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--tinta-suave);
+}
+
+/* El primer programa va pegado a la cabecera plegable, sin doble línea. */
+.historial-cliente .grupo-programa:first-of-type .grupo-programa-cabecera {
+  border-top: 1px solid var(--cristal-borde);
+}
+.separador-programas + .grupo-programa .grupo-programa-cabecera { border-top: 0; }

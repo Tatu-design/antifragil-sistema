@@ -22,7 +22,7 @@ export default async function PaginaMiPerfil({ params }: { params: Promise<{ tok
   const perfil = await obtenerPerfilPublico(token);
   if (!perfil) notFound();
 
-  const { nombre, ficha, historial, confirmadasHoy, hoy, profesional } = perfil;
+  const { nombre, ficha, programas, confirmadasHoy, hoy, profesional } = perfil;
   const plural = (n: number) => (n === 1 ? "sesión" : "sesiones");
   const cuandoMes = ficha.mes ? ` en ${mesMinuscula(ficha.mes)}` : " este mes";
 
@@ -45,7 +45,11 @@ export default async function PaginaMiPerfil({ params }: { params: Promise<{ tok
       </div>
 
       <div className="perfil-hero">
-        <div className="programa-nombre">{ficha.servicio ?? "sin servicio asignado"}</div>
+        {/* El NOMBRE del programa no se le enseña al cliente. Son etiquetas
+            internas de Fernando y llevan la tarifa dentro: «Nuevo 45€ x4»,
+            «Pareja 60€ x16». Se lo estaban viendo 7 de 9 clientes en esta
+            misma línea (2026-08-10). */}
+        <div className="programa-nombre">Tu programa</div>
 
         {ficha.modalidad === "bono" && ficha.sesionesTotales ? (
           <div className="perfil-progreso">
@@ -139,7 +143,7 @@ export default async function PaginaMiPerfil({ params }: { params: Promise<{ tok
         </div>
       )}
 
-      <HistorialPublico sesiones={historial} />
+      <HistorialPublico programas={programas} />
     </div>
   );
 }
