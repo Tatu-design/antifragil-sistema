@@ -365,7 +365,6 @@ describe("ninguna puerta se queda abierta", () => {
   it("las pantallas de dinero y de administración exigen ser administrador", () => {
     const SOLO_ADMIN = [
       "economia/page.tsx",
-      "clientes/[id]/programa/page.tsx",
       "clientes/[id]/eliminar/page.tsx",
       "clases/[tipo]/page.tsx",
       "clases/kids/facturacion/page.tsx",

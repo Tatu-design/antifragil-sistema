@@ -13,7 +13,26 @@ import { Icono } from "./Iconos";
  * Todo sale de `ficha`, que se construye desde el ciclo en curso: este
  * componente no decide nada ni mezcla dos fuentes.
  */
-export function PerfilHero({ clienteId, ficha }: { clienteId: string; ficha: FichaServicio }) {
+export function PerfilHero({
+  clienteId,
+  ficha,
+  verPrecioHora = true,
+}: {
+  clienteId: string;
+  ficha: FichaServicio;
+  /**
+   * Si se enseña el precio POR HORA, que es una cifra derivada.
+   *
+   * Fernando lo quitó del perfil de los trabajadores (2026-08-10). La
+   * distinción es fina pero tiene sentido: «precio del bono 960 €» es lo que
+   * paga el cliente y un entrenador tiene que saberlo; «80 € por sesión» es a
+   * cuánto le sale la hora al negocio, y eso es cuenta del administrador.
+   *
+   * En una cuenta de cliente NO se esconde el precio por sesión, porque ahí
+   * sí es lo que paga: se cobra sesión a sesión.
+   */
+  verPrecioHora?: boolean;
+}) {
   const plural = (n: number) => (n === 1 ? "sesión" : "sesiones");
 
   return (
@@ -44,7 +63,7 @@ export function PerfilHero({ clienteId, ficha }: { clienteId: string; ficha: Fic
                 <dd>{euros(ficha.precioTotal)}</dd>
               </div>
             ) : null}
-            {ficha.tarifa ? (
+            {verPrecioHora && ficha.tarifa ? (
               <div>
                 <dt>Por sesión</dt>
                 <dd>{euros(ficha.tarifa)}</dd>
@@ -71,10 +90,12 @@ export function PerfilHero({ clienteId, ficha }: { clienteId: string; ficha: Fic
               <dt>Cuota del mes</dt>
               <dd>{euros(ficha.cuotaMensual)}</dd>
             </div>
-            <div>
-              <dt>Sale a</dt>
-              <dd>{ficha.precioEfectivo ? `${euros(ficha.precioEfectivo)}/h` : "—"}</dd>
-            </div>
+            {verPrecioHora && (
+              <div>
+                <dt>Sale a</dt>
+                <dd>{ficha.precioEfectivo ? `${euros(ficha.precioEfectivo)}/h` : "—"}</dd>
+              </div>
+            )}
             {ficha.mes ? (
               <div>
                 <dt>Periodo</dt>

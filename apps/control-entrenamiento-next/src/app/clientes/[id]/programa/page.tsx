@@ -9,7 +9,7 @@ import { euros } from "@/lib/formato";
 import { BaseNoDisponible } from "@/repositories/postgres";
 import { obtenerPerfil } from "@/services/clientes";
 
-import { exigirAdmin } from "@/lib/permisos";
+import { exigirAccesoACliente } from "@/lib/permisos";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Editar programa — Antifrágil" };
@@ -22,9 +22,14 @@ export default async function PaginaPrograma({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ error?: string }>;
 }) {
-  await exigirAdmin();
-
   const { id } = await params;
+
+  // Desde el 2026-08-10 un entrenador también edita el programa de SUS
+  // clientes: es él quien les pone el precio al darlos de alta, así que no
+  // tiene sentido que no pueda corregirlo después. Sobre clientes ajenos
+  // sigue sin poder, y eso lo garantiza esta línea, no esconder el botón.
+  await exigirAccesoACliente(id);
+
   let perfil;
   try {
     perfil = await obtenerPerfil(id);

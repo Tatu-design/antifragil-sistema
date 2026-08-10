@@ -17,6 +17,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { Ltv } from "@/components/Ltv";
+import { eurosRedondos } from "@/lib/formato";
 import { calcularLtv } from "@/domain/ltv";
 import { BONO, CUENTA, MENSUALIDAD } from "@/domain/modalidades";
 import { repositorio } from "@/repositories";
@@ -166,14 +167,23 @@ describe("el LTV en la ficha del profesional", () => {
 // ---------------------------------------------------------------------------
 
 describe("cómo se ve el bloque de LTV", () => {
-  it("enseña la sigla, el valor y su explicación", () => {
+  it("NACE TAPADO: la cifra no se ve hasta pulsar", () => {
+    // Lo pidió Fernando el 2026-08-10, y no por estética: la sesión se firma
+    // con el cliente delante mirando la pantalla, y ahí no pinta nada una
+    // cifra que dice cuánto lleva gastado.
     const html = pintar(1485);
 
+    expect(html).not.toContain("1.485");
     expect(html).toContain("LTV");
-    expect(html).toContain("1.485 €");
-    // La sigla sola no explica nada: el texto de apoyo es texto real, no un
-    // `title` que en un móvil no hay forma de ver.
-    expect(html).toContain("Valor acumulado");
+    expect(html).toContain("Pulsa para ver");
+  });
+
+  it("y ninguna cifra se cuela en el marcado mientras está tapado", () => {
+    // Que no se vea NO puede significar «está ahí pero en gris»: quien mire
+    // el código de la página no debe encontrarla tampoco.
+    const html = pintar(12350, { bonos: 12350 });
+    expect(html).not.toContain("12.350");
+    expect(html).not.toContain("12350");
   });
 
   it("no usa los textos que confunden valor con dinero cobrado", () => {
@@ -181,22 +191,6 @@ describe("cómo se ve el bloque de LTV", () => {
     for (const prohibido of ["Facturación total", "Dinero cobrado", "Total pagado"]) {
       expect(html).not.toContain(prohibido);
     }
-  });
-
-  it("un cliente sin historial enseña «0 €», no un hueco ni un guion", () => {
-    const html = pintar(0);
-    expect(html).toContain("0 €");
-    expect(html).not.toContain("—");
-  });
-
-  it("las cifras van en formato español, con punto de millar", () => {
-    expect(pintar(485)).toContain("485 €");
-    expect(pintar(1485)).toContain("1.485 €");
-    expect(pintar(12350)).toContain("12.350 €");
-    expect(pintar(123456)).toContain("123.456 €");
-    // Nunca el formato inglés.
-    expect(pintar(1485)).not.toContain("1485.00");
-    expect(pintar(1485)).not.toContain("EUR");
   });
 
   it("es el MISMO bloque para bono, mensualidad y cuenta", () => {
@@ -210,12 +204,9 @@ describe("cómo se ve el bloque de LTV", () => {
     expect(soloCuenta).toBe(soloBono);
   });
 
-  it("todavía no enseña el desglose por modalidad", () => {
-    // Se calcula, pero no se pinta: primero validar que el total cuadra.
-    const html = pintar(1080, { bonos: 360, mensualidades: 720 });
-    expect(html).not.toContain("360");
-    expect(html).not.toContain("720");
-    expect(html).toContain("1.080 €");
+  it("se puede destapar y volver a tapar", () => {
+    // El texto lo dice: pulsar la primera vez enseña, pulsar otra vez esconde.
+    expect(pintar(1485)).toContain("Pulsa para ver");
   });
 
   it("no depende del color ni de un icono para entenderse", () => {
@@ -223,5 +214,25 @@ describe("cómo se ve el bloque de LTV", () => {
     // Sin `<svg>`, sin `<img>`: todo lo que dice el bloque es texto.
     expect(html).not.toContain("<svg");
     expect(html).not.toContain("<img");
+  });
+});
+
+describe("el formato del importe acumulado", () => {
+  it("va en español, con punto de millar y sin céntimos", () => {
+    // Se comprueba sobre el formateador, porque en el bloque la cifra está
+    // tapada hasta que se pulsa.
+    expect(eurosRedondos(485)).toBe("485 €");
+    expect(eurosRedondos(1485)).toBe("1.485 €");
+    expect(eurosRedondos(12350)).toBe("12.350 €");
+    expect(eurosRedondos(123456)).toBe("123.456 €");
+  });
+
+  it("un cliente sin historial da «0 €», no un hueco ni un guion", () => {
+    expect(eurosRedondos(0)).toBe("0 €");
+  });
+
+  it("nunca el formato inglés", () => {
+    expect(eurosRedondos(1485)).not.toContain("1485.00");
+    expect(eurosRedondos(1485)).not.toContain("EUR");
   });
 });

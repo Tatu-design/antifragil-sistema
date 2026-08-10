@@ -196,11 +196,14 @@ export async function accionCrearCliente(datos: FormData): Promise<void> {
 
 /** «Guardar cambios» de Editar programa. Vuelve al perfil, como Flask. */
 export async function accionConfigurarServicio(datos: FormData): Promise<void> {
-  await exigirAdmin();
+  await exigirUsuario();
   const validado = esquemaServicio.safeParse(desdeFormulario(datos));
   if (!validado.success) redirect("/clientes");
 
   const id = validado.data.clienteId;
+  // Un entrenador puede cambiar el programa de SUS clientes (2026-08-10). El
+  // de otro, no: lo impide esta comprobación, no que no vea el botón.
+  await exigirAccesoACliente(id);
   let mensaje: string;
   try {
     const resultado = await configurarServicio(id, {

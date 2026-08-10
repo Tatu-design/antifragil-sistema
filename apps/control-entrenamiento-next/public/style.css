@@ -617,6 +617,25 @@ h1 {
   color: var(--tinta-suave);
 }
 
+/* Tapado hasta que se pulsa: la sesión se firma con el cliente mirando la
+   pantalla, y ahí no pinta nada cuánto lleva gastado. Ancho completo y
+   alineado a la izquierda como el resto de la ficha, para que no parezca un
+   botón de acción — no lo es, solo destapa un dato. */
+.ltv {
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  /* Sin salto al destapar: los dos estados miden lo mismo. */
+  min-height: 5.1rem;
+  justify-content: center;
+}
+
+.ltv-oculto {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--acento-oscuro);
+}
+
 .acciones-perfil { display: flex; gap: 0.65rem; margin-bottom: 1.25rem; }
 .acciones-perfil form { flex: 2; }
 .acciones-perfil .boton-secundario { flex: 1; }

@@ -39,9 +39,10 @@ export default async function PaginaPerfil({
   //     necesita: es él quien le pone el precio al darlo de alta, y quien
   //     responde si el cliente pregunta.
   //
-  //   verLtv → el valor acumulado. Eso ya es finanzas del negocio, no del
-  //     servicio, y se queda para el administrador. Lo único de finanzas que
-  //     ve un entrenador es si su cliente está o no al día.
+  //   verLtv → el valor acumulado Y el precio por hora. Las dos son cuentas
+  //     del negocio, no del servicio, y se quedan para el administrador. Un
+  //     entrenador ve lo que paga su cliente —el precio del bono, la cuota—
+  //     pero no a cuánto sale la hora.
   const verLtv = esAdmin(usuario);
   let perfil;
   try {
@@ -115,7 +116,7 @@ export default async function PaginaPerfil({
           )
         )}
 
-        <PerfilHero clienteId={cliente.id} ficha={ficha} />
+        <PerfilHero clienteId={cliente.id} ficha={ficha} verPrecioHora={verLtv} />
 
         {/* Acción principal. Depende de `ficha.puedeFirmar`, que mira el estado
             del cliente y los datos que SU modalidad necesita. */}
@@ -143,11 +144,9 @@ export default async function PaginaPerfil({
           {/* Cambiar el programa es cambiar tarifas: solo el administrador.
               La pantalla lo exige por su cuenta, esto solo evita enseñar un
               botón que respondería «no existe». */}
-          {esAdmin(usuario) && (
-            <Link className="boton-secundario" href={`/clientes/${cliente.id}/programa`}>
-              Editar programa
-            </Link>
-          )}
+          <Link className="boton-secundario" href={`/clientes/${cliente.id}/programa`}>
+            Editar programa
+          </Link>
         </div>
 
         <EnlaceYQr
