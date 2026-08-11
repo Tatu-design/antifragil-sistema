@@ -90,12 +90,6 @@ export function PerfilHero({
               <dt>Cuota del mes</dt>
               <dd>{euros(ficha.cuotaMensual)}</dd>
             </div>
-            {verPrecioHora && (
-              <div>
-                <dt>Sale a</dt>
-                <dd>{ficha.precioEfectivo ? `${euros(ficha.precioEfectivo)}/h` : "—"}</dd>
-              </div>
-            )}
             {ficha.mes ? (
               <div>
                 <dt>Periodo</dt>

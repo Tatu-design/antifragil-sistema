@@ -375,6 +375,19 @@ describe("ninguna puerta se queda abierta", () => {
     }
   });
 
+  it("«sale a X €/h» no se enseña en ninguna ficha, ni al administrador", () => {
+    // Es un calculo de rentabilidad y su sitio es Economia, no la ficha de una
+    // persona (Fernando, 2026-08-11). Aqui lo que hace falta saber es cuanto
+    // paga y cuantas sesiones lleva.
+    const hero = readFileSync(path.join(process.cwd(), "src", "components", "PerfilHero.tsx"), "utf8");
+    expect(hero).not.toContain("precioEfectivo");
+    expect(hero).not.toContain("Sale a");
+
+    // Y en la pantalla del cliente tampoco, que nunca lo tuvo.
+    const publica = readFileSync(path.join(RAIZ, "mi", "[token]", "page.tsx"), "utf8");
+    expect(publica).not.toContain("precioEfectivo");
+  });
+
   it("el enlace público del cliente sigue sin pedir cuenta", () => {
     // Si alguien le pusiera un candado, todos los QR repartidos dejarían de
     // funcionar de golpe.
