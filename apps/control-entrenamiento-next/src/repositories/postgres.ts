@@ -48,6 +48,7 @@ pg.types.setTypeParser(1082, (valor) => valor);
 pg.types.setTypeParser(1114, (valor) => valor);
 
 import type { TipoClase } from "@/domain/economia";
+import { DESDE_QUE_HAY_PROFESIONALES } from "@/domain/atribucion";
 import { MENSUALIDAD, type Modalidad } from "@/domain/modalidades";
 import type { CargoMensual, Ciclo, Cliente, Estado, Sesion } from "@/domain/tipos";
 import { TARIFA_LIDOMARE } from "@/domain/economia";
@@ -731,15 +732,33 @@ export class RepositorioPostgres implements Repositorio {
    */
   async datosDeTodosLosMeses(
     soloDe?: string | null,
-    opciones: { esAdministrador?: boolean } = {},
+    opciones: { esAdministrador?: boolean; adminId?: string | null } = {},
   ): Promise<Array<{ anio: number; mes: number } & DatosMes>> {
     const clave = (anio: number, mes: number) => `${anio}-${String(mes).padStart(2, "0")}`;
 
     // Lo del administrador —CrossFit y ajustes— solo se pide si se está
     // mirando la suya, o la global. A un entrenador no le corresponde nada de
     // eso, así que esas tres consultas ni se lanzan.
-    const conComunes = !soloDe || opciones.esAdministrador === true;
+    const esAdmin = opciones.esAdministrador === true;
+    const conComunes = !soloDe || esAdmin;
     const vacio = Promise.resolve([] as Record<string, unknown>[]);
+
+    // De quién es una sesión, en SQL. Las mismas tres reglas que
+    // `domain/atribucion.ts`, en el mismo orden:
+    //   1. lo que guardó al firmarse;
+    //   2. si no lo guardó y es anterior a que existieran los profesionales,
+    //      del administrador;
+    //   3. si no, del responsable actual del cliente.
+    const duenio = (columna: string) =>
+      `coalesce(${columna}, case when %FECHA% < $3::date then $2 else cl.entrenador_id end)`;
+
+    // Las mensualidades y las cuentas de cliente son EXCLUSIVAS del
+    // administrador (regla de Fernando, 2026-08-11): un entrenador solo lleva
+    // bonos. Se filtra también aquí, no solo al dar de alta, para que una fila
+    // antigua o mal metida no se le cuele en su economía.
+    const soloBonos = soloDe && !esAdmin ? "and coalesce(c.modalidad::text,'bono') = 'bono'" : "";
+
+    const argsAtribucion = [soloDe, opciones.adminId ?? null, DESDE_QUE_HAY_PROFESIONALES];
 
     const [sesiones, cargos, clases, ajustes, kids] = await Promise.all([
       consultar(
@@ -748,15 +767,19 @@ export class RepositorioPostgres implements Repositorio {
            from sesiones s
            join clientes cl on cl.id = s.cliente_id
            left join ciclos c on c.cliente_id = s.cliente_id and c.ciclo = s.ciclo
-          ${soloDe ? "where coalesce(s.profesional_id, cl.entrenador_id) = $1" : ""}`,
-        soloDe ? [soloDe] : [],
+          ${soloDe ? `where ${duenio("s.profesional_id").replace("%FECHA%", "s.fecha")} = $1 ${soloBonos}` : ""}`,
+        soloDe ? argsAtribucion : [],
       ),
       consultar(
-        `select g.anio, g.mes, g.importe
-           from cargos_mensuales g
-           join clientes cl on cl.id = g.cliente_id
-          ${soloDe ? "where coalesce(g.profesional_id, cl.entrenador_id) = $1" : ""}`,
-        soloDe ? [soloDe] : [],
+        // La cuota de una mensualidad no puede ser de un entrenador: si se
+        // pide la suya, esta consulta no devuelve nada por definición.
+        soloDe && !esAdmin
+          ? "select anio, mes, importe from cargos_mensuales where false"
+          : `select g.anio, g.mes, g.importe
+               from cargos_mensuales g
+               join clientes cl on cl.id = g.cliente_id
+              ${soloDe ? `where ${duenio("g.profesional_id").replace("%FECHA%", "make_date(g.anio, g.mes, 1)")} = $1` : ""}`,
+        soloDe && !esAdmin ? [] : soloDe ? argsAtribucion : [],
       ),
       conComunes
         ? consultar(

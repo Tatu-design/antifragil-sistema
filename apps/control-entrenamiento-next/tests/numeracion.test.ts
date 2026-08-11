@@ -21,7 +21,7 @@ import { comprobarCoherencia, diagnosticar, reparar } from "@/services/reparacio
 import { eliminarSesion, firmarSesion } from "@/services/sesiones";
 
 const BONO = "cli-a"; // bono de 8 × 45 €
-const CUENTA = "cli-d"; // cuenta de cliente, 35 €/sesión
+const CUENTA = "cli-f"; // cuenta de cliente del admin, 35 €/sesión
 const MENSUAL = "cli-b"; // mensualidad de 720 € al mes
 
 /** Deja al cliente sin ninguna sesión, para partir de cero. */

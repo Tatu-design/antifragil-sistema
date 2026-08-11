@@ -184,7 +184,13 @@ export interface Repositorio {
    */
   datosDeTodosLosMeses(
     soloDe?: string | null,
-    opciones?: { esAdministrador?: boolean },
+    opciones?: {
+      /** Si es el administrador: le tocan CrossFit, ajustes y todas las modalidades. */
+      esAdministrador?: boolean;
+      /** Quién es el administrador, para atribuirle el histórico anterior a
+       *  que existieran los profesionales. */
+      adminId?: string | null;
+    },
   ): Promise<Array<{ anio: number; mes: number } & DatosMes>>;
 
   /** Sesiones de hoy de ese cliente que aún no ha confirmado. */

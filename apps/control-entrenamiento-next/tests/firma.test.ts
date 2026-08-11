@@ -16,7 +16,7 @@ import { eliminarSesion, firmarSesion } from "@/services/sesiones";
 
 const BONO_CASI_AGOTADO = "cli-a"; // 6 de 8 sesiones, tarifa 45 €
 const MENSUAL = "cli-b"; // cuota 720 €
-const CUENTA_CLIENTE = "cli-d"; // 35 €/sesión, sin tope
+const CUENTA_CLIENTE = "cli-f"; // 35 €/sesión, sin tope. Del admin: un entrenador solo lleva bonos.
 const PAUSADO = "cli-e";
 
 describe("firmar una sesión", () => {

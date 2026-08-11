@@ -1942,12 +1942,24 @@ El identificador de la dirección **no se usa tal cual**: se comprueba contra
 la lista real de profesionales y, si no cuadra, se cae en el propio
 administrador. Uno inventado no devuelve la economía de nadie.
 
+### Un entrenador solo lleva bonos (regla de Fernando, 2026-08-11)
+
+Las **mensualidades**, las **cuentas de cliente** y **CrossFit** son
+exclusivamente del administrador. Un entrenador solo trabaja con clientes de
+bono.
+
+No es una limitación técnica: es cómo funciona el negocio. Vive en
+`domain/atribucion.ts` y se comprueba **en el servidor** en los tres sitios por
+los que se podría colar: dar de alta, cambiar el programa y traspasar un
+cliente. Esconder opciones en la pantalla no basta.
+
 ### De quién es cada producción
 
 | | Pertenece a |
 |---|---|
-| Sesión | el profesional responsable **del cliente** |
-| Cuota de mensualidad | ídem |
+| Sesión de bono | el profesional responsable **del cliente** |
+| Cuota de mensualidad | **solo el administrador** |
+| Sesión de cuenta de cliente | **solo el administrador** |
 | CrossFit Lidomare y Kids | el administrador, y no se reparten |
 | Ajustes históricos | el administrador |
 
@@ -1972,20 +1984,38 @@ este motivo escrito en el esquema inicial:
 El profesional responsable es una condición más del momento. Se guarda igual:
 `sesiones.profesional_id` y `cargos_mensuales.profesional_id`.
 
-La atribución es `coalesce(profesional_id, clientes.entrenador_id)`:
+La atribución tiene **tres reglas en orden** (`domain/atribucion.ts`):
 
-- **con copia** → de quien era cuando se produjo, pase lo que pase después;
-- **sin copia** (filas anteriores al 2026-08-11) → del responsable actual.
+1. **Lo que la sesión guardó al firmarse.** Siempre manda. Cambiar después el
+   responsable del cliente no mueve nada hacia atrás.
+2. **Si no lo guardó y es anterior al 2026-08-09** → del administrador.
+3. **Si no lo guardó y es posterior** → del responsable actual del cliente.
 
-Mientras un cliente no cambie de manos, las dos dan el mismo resultado, así
-que el histórico existente cuadra exactamente igual que antes. Comprobado el
-2026-08-11: global 4.172,50 € = 3.967,50 € (Tatu) + 205,00 € (Rafa),
-diferencia 0,00 €.
+#### Por qué el 2026-08-09
 
-**Queda un hueco conocido**, pendiente de aprobación de Fernando: rellenar
-`profesional_id` en las filas históricas. Hasta que se haga, mover hoy un
-cliente de profesional sí arrastraría su pasado. Es un cambio sobre datos
-reales y necesita su visto bueno (regla del 2026-08-04).
+No es una fecha elegida a mano. Es el día en que se creó la columna
+`clientes.entrenador_id` (migración `20260809100000_multi_entrenador.sql`) y en
+que se dio de alta el primer perfil de entrenador. **Antes de ese día el
+concepto de profesional no existía en el sistema, así que toda la producción
+anterior es del administrador** — sin mirar de quién sea el cliente hoy.
+
+Esto importa: un cliente que hoy lleve Rafa pudo entrenar durante meses cuando
+Rafa ni siquiera existía. Ese pasado no es suyo.
+
+#### El hueco que queda, y su cierre
+
+La regla 3 es de respaldo y es frágil: si un cliente cambia de profesional, sus
+sesiones sin copia se irían con él. Hoy da el resultado correcto porque ningún
+cliente ha cambiado de manos, pero conviene cerrarlo.
+
+`scripts/rellenar-profesional-historico.mjs` lo hace: enseña la vista previa,
+guarda copia y solo escribe con `--aplicar`. Reparte 78 sesiones al
+administrador (anteriores al corte) y 8 a su responsable actual, sin ningún
+caso ambiguo. **Pendiente de la aprobación de Fernando** (regla del
+2026-08-04).
+
+Comprobado el 2026-08-11: global 4.172,50 € = 3.967,50 € (Tatu) + 205,00 €
+(Rafa), diferencia 0,00 €.
 
 ### Coste
 

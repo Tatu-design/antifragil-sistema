@@ -50,7 +50,13 @@ export default async function PaginaEconomia({
   let sinLeer = 0;
   try {
     const [economia, avisos] = await Promise.all([
-      obtenerEconomia({ profesionalId: elegido.id, esAdministrador: elegido.rol === "admin" }),
+      obtenerEconomia({
+        profesionalId: elegido.id,
+        esAdministrador: elegido.rol === "admin",
+        // Quién es el administrador: suyo es todo el histórico anterior a que
+        // existieran los profesionales.
+        adminId: profesionales.find((p) => p.rol === "admin")?.id ?? null,
+      }),
       contarNoLeidos(),
     ]);
     vista = economia;

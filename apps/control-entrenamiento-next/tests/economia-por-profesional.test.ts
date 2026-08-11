@@ -23,6 +23,8 @@ import { hoyNegocio } from "@/lib/fechas";
 import { repositorio } from "@/repositories";
 import { reiniciarStagingParaPruebas } from "@/repositories/staging";
 import { confirmarFacturacionKids, firmarClase } from "@/services/clases";
+import { DESDE_QUE_HAY_PROFESIONALES, duenioDeLaSesion, puedeLlevarModalidad } from "@/domain/atribucion";
+import { configurarServicio, crearCliente, traspasarCliente } from "@/services/clientes";
 import { obtenerEconomia } from "@/services/economia";
 import { firmarSesion } from "@/services/sesiones";
 
@@ -34,9 +36,11 @@ const HOY = hoyNegocio();
 const ANIO = Number(HOY.slice(0, 4));
 const MES = Number(HOY.slice(5, 7));
 
-const deAdmin = () => obtenerEconomia({ profesionalId: ADMIN, esAdministrador: true });
-const deRafa = () => obtenerEconomia({ profesionalId: RAFA });
-const deOtro = () => obtenerEconomia({ profesionalId: OTRO });
+// `adminId` va siempre: es quien se queda todo el histórico anterior a que
+// existieran los profesionales.
+const deAdmin = () => obtenerEconomia({ profesionalId: ADMIN, esAdministrador: true, adminId: ADMIN });
+const deRafa = () => obtenerEconomia({ profesionalId: RAFA, adminId: ADMIN });
+const deOtro = () => obtenerEconomia({ profesionalId: OTRO, adminId: ADMIN });
 
 /** Deja el mes en curso vacío, para partir de cero de verdad. */
 async function vaciarMesActual() {
@@ -63,7 +67,7 @@ describe("de quién es cada producción", () => {
 
   it("la sesión de un cliente cuenta para SU profesional", async () => {
     await vaciarMesActual();
-    // «cli-a» es del administrador; «cli-d», de Rafa (35 €/sesión).
+    // «cli-a» es del administrador; «cli-d», de Rafa (bono de 35 €/sesión).
     await firmarSesion("cli-a", { fecha: HOY });
     await firmarSesion("cli-d", { fecha: HOY });
 
@@ -89,10 +93,10 @@ describe("de quién es cada producción", () => {
     expect((await deRafa()).mesActual.facturacionTotal).toBe(0);
   });
 
-  it("la cuota de una mensualidad va al profesional de ese cliente", async () => {
-    // «cli-b» es del administrador y tiene una cuota de 720 €.
-    const conCuota = (await deAdmin()).mesActual.facturacionCuotas;
-    expect(conCuota).toBe(720);
+  it("las cuotas de mensualidad son SOLO del administrador", async () => {
+    // Un entrenador no puede llevar mensualidades, así que su economía nunca
+    // tiene cuotas (regla de Fernando, 2026-08-11).
+    expect((await deAdmin()).mesActual.facturacionCuotas).toBe(720);
     expect((await deRafa()).mesActual.facturacionCuotas).toBe(0);
   });
 
@@ -242,5 +246,115 @@ describe("si un cliente cambia de profesional", () => {
     const julio = (await deAdmin()).anteriores.find((m) => m.mes === 7);
     expect(julio?.facturacionTotal).toBeGreaterThan(0);
     expect((await deRafa()).anteriores.some((m) => m.mes === 7)).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// El histórico anterior a que existieran los profesionales
+// ---------------------------------------------------------------------------
+
+describe("lo de antes de que hubiera profesionales", () => {
+  beforeEach(() => reiniciarStagingParaPruebas());
+
+  it("es del administrador, aunque el cliente sea hoy de otro", async () => {
+    // El caso que Fernando marcó como importante: un cliente que hoy lleva
+    // Rafa pudo entrenar meses antes de que Rafa existiera en el sistema. Ese
+    // pasado no es suyo.
+    const repo = repositorio();
+    // Una sesión de julio, anterior al corte, de un cliente que HOY es de Rafa.
+    await repo.asignarProfesional("cli-a", RAFA);
+
+    const admin = await deAdmin();
+    const rafa = await deRafa();
+
+    const julioAdmin = admin.anteriores.find((m) => m.mes === 7);
+    expect(julioAdmin?.facturacionTotal).toBeGreaterThan(0);
+    // Y a Rafa no le aparece ese julio.
+    expect(rafa.anteriores.some((m) => m.mes === 7)).toBe(false);
+  });
+
+  it("la frontera está en el día en que se crearon los profesionales", async () => {
+    expect(DESDE_QUE_HAY_PROFESIONALES).toBe("2026-08-09");
+
+    // Una sesión del día ANTERIOR es del administrador…
+    expect(
+      duenioDeLaSesion({ fecha: "2026-08-08", responsableActual: RAFA, adminId: ADMIN }),
+    ).toBe(ADMIN);
+    // …y una del mismo día ya se atribuye al responsable del cliente.
+    expect(
+      duenioDeLaSesion({ fecha: "2026-08-09", responsableActual: RAFA, adminId: ADMIN }),
+    ).toBe(RAFA);
+  });
+
+  it("lo que guardó su profesional manda por encima de todo", async () => {
+    // Aunque sea antigua y aunque el cliente cambie de manos.
+    expect(
+      duenioDeLaSesion({
+        profesionalId: RAFA,
+        fecha: "2020-01-01",
+        responsableActual: ADMIN,
+        adminId: ADMIN,
+      }),
+    ).toBe(RAFA);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Un entrenador solo lleva bonos
+// ---------------------------------------------------------------------------
+
+describe("qué modalidades puede llevar cada uno", () => {
+  beforeEach(() => reiniciarStagingParaPruebas());
+
+  const alta = (modalidad: string, profesionalId: string) =>
+    crearCliente({
+      nombre: `Prueba ${modalidad} ${profesionalId}`,
+      modalidad: modalidad as never,
+      servicio: "Prueba",
+      sesionesTotales: modalidad === "bono" ? 8 : null,
+      precioTotal: modalidad === "bono" ? 360 : null,
+      cuotaMensual: modalidad === "mensualidad" ? 720 : null,
+      tarifa: modalidad === "cuenta" ? 35 : modalidad === "bono" ? 45 : null,
+      profesionalId,
+    });
+
+  it("un entrenador SÍ puede llevar un bono", async () => {
+    await expect(alta("bono", RAFA)).resolves.toBeDefined();
+  });
+
+  it("pero NO una mensualidad", async () => {
+    await expect(alta("mensualidad", RAFA)).rejects.toThrow(/solo puede llevar clientes con bono/i);
+  });
+
+  it("ni una cuenta de cliente", async () => {
+    await expect(alta("cuenta", RAFA)).rejects.toThrow(/solo puede llevar clientes con bono/i);
+  });
+
+  it("el administrador puede llevar las tres", async () => {
+    for (const modalidad of ["bono", "mensualidad", "cuenta"]) {
+      await expect(alta(modalidad, ADMIN), modalidad).resolves.toBeDefined();
+    }
+  });
+
+  it("tampoco se le puede convertir su bono en mensualidad después", async () => {
+    // El mismo agujero por otra puerta: cambiar el programa de un cliente suyo.
+    await expect(
+      configurarServicio("cli-d", { modalidad: "mensualidad" as never, servicio: "M", cuotaMensual: 720 }),
+    ).rejects.toThrow(/solo puede llevar clientes con bono/i);
+  });
+
+  it("ni traspasarle un cliente con mensualidad", async () => {
+    // «cli-b» es una mensualidad del administrador.
+    await expect(traspasarCliente("cli-b", RAFA)).rejects.toThrow(/solo puede llevar clientes con bono/i);
+  });
+
+  it("y traspasarle un bono sí vale", async () => {
+    await expect(traspasarCliente("cli-a", RAFA)).resolves.toBeUndefined();
+  });
+
+  it("la regla se decide por el rol, no por el nombre", async () => {
+    expect(puedeLlevarModalidad(true, "mensualidad" as never)).toBe(true);
+    expect(puedeLlevarModalidad(false, "mensualidad" as never)).toBe(false);
+    expect(puedeLlevarModalidad(false, "bono" as never)).toBe(true);
   });
 });

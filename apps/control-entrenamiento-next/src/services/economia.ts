@@ -53,6 +53,9 @@ export async function obtenerEconomia(alcance?: {
   /** Si ese profesional es el administrador: a él le corresponden CrossFit y
    *  los ajustes, que no son de ningún cliente. */
   esAdministrador?: boolean;
+  /** Quién es el administrador. Se le atribuye todo el histórico anterior a
+   *  que existieran los profesionales. */
+  adminId?: string | null;
 }): Promise<VistaEconomia> {
   const repo = repositorio();
   const hoy = hoyNegocio();
@@ -63,6 +66,7 @@ export async function obtenerEconomia(alcance?: {
   // le importa de quién son los datos. Lo único que cambia es qué filas entran.
   const todos = await repo.datosDeTodosLosMeses(alcance?.profesionalId, {
     esAdministrador: alcance?.esAdministrador,
+    adminId: alcance?.adminId,
   });
   const esActual = (m: { anio: number; mes: number }) => m.anio === anio && m.mes === mes;
 

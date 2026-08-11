@@ -15,7 +15,7 @@ import { obtenerPerfil } from "@/services/clientes";
 import { editarSesion, eliminarClienteConHistorial, firmarSesion } from "@/services/sesiones";
 
 const BONO = "cli-a"; // bono 8 × 45 €, 6 hechas
-const CUENTA = "cli-d"; // 35 €/sesión
+const CUENTA = "cli-f"; // 35 €/sesión. Es del ADMIN: un entrenador solo lleva bonos.
 
 describe("corregir una sesión", () => {
   beforeEach(() => reiniciarStagingParaPruebas());

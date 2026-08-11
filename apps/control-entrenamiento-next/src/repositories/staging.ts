@@ -18,6 +18,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { TARIFA_LIDOMARE, type TipoClase } from "@/domain/economia";
+import { duenioDeLaSesion } from "@/domain/atribucion";
 import { BONO, CUENTA, MENSUALIDAD } from "@/domain/modalidades";
 import type { CargoMensual, Ciclo, Cliente, Sesion } from "@/domain/tipos";
 import { rangoSemana } from "@/lib/fechas";
@@ -66,6 +67,7 @@ function semilla(): Almacen {
     { id: "cli-c", nombre: "Pareja C", estado: "activo", token: "tok-pareja-c", pendientePago: false, sesionesCompletadas: 3, cicloActual: 1, profesionalId: "per-admin" },
     { id: "cli-d", nombre: "Cliente D", estado: "activo", token: "tok-cliente-d", pendientePago: false, sesionesCompletadas: 0, cicloActual: 1, profesionalId: "per-rafa" },
     { id: "cli-e", nombre: "Cliente E", estado: "pausado", token: "tok-cliente-e", pendientePago: false, sesionesCompletadas: 2, cicloActual: 1, profesionalId: "per-otro" },
+    { id: "cli-f", nombre: "Cliente F", estado: "activo", token: "tok-cliente-f", pendientePago: false, sesionesCompletadas: 0, cicloActual: 1, profesionalId: "per-admin" },
   ];
 
   const ciclos: Ciclo[] = [
@@ -73,7 +75,11 @@ function semilla(): Almacen {
     { clienteId: "cli-a", ciclo: 1, modalidad: BONO, servicio: "Bono 8 sesiones", tarifa: 45, sesionesTotales: 8, precioTotal: 360, cuotaMensual: null, sesionesReferencia: null, anio: null, mes: null, fechaInicio: "2026-07-13", fechaFin: null, pagado: true },
     { clienteId: "cli-b", ciclo: 1, modalidad: MENSUALIDAD, servicio: "Mensualidad", tarifa: null, sesionesTotales: 0, precioTotal: null, cuotaMensual: 720, sesionesReferencia: 12, anio: 2026, mes: 8, fechaInicio: null, fechaFin: null, pagado: false },
     { clienteId: "cli-c", ciclo: 1, modalidad: BONO, servicio: "Bono pareja 10", tarifa: 60, sesionesTotales: 10, precioTotal: 600, cuotaMensual: null, sesionesReferencia: null, anio: null, mes: null, fechaInicio: "2026-07-20", fechaFin: null, pagado: true },
-    { clienteId: "cli-d", ciclo: 1, modalidad: CUENTA, servicio: "Cuenta de cliente", tarifa: 35, sesionesTotales: 0, precioTotal: null, cuotaMensual: null, sesionesReferencia: null, anio: 2026, mes: 8, fechaInicio: null, fechaFin: null, pagado: false },
+    // Una cuenta de cliente, que solo puede llevar el administrador.
+    { clienteId: "cli-f", ciclo: 1, modalidad: CUENTA, servicio: "Cuenta de cliente", tarifa: 35, sesionesTotales: 0, precioTotal: null, cuotaMensual: null, sesionesReferencia: null, anio: 2026, mes: 8, fechaInicio: null, fechaFin: null, pagado: false },
+    // El cliente de Rafa es un BONO: un entrenador no puede llevar otra
+    // cosa (regla de Fernando, 2026-08-11).
+    { clienteId: "cli-d", ciclo: 1, modalidad: BONO, servicio: "Bono 8 sesiones", tarifa: 35, sesionesTotales: 8, precioTotal: 280, cuotaMensual: null, sesionesReferencia: null, anio: null, mes: null, fechaInicio: "2026-08-10", fechaFin: null, pagado: false },
     { clienteId: "cli-e", ciclo: 1, modalidad: BONO, servicio: "Bono 4 sesiones", tarifa: 50, sesionesTotales: 4, precioTotal: 200, cuotaMensual: null, sesionesReferencia: null, anio: null, mes: null, fechaInicio: "2026-06-15", fechaFin: null, pagado: true },
   ];
 
@@ -530,23 +536,45 @@ export class RepositorioStaging implements Repositorio {
    */
   async datosDeTodosLosMeses(
     soloDe?: string | null,
-    opciones: { esAdministrador?: boolean } = {},
+    opciones: { esAdministrador?: boolean; adminId?: string | null } = {},
   ) {
     const datos = await cargar();
+    const esAdmin = opciones.esAdministrador === true;
 
-    // Las mismas reglas que en Postgres: la sesión es de quien era responsable
-    // del cliente cuando se firmó y, si no hay copia, del responsable de hoy.
-    // Nunca de quien la firmó.
-    const deQuienEs = (clienteId: string, profesionalId?: string | null) =>
-      profesionalId ?? datos.clientes.find((c) => c.id === clienteId)?.profesionalId ?? null;
-    const esSuya = (clienteId: string, profesionalId?: string | null) =>
-      !soloDe || deQuienEs(clienteId, profesionalId) === soloDe;
+    // Exactamente las mismas reglas que en Postgres, escritas una sola vez en
+    // `domain/atribucion.ts`. Si las dos implementaciones divergieran, la
+    // economía diría una cosa en pruebas y otra en producción.
+    const responsableActual = (clienteId: string) =>
+      datos.clientes.find((c) => c.id === clienteId)?.profesionalId ?? null;
+
+    const esSuya = (clienteId: string, fecha: string, profesionalId?: string | null) =>
+      !soloDe ||
+      duenioDeLaSesion({
+        profesionalId,
+        fecha,
+        responsableActual: responsableActual(clienteId),
+        adminId: opciones.adminId ?? null,
+      }) === soloDe;
+
+    const modalidadDeCliente = (clienteId: string, ciclo: number) =>
+      datos.ciclos.find((c) => c.clienteId === clienteId && c.ciclo === ciclo)?.modalidad ?? BONO;
 
     // CrossFit y ajustes son del administrador y no se reparten.
-    const conComunes = !soloDe || opciones.esAdministrador === true;
+    const conComunes = !soloDe || esAdmin;
 
-    const sesiones = datos.sesiones.filter((s) => esSuya(s.clienteId, s.profesionalId));
-    const cargos = datos.cargos.filter((c) => esSuya(c.clienteId, c.profesionalId));
+    const sesiones = datos.sesiones.filter(
+      (s) =>
+        esSuya(s.clienteId, s.fecha, s.profesionalId) &&
+        // Un entrenador solo lleva bonos: nada más puede entrar en su economía.
+        (!soloDe || esAdmin || modalidadDeCliente(s.clienteId, s.ciclo) === BONO),
+    );
+    // Las cuotas son exclusivas del administrador.
+    const cargos =
+      soloDe && !esAdmin
+        ? []
+        : datos.cargos.filter((c) =>
+            esSuya(c.clienteId, `${c.anio}-${String(c.mes).padStart(2, "0")}-01`, c.profesionalId),
+          );
     const clases = conComunes ? datos.clases : [];
     const ajustes = conComunes ? datos.ajustes : [];
 

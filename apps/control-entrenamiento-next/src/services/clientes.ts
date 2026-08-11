@@ -6,6 +6,7 @@
 import { randomUUID } from "node:crypto";
 
 import { fichaServicio } from "@/domain/ficha";
+import { puedeLlevarModalidad, porQueNoPuede } from "@/domain/atribucion";
 import { calcularLtv, type Ltv } from "@/domain/ltv";
 import { ErrorDeNegocio, MENSUALIDAD, validarCondiciones } from "@/domain/modalidades";
 import type { Modalidad } from "@/domain/modalidades";
@@ -168,6 +169,8 @@ export async function crearCliente(datos: DatosAlta): Promise<Cliente> {
   if (!nombre) throw new ErrorDeNegocio("El nombre del cliente no puede estar vacío");
 
   const condiciones = validarCondiciones(datos.modalidad, datos);
+  // Antes de escribir nada: un entrenador solo puede llevar bonos.
+  await exigirModalidadPermitida(datos.profesionalId, condiciones.modalidad);
   const hoy = new Date();
 
   const cliente: Cliente = {
@@ -269,6 +272,12 @@ export async function configurarServicio(
 ): Promise<ResultadoCambio> {
   const repo = repositorio();
   const condiciones = validarCondiciones(cambio.modalidad, cambio);
+
+  // Quien lleve a este cliente tiene que poder llevar esa modalidad. Sin esto,
+  // se podría convertir el bono de un entrenador en una mensualidad.
+  const cliente = await repo.obtenerCliente(clienteId);
+  await exigirModalidadPermitida(cliente?.profesionalId, condiciones.modalidad);
+
   const hoy = new Date();
 
   return repo.transaccion(async () => {
@@ -448,5 +457,44 @@ export async function marcarCobro(clienteId: string, ciclo: number, pagado: bool
  * quién aparece.
  */
 export async function traspasarCliente(clienteId: string, profesionalId: string): Promise<void> {
-  await repositorio().asignarProfesional(clienteId, profesionalId);
+  const repo = repositorio();
+
+  // El sentido contrario del mismo problema: no se le puede traspasar a un
+  // entrenador un cliente con mensualidad o cuenta, porque no puede llevarlas.
+  const cliente = await repo.obtenerCliente(clienteId);
+  if (cliente) {
+    const ciclo = await repo.cicloActual(clienteId);
+    if (ciclo) await exigirModalidadPermitida(profesionalId, ciclo.modalidad);
+  }
+
+  await repo.asignarProfesional(clienteId, profesionalId);
+}
+
+/**
+ * Comprueba que ese profesional puede llevar esa modalidad.
+ *
+ * **Un entrenador solo lleva bonos** (regla de Fernando, 2026-08-11). Las
+ * mensualidades, las cuentas de cliente y CrossFit son del administrador.
+ *
+ * Se comprueba AQUÍ, en el servidor, y no escondiendo opciones en la pantalla:
+ * esconder un desplegable no impide mandar el formulario a mano.
+ *
+ * Lanza `ErrorDeNegocio` con un mensaje que se puede leer sin saber
+ * programar, para que la pantalla lo enseñe tal cual.
+ */
+export async function exigirModalidadPermitida(
+  profesionalId: string | null | undefined,
+  modalidad: Modalidad,
+): Promise<void> {
+  // Sin responsable, el cliente es del administrador: puede llevar cualquiera.
+  if (!profesionalId) return;
+
+  const perfil = await repositorio().perfilPorId(profesionalId);
+  // Un identificador que no lleva a nadie no habilita nada: se trata como
+  // entrenador, que es lo restrictivo.
+  const esAdministrador = perfil?.rol === "admin";
+
+  if (!puedeLlevarModalidad(esAdministrador, modalidad)) {
+    throw new ErrorDeNegocio(porQueNoPuede(modalidad));
+  }
 }

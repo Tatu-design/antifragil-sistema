@@ -16,7 +16,7 @@ import { firmarSesion } from "@/services/sesiones";
 
 const BONO_CLIENTE = "cli-a"; // bono 8 × 45 €, 6 hechas
 const MENSUAL = "cli-b"; // cuota 720 €
-const CUENTA_CLIENTE = "cli-d"; // 35 €/sesión
+const CUENTA_CLIENTE = "cli-f"; // 35 €/sesión, del admin
 
 describe("corregir las condiciones sin cambiar de modalidad", () => {
   beforeEach(() => reiniciarStagingParaPruebas());
