@@ -14,6 +14,7 @@ import { SinConexion } from "@/components/SinConexion";
 import { BaseNoDisponible } from "@/repositories/postgres";
 import { confirmacionDeHoy, obtenerPerfil } from "@/services/clientes";
 
+import { enlaceDelCliente } from "@/lib/enlace-publico";
 import { esAdmin, exigirAccesoACliente } from "@/lib/permisos";
 
 export const dynamic = "force-dynamic";
@@ -58,12 +59,15 @@ export default async function PaginaPerfil({
 
   const confirmacion = await confirmacionDeHoy(cliente.id);
 
-  // La dirección se calcula desde la petición: así el enlace es correcto tanto
-  // en local como desplegado, sin configurarlo en dos sitios.
+  // El enlace del cliente NO se saca de la petición. En Vercel la misma
+  // aplicación responde en varias direcciones y las de despliegue están
+  // protegidas: un enlace fabricado sobre una de ellas le pide al cliente una
+  // cuenta de Vercel. Ver `lib/enlace-publico.ts`.
   const cabeceras = await headers();
-  const anfitrion = cabeceras.get("x-forwarded-host") ?? cabeceras.get("host") ?? "localhost:3000";
-  const protocolo = anfitrion.startsWith("localhost") ? "http" : "https";
-  const enlace = `${protocolo}://${anfitrion}/mi/${cliente.token}`;
+  const enlace = enlaceDelCliente(
+    cliente.token,
+    cabeceras.get("x-forwarded-host") ?? cabeceras.get("host"),
+  );
   const qr = await QRCode.toDataURL(`${enlace}/confirmar`, {
     width: 190,
     margin: 1,
