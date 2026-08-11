@@ -76,17 +76,16 @@ export default async function PaginaMiPerfil({ params }: { params: Promise<{ tok
                 </span>
               </div>
             </div>
+            {/* Sin «previstas» (Fernando, 2026-08-11). Es una referencia
+                interna para calcular, no un compromiso: enseñársela al cliente
+                lo convierte en uno —«me habías dicho doce»— cuando en una
+                mensualidad se entrena lo que se pueda entrenar ese mes.
+                La cuenta de cliente nunca la tuvo. */}
             <dl className="datos-servicio">
               <div>
                 <dt>Cuota del mes</dt>
                 <dd>{euros(ficha.cuotaMensual)}</dd>
               </div>
-              {ficha.sesionesReferencia ? (
-                <div>
-                  <dt>Previstas</dt>
-                  <dd>{ficha.sesionesReferencia}</dd>
-                </div>
-              ) : null}
             </dl>
           </>
         )}

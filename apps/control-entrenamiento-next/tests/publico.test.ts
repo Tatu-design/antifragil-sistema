@@ -238,6 +238,15 @@ describe("la pantalla del cliente", () => {
     expect(pagina).toContain("useState(false)");
   });
 
+  it("no se le enseñan las sesiones previstas del mes", async () => {
+    // Es una referencia interna para calcular, no un compromiso. Enseñársela
+    // lo convierte en uno --«me habías dicho doce»-- cuando en una
+    // mensualidad se entrena lo que se pueda ese mes (Fernando, 2026-08-11).
+    const pagina = readFileSync("src/app/mi/[token]/page.tsx", "utf8");
+    expect(pagina).not.toContain("sesionesReferencia");
+    expect(pagina).not.toContain("Previstas");
+  });
+
   it("no se le habla de «bono», sino de su programa", async () => {
     const pagina = readFileSync("src/app/mi/[token]/page.tsx", "utf8");
     expect(pagina).not.toContain("Así va tu bono");
