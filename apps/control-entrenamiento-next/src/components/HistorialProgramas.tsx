@@ -140,10 +140,12 @@ function condiciones(servicio: Servicio, verPrecioHora: boolean): string {
   const sesiones = `${n} ${n === 1 ? "sesión" : "sesiones"}`;
 
   if (servicio.modalidad === "mensualidad") {
-    const efectivo =
-      verPrecioHora && n && servicio.cuotaMensual ? ` · ${euros(servicio.cuotaMensual / n)}/h` : "";
+
     const referencia = servicio.sesionesReferencia ? ` · ref. ${servicio.sesionesReferencia}` : "";
-    return `Cuota ${euros(servicio.cuotaMensual)} · ${sesiones}${efectivo}${referencia}`;
+    // Sin el precio por hora: es un cálculo de rentabilidad y su sitio es
+    // Economía (Fernando, 2026-08-11). Estaba aquí ADEMÁS de en la tarjeta del
+    // servicio, y quitarlo de un solo sitio no es quitarlo.
+    return `Cuota ${euros(servicio.cuotaMensual)} · ${sesiones}${referencia}`;
   }
   if (servicio.modalidad === "cuenta") {
     const total = euros((servicio.tarifa ?? 0) * n);

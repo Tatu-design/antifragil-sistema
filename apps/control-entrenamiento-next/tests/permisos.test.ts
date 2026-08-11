@@ -379,9 +379,14 @@ describe("ninguna puerta se queda abierta", () => {
     // Es un calculo de rentabilidad y su sitio es Economia, no la ficha de una
     // persona (Fernando, 2026-08-11). Aqui lo que hace falta saber es cuanto
     // paga y cuantas sesiones lleva.
-    const hero = readFileSync(path.join(process.cwd(), "src", "components", "PerfilHero.tsx"), "utf8");
-    expect(hero).not.toContain("precioEfectivo");
-    expect(hero).not.toContain("Sale a");
+    // En las DOS pantallas donde estaba: la tarjeta del servicio y el
+    // historial de programas. Quitarlo de una sola no es quitarlo.
+    for (const componente of ["PerfilHero.tsx", "HistorialProgramas.tsx"]) {
+      const codigo = readFileSync(path.join(process.cwd(), "src", "components", componente), "utf8");
+      expect(codigo, componente).not.toContain("precioEfectivo");
+      expect(codigo, componente).not.toContain("Sale a");
+      expect(codigo, componente).not.toMatch(/cuotaMensual \/ n/);
+    }
 
     // Y en la pantalla del cliente tampoco, que nunca lo tuvo.
     const publica = readFileSync(path.join(RAIZ, "mi", "[token]", "page.tsx"), "utf8");
