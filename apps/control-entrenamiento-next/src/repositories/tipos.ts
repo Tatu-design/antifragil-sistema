@@ -176,7 +176,16 @@ export interface Repositorio {
    *
    * Así son cinco viajes en total, hoy y dentro de tres años.
    */
-  datosDeTodosLosMeses(): Promise<Array<{ anio: number; mes: number } & DatosMes>>;
+  /**
+   * Con `soloDe`, la economía de ESE profesional; sin él, la de todo.
+   *
+   * `esAdministrador` decide si se incluye lo que no es de nadie en concreto
+   * —CrossFit y ajustes—, que por ahora pertenece al administrador.
+   */
+  datosDeTodosLosMeses(
+    soloDe?: string | null,
+    opciones?: { esAdministrador?: boolean },
+  ): Promise<Array<{ anio: number; mes: number } & DatosMes>>;
 
   /** Sesiones de hoy de ese cliente que aún no ha confirmado. */
   sesionesSinConfirmarHoy(clienteId: string, hoy: string): Promise<Sesion[]>;

@@ -93,7 +93,9 @@ describe("qué datos salen de la base", () => {
   });
 
   it("un entrenador sin clientes recibe una lista vacía, no la de todos", async () => {
-    expect(await listarClientes(OTRO.id)).toEqual([]);
+    // Un identificador que no lleva a nadie: la respuesta correcta es «nada»,
+    // nunca «todos».
+    expect(await listarClientes("per-sin-clientes")).toEqual([]);
   });
 
   it("no viajan los nombres de los clientes ajenos", async () => {
@@ -165,7 +167,8 @@ describe("qué datos salen de la base", () => {
 
     const deRafa = await listarClientes(RAFA.id);
     expect(deRafa.map((c) => c.id)).toContain(nuevo.id);
-    expect(await listarClientes(OTRO.id)).toEqual([]);
+    // Y no se le cuela al tercer profesional, que tiene los suyos.
+    expect((await listarClientes(OTRO.id)).map((c) => c.id)).not.toContain(nuevo.id);
   });
 
   it("sin responsable, un cliente nuevo no aparece en la lista de ningún entrenador", async () => {
@@ -391,6 +394,26 @@ describe("ninguna puerta se queda abierta", () => {
     // Y en la pantalla del cliente tampoco, que nunca lo tuvo.
     const publica = readFileSync(path.join(RAIZ, "mi", "[token]", "page.tsx"), "utf8");
     expect(publica).not.toContain("precioEfectivo");
+  });
+
+  it("Economía sigue siendo SOLO del administrador, también con el selector", () => {
+    // Que ahora se pueda mirar por profesional no le da acceso a nadie más.
+    const pagina = readFileSync(path.join(RAIZ, "economia", "page.tsx"), "utf8");
+    expect(pagina).toContain("exigirAdmin(");
+    expect(pagina).not.toContain("exigirUsuario(");
+  });
+
+  it("el profesional de la dirección se comprueba contra la lista real", () => {
+    // Sin esto, `/economia?profesional=<lo-que-sea>` seria una puerta: bastaria
+    // con escribir un identificador para consultar la economia de otro. El
+    // codigo NO puede usar el parametro tal cual.
+    const pagina = readFileSync(path.join(RAIZ, "economia", "page.tsx"), "utf8");
+    expect(pagina).toContain("listarProfesionales()");
+    expect(pagina).toMatch(/profesionales\.find\(\(p\) => p\.id === pedido\)/);
+    // Y si no cuadra, se cae en el propio administrador, no en un error ni en
+    // la economia de otro.
+    expect(pagina).toContain("?? usuario");
+    expect(pagina).not.toMatch(/profesionalId: pedido/);
   });
 
   it("el enlace público del cliente sigue sin pedir cuenta", () => {

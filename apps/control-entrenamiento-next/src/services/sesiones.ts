@@ -116,6 +116,11 @@ export async function firmarSesion(clienteId: string, opciones: OpcionesFirma = 
       ciclo: ciclo.ciclo,
       servicio: ciclo.servicio,
       firmadaPor: opciones.firmadaPor ?? null,
+      // De QUIÉN es la producción: el responsable del cliente en este momento,
+      // no quien pulsa. Si Fernando firma una sesión de un cliente de Rafa,
+      // esa sesión es de Rafa. Se guarda ahora para que el historial siga
+      // diciendo la verdad si el cliente cambia de profesional después.
+      profesionalId: cliente.profesionalId ?? null,
     };
     await repo.guardarSesion(sesion);
     await repo.sumarASemana(fecha, tarifa, 1);

@@ -56,6 +56,8 @@ function semilla(): Almacen {
   const perfiles: Perfil[] = [
     { id: "per-admin", correo: "admin@pruebas.local", nombre: "Administrador", rol: "admin" },
     { id: "per-rafa", correo: "entrenador@pruebas.local", nombre: "Entrenador", rol: "entrenador" },
+    // Un tercero, para comprobar que nada está atado a «dos profesionales».
+    { id: "per-otro", correo: "otro@pruebas.local", nombre: "Otro", rol: "entrenador" },
   ];
 
   const clientes: Cliente[] = [
@@ -63,7 +65,7 @@ function semilla(): Almacen {
     { id: "cli-b", nombre: "Cliente B", estado: "activo", token: "tok-cliente-b", pendientePago: true, sesionesCompletadas: 0, cicloActual: 1, profesionalId: "per-admin" },
     { id: "cli-c", nombre: "Pareja C", estado: "activo", token: "tok-pareja-c", pendientePago: false, sesionesCompletadas: 3, cicloActual: 1, profesionalId: "per-admin" },
     { id: "cli-d", nombre: "Cliente D", estado: "activo", token: "tok-cliente-d", pendientePago: false, sesionesCompletadas: 0, cicloActual: 1, profesionalId: "per-rafa" },
-    { id: "cli-e", nombre: "Cliente E", estado: "pausado", token: "tok-cliente-e", pendientePago: false, sesionesCompletadas: 2, cicloActual: 1, profesionalId: "per-admin" },
+    { id: "cli-e", nombre: "Cliente E", estado: "pausado", token: "tok-cliente-e", pendientePago: false, sesionesCompletadas: 2, cicloActual: 1, profesionalId: "per-otro" },
   ];
 
   const ciclos: Ciclo[] = [
@@ -526,14 +528,33 @@ export class RepositorioStaging implements Repositorio {
    * prueba de rendimiento cuenta llamadas al repositorio, y llamarse a sí
    * mismo por dentro le haría contar viajes que en Postgres no existen.
    */
-  async datosDeTodosLosMeses() {
+  async datosDeTodosLosMeses(
+    soloDe?: string | null,
+    opciones: { esAdministrador?: boolean } = {},
+  ) {
     const datos = await cargar();
 
+    // Las mismas reglas que en Postgres: la sesión es de quien era responsable
+    // del cliente cuando se firmó y, si no hay copia, del responsable de hoy.
+    // Nunca de quien la firmó.
+    const deQuienEs = (clienteId: string, profesionalId?: string | null) =>
+      profesionalId ?? datos.clientes.find((c) => c.id === clienteId)?.profesionalId ?? null;
+    const esSuya = (clienteId: string, profesionalId?: string | null) =>
+      !soloDe || deQuienEs(clienteId, profesionalId) === soloDe;
+
+    // CrossFit y ajustes son del administrador y no se reparten.
+    const conComunes = !soloDe || opciones.esAdministrador === true;
+
+    const sesiones = datos.sesiones.filter((s) => esSuya(s.clienteId, s.profesionalId));
+    const cargos = datos.cargos.filter((c) => esSuya(c.clienteId, c.profesionalId));
+    const clases = conComunes ? datos.clases : [];
+    const ajustes = conComunes ? datos.ajustes : [];
+
     const claves = new Set<string>();
-    for (const s of datos.sesiones) claves.add(s.fecha.slice(0, 7));
-    for (const c of datos.clases) claves.add(c.fecha.slice(0, 7));
-    for (const c of datos.cargos) claves.add(`${c.anio}-${String(c.mes).padStart(2, "0")}`);
-    for (const a of datos.ajustes) claves.add(`${a.anio}-${String(a.mes).padStart(2, "0")}`);
+    for (const s of sesiones) claves.add(s.fecha.slice(0, 7));
+    for (const c of clases) claves.add(c.fecha.slice(0, 7));
+    for (const c of cargos) claves.add(`${c.anio}-${String(c.mes).padStart(2, "0")}`);
+    for (const a of ajustes) claves.add(`${a.anio}-${String(a.mes).padStart(2, "0")}`);
 
     const modalidadDe = (clienteId: string, ciclo: number) =>
       datos.ciclos.find((c) => c.clienteId === clienteId && c.ciclo === ciclo)?.modalidad ?? BONO;
@@ -546,15 +567,16 @@ export class RepositorioStaging implements Repositorio {
         return {
           anio,
           mes,
-          sesiones: datos.sesiones
+          sesiones: sesiones
             .filter((s) => s.fecha.startsWith(prefijo))
             .map((s) => ({ fecha: s.fecha, tarifa: s.tarifa, modalidad: modalidadDe(s.clienteId, s.ciclo) })),
-          cuotas: datos.cargos.filter((c) => c.anio === anio && c.mes === mes).map((c) => c.importe),
-          clasesLidomare: datos.clases.filter((c) => c.tipo === "lidomare" && c.fecha.startsWith(prefijo)).length,
-          clasesKids: datos.clases.filter((c) => c.tipo === "kids" && c.fecha.startsWith(prefijo)).length,
-          facturacionKids:
-            datos.facturacionKids.find((f) => f.anio === anio && f.mes === mes)?.importe ?? null,
-          ajustes: datos.ajustes
+          cuotas: cargos.filter((c) => c.anio === anio && c.mes === mes).map((c) => c.importe),
+          clasesLidomare: clases.filter((c) => c.tipo === "lidomare" && c.fecha.startsWith(prefijo)).length,
+          clasesKids: clases.filter((c) => c.tipo === "kids" && c.fecha.startsWith(prefijo)).length,
+          facturacionKids: conComunes
+            ? (datos.facturacionKids.find((f) => f.anio === anio && f.mes === mes)?.importe ?? null)
+            : null,
+          ajustes: ajustes
             .filter((a) => a.anio === anio && a.mes === mes)
             .map((a) => ({ origen: a.origen, importe: a.importe, horas: a.horas, motivo: a.motivo })),
         };

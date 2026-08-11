@@ -42,14 +42,28 @@ export interface VistaEconomia {
  * pedía mes a mes, y como cada mes costaba cinco viajes de red, la pantalla
  * se volvía más lenta cada mes que pasaba: sesenta viajes en diciembre contra
  * veinticinco en agosto. Ahora son cinco, siempre.
+ *
+ * Desde el 2026-08-11 se puede pedir la de UN profesional. No hay una segunda
+ * economía: es la misma función con menos filas. Si algún día cambia una regla
+ * del dinero, cambia para todos a la vez porque solo existe en un sitio.
  */
-export async function obtenerEconomia(): Promise<VistaEconomia> {
+export async function obtenerEconomia(alcance?: {
+  /** De qué profesional. Sin esto, la economía de todo el negocio. */
+  profesionalId?: string | null;
+  /** Si ese profesional es el administrador: a él le corresponden CrossFit y
+   *  los ajustes, que no son de ningún cliente. */
+  esAdministrador?: boolean;
+}): Promise<VistaEconomia> {
   const repo = repositorio();
   const hoy = hoyNegocio();
   const anio = Number(hoy.slice(0, 4));
   const mes = Number(hoy.slice(5, 7));
 
-  const todos = await repo.datosDeTodosLosMeses();
+  // Las reglas económicas son EXACTAMENTE las mismas: `resumirMes` no sabe ni
+  // le importa de quién son los datos. Lo único que cambia es qué filas entran.
+  const todos = await repo.datosDeTodosLosMeses(alcance?.profesionalId, {
+    esAdministrador: alcance?.esAdministrador,
+  });
   const esActual = (m: { anio: number; mes: number }) => m.anio === anio && m.mes === mes;
 
   // El día 1, con el mes recién empezado, no hay ninguna fila que lo

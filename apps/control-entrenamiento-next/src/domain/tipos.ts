@@ -83,8 +83,20 @@ export interface Sesion {
   /**
    * Quién la firmó. `null` en las anteriores al 2026-08-09, cuando solo había
    * una persona usando la aplicación: no se inventa quién las hizo.
+   *
+   * **Es trazabilidad, no propiedad.** Para saber de quién es la producción,
+   * `profesionalId`.
    */
   firmadaPor?: string | null;
+  /**
+   * De quién era el cliente CUANDO se firmó. Es de quien es la producción.
+   *
+   * Se guarda igual que la tarifa y el servicio: son las condiciones del
+   * momento, y el historial tiene que seguir diciendo la verdad aunque el
+   * cliente cambie de profesional después. `null` en las anteriores al
+   * 2026-08-11: esas se atribuyen por el responsable actual del cliente.
+   */
+  profesionalId?: string | null;
 }
 
 export interface CargoMensual {
@@ -96,6 +108,8 @@ export interface CargoMensual {
   importe: number;
   /** En una mensualidad, ESTE es el estado de cobro que manda. */
   pagado: boolean;
+  /** De quién era el cliente cuando se registró la cuota. Ver `Sesion`. */
+  profesionalId?: string | null;
 }
 
 /** Todo lo que la ficha del cliente necesita enseñar, ya resuelto.

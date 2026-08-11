@@ -209,6 +209,7 @@ function aSesion(f: Record<string, unknown>): Sesion {
     ciclo: Number(f.ciclo),
     servicio: f.servicio as string,
     firmadaPor: (f.firmada_por as string | null) ?? null,
+    profesionalId: (f.profesional_id as string | null) ?? null,
   };
 }
 
@@ -399,12 +400,14 @@ export class RepositorioPostgres implements Repositorio {
   async guardarSesion(sesion: Sesion): Promise<void> {
     await consultar(
       `insert into sesiones (id, cliente_id, ciclo, fecha, hora, numero_sesion,
-                             sesiones_totales, tarifa, servicio, firmada_por)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+                             sesiones_totales, tarifa, servicio, firmada_por, profesional_id)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
       [
         sesion.id, sesion.clienteId, sesion.ciclo, sesion.fecha, sesion.hora,
         sesion.numeroSesion, sesion.sesionesTotales, sesion.tarifa, sesion.servicio,
         sesion.firmadaPor ?? null,
+        // De quién es la producción. Ver `domain/tipos.ts`.
+        sesion.profesionalId ?? null,
       ],
     );
   }
@@ -456,6 +459,7 @@ export class RepositorioPostgres implements Repositorio {
       ciclo: Number(f.ciclo),
       importe: Number(f.importe),
       pagado: Boolean(f.pagado),
+      profesionalId: (f.profesional_id as string | null) ?? null,
     };
   }
 
@@ -463,11 +467,13 @@ export class RepositorioPostgres implements Repositorio {
     // La clave (cliente, año, mes, concepto) es lo que impide cobrar dos veces
     // el mismo mes. Aquí solo se actualiza lo que puede cambiar de verdad.
     await consultar(
-      `insert into cargos_mensuales (cliente_id, anio, mes, concepto, ciclo, importe, pagado)
-       values ($1,$2,$3,'mensualidad',$4,$5,$6)
+      `insert into cargos_mensuales (cliente_id, anio, mes, concepto, ciclo, importe, pagado,
+                                     profesional_id)
+       values ($1,$2,$3,'mensualidad',$4,$5,$6,$7)
        on conflict (cliente_id, anio, mes, concepto) do update set
          importe = excluded.importe, pagado = excluded.pagado`,
-      [cargo.clienteId, cargo.anio, cargo.mes, cargo.ciclo, cargo.importe, cargo.pagado],
+      [cargo.clienteId, cargo.anio, cargo.mes, cargo.ciclo, cargo.importe, cargo.pagado,
+       cargo.profesionalId ?? null],
     );
   }
 
@@ -701,24 +707,68 @@ export class RepositorioPostgres implements Repositorio {
    * El volumen no preocupa: son las sesiones de un entrenador personal, unos
    * pocos miles de filas en toda la historia del negocio.
    */
-  async datosDeTodosLosMeses(): Promise<Array<{ anio: number; mes: number } & DatosMes>> {
+  /**
+   * Con `soloDe`, la economía de UN profesional.
+   *
+   * A QUIÉN PERTENECE CADA COSA (2026-08-11):
+   *
+   *   sesión → `coalesce(s.profesional_id, cl.entrenador_id)`. Es decir: el
+   *     responsable del cliente CUANDO se firmó y, si esa copia no existe
+   *     —sesiones anteriores al 2026-08-11—, el responsable de hoy.
+   *
+   *     NO se usa `firmada_por`: dice quién pulsó el botón, no de quién es el
+   *     cliente. Si Fernando firma excepcionalmente una sesión de un cliente
+   *     de Rafa, esa producción es de Rafa.
+   *
+   *   cuota → igual, con su propia copia.
+   *
+   *   CrossFit y ajustes → del administrador, y no se reparten. Cuando se pide
+   *     la economía de un entrenador, sus consultas ni se lanzan: no hay nada
+   *     que traer.
+   *
+   * Siguen siendo como mucho cinco consultas, y no crecen con el número de
+   * profesionales ni de clientes.
+   */
+  async datosDeTodosLosMeses(
+    soloDe?: string | null,
+    opciones: { esAdministrador?: boolean } = {},
+  ): Promise<Array<{ anio: number; mes: number } & DatosMes>> {
     const clave = (anio: number, mes: number) => `${anio}-${String(mes).padStart(2, "0")}`;
+
+    // Lo del administrador —CrossFit y ajustes— solo se pide si se está
+    // mirando la suya, o la global. A un entrenador no le corresponde nada de
+    // eso, así que esas tres consultas ni se lanzan.
+    const conComunes = !soloDe || opciones.esAdministrador === true;
+    const vacio = Promise.resolve([] as Record<string, unknown>[]);
 
     const [sesiones, cargos, clases, ajustes, kids] = await Promise.all([
       consultar(
         `select to_char(s.fecha,'YYYY-MM-DD') as fecha, s.tarifa,
                 coalesce(c.modalidad::text, 'bono') as modalidad
            from sesiones s
-           left join ciclos c on c.cliente_id = s.cliente_id and c.ciclo = s.ciclo`,
+           join clientes cl on cl.id = s.cliente_id
+           left join ciclos c on c.cliente_id = s.cliente_id and c.ciclo = s.ciclo
+          ${soloDe ? "where coalesce(s.profesional_id, cl.entrenador_id) = $1" : ""}`,
+        soloDe ? [soloDe] : [],
       ),
-      consultar("select anio, mes, importe from cargos_mensuales"),
       consultar(
-        `select extract(year from fecha)::int as anio, extract(month from fecha)::int as mes,
-                tipo, count(*)::int as n
-           from clases_grupo group by 1, 2, 3`,
+        `select g.anio, g.mes, g.importe
+           from cargos_mensuales g
+           join clientes cl on cl.id = g.cliente_id
+          ${soloDe ? "where coalesce(g.profesional_id, cl.entrenador_id) = $1" : ""}`,
+        soloDe ? [soloDe] : [],
       ),
-      consultar("select anio, mes, origen, importe, horas, motivo from ajustes_mensuales order by origen"),
-      consultar("select anio, mes, importe from facturacion_kids_mensual"),
+      conComunes
+        ? consultar(
+            `select extract(year from fecha)::int as anio, extract(month from fecha)::int as mes,
+                    tipo, count(*)::int as n
+               from clases_grupo group by 1, 2, 3`,
+          )
+        : vacio,
+      conComunes
+        ? consultar("select anio, mes, origen, importe, horas, motivo from ajustes_mensuales order by origen")
+        : vacio,
+      conComunes ? consultar("select anio, mes, importe from facturacion_kids_mensual") : vacio,
     ]);
 
     // Un mes existe si algo lo menciona, aunque sea solo una cuota o un

@@ -1728,3 +1728,14 @@ a.pill { text-decoration: none; }
   border-top: 1px solid var(--cristal-borde);
 }
 .separador-programas + .grupo-programa .grupo-programa-cabecera { border-top: 0; }
+
+/* El selector de profesional de Economía. Son enlaces, no botones, pero se
+   leen igual que las opciones del panel de filtros: mismo lenguaje. */
+.filtros-profesional {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin: -0.35rem 0 1.35rem;
+}
+
+.filtros-profesional .panel-opcion { text-decoration: none; }

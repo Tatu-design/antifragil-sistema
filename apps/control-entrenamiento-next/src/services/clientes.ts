@@ -218,6 +218,8 @@ export async function crearCliente(datos: DatosAlta): Promise<Cliente> {
         ciclo: 1,
         importe: condiciones.cuotaMensual,
         pagado: false,
+        // De quién es esta producción, anotado ahora. Ver `domain/tipos.ts`.
+        profesionalId: cliente.profesionalId ?? null,
       });
     }
   });
@@ -375,6 +377,7 @@ async function cobrarMesSiProcede(
     ciclo,
     importe: cuota,
     pagado: false,
+    profesionalId: cliente.profesionalId ?? null,
   });
 }
 

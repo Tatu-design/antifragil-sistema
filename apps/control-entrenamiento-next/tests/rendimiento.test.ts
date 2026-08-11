@@ -152,6 +152,32 @@ describe("presupuesto de consultas por pantalla", () => {
     ).toBeLessThanOrEqual(PRESUPUESTO.economía);
   });
 
+  it("economía de UN profesional cuesta lo mismo que la global", async () => {
+    // Mirar por profesional no puede costar consultas de más: es la misma
+    // llamada con un filtro dentro, no una economía aparte.
+    //
+    // El contador envuelve los métodos del repositorio y no los devuelve a su
+    // sitio, así que solo puede usarse UNA vez por prueba: por eso el
+    // presupuesto se comprueba aquí y la comparación entre profesionales va en
+    // la prueba siguiente.
+    const contador = contarConsultas();
+    await obtenerEconomia({ profesionalId: "per-rafa" });
+
+    expect(
+      contador.total(),
+      `economía de un profesional hizo ${contador.total()} consultas`,
+    ).toBeLessThanOrEqual(PRESUPUESTO.economía);
+  });
+
+  it("y no crece al haber más profesionales", async () => {
+    // Con tres en los datos de prueba, pedir la de uno cuesta lo mismo que
+    // pedir la de otro: no se calcula la de todos para enseñar una.
+    const contador = contarConsultas();
+    await obtenerEconomia({ profesionalId: "per-otro" });
+
+    expect(contador.total()).toBeLessThanOrEqual(PRESUPUESTO.economía);
+  });
+
   it("economía no se hace más lenta según pasan los meses", async () => {
     // Esta es la prueba que de verdad importa. Un presupuesto fijo se puede
     // cumplir hoy y romperse solo en diciembre si el coste depende de cuántos

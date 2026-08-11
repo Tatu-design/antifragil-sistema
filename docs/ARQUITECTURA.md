@@ -1925,6 +1925,74 @@ node scripts/crear-usuario.mjs <correo> <contraseña> entrenador "Nombre Apellid
 Y asignarle clientes. No hay nada más que tocar: ni políticas, ni pantallas, ni
 consultas.
 
+## Economía por profesional (2026-08-11)
+
+El administrador puede mirar la economía de cada profesional. **No hay una
+segunda economía**: es la misma función con menos filas. Si algún día cambia
+una regla del dinero, cambia para todos a la vez porque solo existe en un
+sitio (`services/economia.ts` → `domain/economia.ts`).
+
+### Quién puede verla
+
+Solo el administrador, igual que antes. Que ahora se pueda filtrar por
+profesional **no le da acceso a nadie más**: un entrenador que escriba
+`/economia?profesional=<id>` acaba en su lista de clientes.
+
+El identificador de la dirección **no se usa tal cual**: se comprueba contra
+la lista real de profesionales y, si no cuadra, se cae en el propio
+administrador. Uno inventado no devuelve la economía de nadie.
+
+### De quién es cada producción
+
+| | Pertenece a |
+|---|---|
+| Sesión | el profesional responsable **del cliente** |
+| Cuota de mensualidad | ídem |
+| CrossFit Lidomare y Kids | el administrador, y no se reparten |
+| Ajustes históricos | el administrador |
+
+**`sesiones.firmada_por` NO decide nada de esto.** Dice quién pulsó el botón.
+Si Fernando firma excepcionalmente una sesión de un cliente de Rafa, esa
+producción es de Rafa.
+
+### Cómo se conserva el histórico si un cliente cambia de profesional
+
+Este era el punto delicado, y **la arquitectura no lo resolvía**: hasta el
+2026-08-11 lo único disponible era `clientes.entrenador_id`, el responsable de
+HOY. Mover un cliente habría reescrito toda su producción pasada — enero se
+recalcularía en febrero.
+
+La solución ya estaba inventada en el propio esquema. Las sesiones guardan
+copia de `tarifa`, `servicio` y `sesiones_totales` del momento de firmar, con
+este motivo escrito en el esquema inicial:
+
+> «Copia de las condiciones del ciclo en el momento de firmar, para que el
+> historial siga diciendo la verdad aunque el servicio cambie después.»
+
+El profesional responsable es una condición más del momento. Se guarda igual:
+`sesiones.profesional_id` y `cargos_mensuales.profesional_id`.
+
+La atribución es `coalesce(profesional_id, clientes.entrenador_id)`:
+
+- **con copia** → de quien era cuando se produjo, pase lo que pase después;
+- **sin copia** (filas anteriores al 2026-08-11) → del responsable actual.
+
+Mientras un cliente no cambie de manos, las dos dan el mismo resultado, así
+que el histórico existente cuadra exactamente igual que antes. Comprobado el
+2026-08-11: global 4.172,50 € = 3.967,50 € (Tatu) + 205,00 € (Rafa),
+diferencia 0,00 €.
+
+**Queda un hueco conocido**, pendiente de aprobación de Fernando: rellenar
+`profesional_id` en las filas históricas. Hasta que se haga, mover hoy un
+cliente de profesional sí arrastraría su pasado. Es un cambio sobre datos
+reales y necesita su visto bueno (regla del 2026-08-04).
+
+### Coste
+
+Dos consultas para la economía de un entrenador, cinco para la del
+administrador (lleva además CrossFit y ajustes). **No crece** con el número de
+clientes ni de profesionales, y no se calcula la de todos para enseñar una.
+
 ## Principios de arquitectura (de SYSTEM_VISION.md)
 
 - Módulos independientes: Calendar, base de datos de clientes, resumen
