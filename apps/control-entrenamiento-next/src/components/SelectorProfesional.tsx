@@ -16,16 +16,28 @@ import type { PerfilVisible } from "@/lib/foto-perfil";
  *     de consultar nada. Uno inventado no devuelve la economía de nadie.
  *
  * Se lee igual que los filtros de la lista de clientes, a propósito.
+ *
+ * **«Todos» va primero y es lo que se ve al entrar** (Fernando, 2026-08-12):
+ * es el total real del negocio. Los nombres de al lado desglosan; no son la
+ * puerta de entrada. Se distingue porque `elegido` es `null`.
  */
 export function SelectorProfesional({
   profesionales,
   elegido,
 }: {
   profesionales: PerfilVisible[];
-  elegido: string;
+  /** `null` = el negocio entero. */
+  elegido: string | null;
 }) {
   return (
     <div className="filtros-profesional" role="group" aria-label="Ver la economía de">
+      <Link
+        href="/economia"
+        className={`panel-opcion${elegido === null ? " marcada" : ""}`}
+        aria-current={elegido === null ? "page" : undefined}
+      >
+        Todos
+      </Link>
       {profesionales.map((p) => (
         <Link
           key={p.id}

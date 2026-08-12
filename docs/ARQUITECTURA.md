@@ -2067,3 +2067,39 @@ facturación ni un céntimo.
   cambió solo dónde vive el dato — ver decisión del 2026-07-15).
 - Diseñada para escalar a futuros módulos (fisioterapia, nutrición, psicología,
   finanzas, etc.) sin rehacer la base.
+
+### Economía: «Todos» es lo que se ve al entrar (2026-08-12)
+
+El selector de Economía tiene ahora una opción más, la primera y la de
+partida: **Todos**. Es el total real del negocio.
+
+Antes, entrar en Economía enseñaba la economía del propio administrador. El
+resultado era que el trabajo de los demás profesionales no aparecía en ninguna
+pantalla: una sesión de 80 € de un cliente del entrenador estaba en la base de
+datos y en la ficha del cliente, pero no en ningún total que Fernando pudiera
+mirar. Agosto salía en 1.337,50 € cuando de verdad eran 1.417,50 €. El dinero
+que no se ve es justo el que descuadra el mes contra su Excel.
+
+Las reglas:
+
+- **Todos** = toda la producción del negocio. Es la vista por defecto.
+- **Cada profesional** = solo la suya, con las reglas de atribución de siempre.
+- **CrossFit y los ajustes** siguen siendo del administrador y, por tanto,
+  entran también en Todos.
+- Las métricas no cambian: facturación, horas y € / hora, mes en curso y meses
+  anteriores. Sin comparativas, sin rankings, sin gráficos.
+- Economía sigue siendo **solo del administrador**. Un entrenador que escriba
+  la dirección a mano acaba en su lista de clientes.
+
+**No hay una segunda economía.** Es la misma función (`obtenerEconomia`) sin
+filtro de profesional: lo único que cambia es cuántas filas entran. Por eso un
+profesional nuevo aparece en el total el día que se le firma la primera sesión,
+sin tocar una línea de código — y hay una prueba que lo garantiza.
+
+La regla de qué se está mirando vive en `domain/atribucion.ts`
+(`alcanceEconomico`), no en la pantalla: un identificador inventado en la
+dirección cae en Todos, nunca en la economía de otro.
+
+Comprobado contra producción: Todos 21 h / 1.417,50 €; administrador 20 h /
+1.337,50 €; entrenador 1 h / 80,00 €. La suma cuadra con Todos y Todos cuadra
+con la base de datos en crudo. Cinco consultas para el total.

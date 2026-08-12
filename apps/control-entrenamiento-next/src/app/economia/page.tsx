@@ -11,6 +11,7 @@ import { contarNoLeidos } from "@/services/avisos";
 import { SelectorProfesional } from "@/components/SelectorProfesional";
 import { listarProfesionales } from "@/repositories/perfiles";
 import { obtenerEconomia } from "@/services/economia";
+import { alcanceEconomico } from "@/domain/atribucion";
 
 import { exigirAdmin } from "@/lib/permisos";
 
@@ -41,23 +42,20 @@ export default async function PaginaEconomia({
   const profesionales = await listarProfesionales();
   const { profesional: pedido } = await searchParams;
 
-  // El identificador de la dirección NO se usa tal cual: se comprueba contra
-  // la lista real de profesionales. Uno inventado, uno borrado o uno vacío
-  // caen todos en lo mismo — la economía del propio administrador — en vez de
-  // devolver un error o, peor, colarse.
-  const elegido = profesionales.find((p) => p.id === pedido) ?? usuario;
+  // La regla de qué se está mirando vive en el dominio, no aquí: sin nadie
+  // elegido se enseña el negocio entero, y un identificador inventado cae
+  // también ahí. Ver `alcanceEconomico`.
+  const alcance = alcanceEconomico(pedido, profesionales);
 
   let vista;
   let sinLeer = 0;
   try {
     const [economia, avisos] = await Promise.all([
-      obtenerEconomia({
-        profesionalId: elegido.id,
-        esAdministrador: elegido.rol === "admin",
-        // Quién es el administrador: suyo es todo el histórico anterior a que
-        // existieran los profesionales.
-        adminId: profesionales.find((p) => p.rol === "admin")?.id ?? null,
-      }),
+      // Sin `profesionalId` es la economía del negocio entero. Es la MISMA
+      // función y las mismas reglas: lo único que cambia es cuántas filas
+      // entran, así que un profesional nuevo aparece en el total el día que se
+      // le firma la primera sesión, sin tocar nada aquí.
+      obtenerEconomia(alcance),
       contarNoLeidos(),
     ]);
     vista = economia;
@@ -87,7 +85,10 @@ export default async function PaginaEconomia({
         {/* Solo si hay entre quién elegir. Con un profesional, un selector de
             un botón sería ruido. */}
         {profesionales.length > 1 && (
-          <SelectorProfesional profesionales={profesionales.map(paraLaInterfaz)} elegido={elegido.id} />
+          <SelectorProfesional
+            profesionales={profesionales.map(paraLaInterfaz)}
+            elegido={alcance.profesionalId}
+          />
         )}
 
         <MesEconomico mes={mesActual} destacado />

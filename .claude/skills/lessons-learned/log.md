@@ -808,3 +808,32 @@ La regla de fondo: **dentro de su ordenador, autonomía; fuera de él, se avisa
 primero.** Un fallo dentro se corrige en dos minutos; uno fuera se lo come él
 delante de un cliente.
 
+
+---
+
+## Una pantalla que filtra por defecto esconde dinero (2026-08-12)
+
+**Qué pasó.** Al terminar la corrección de julio comprobé la pantalla de
+Economía y agosto salía en 1.337,50 €, pero en la base de datos había
+1.417,50 €. Faltaba una sesión de 80 €.
+
+No era un fallo de datos ni de la corrección. Era que la pantalla, al entrar,
+enseñaba la economía del administrador y no la del negocio. El único cliente
+del entrenador quedaba fuera, y **no existía ninguna vista donde ese dinero
+apareciera**. El selector solo tenía nombres de personas; no tenía «Todos».
+
+**La causa raíz.** Al construir «economía por profesional» pensé el desglose y
+di por hecho el total. Añadir una forma de filtrar algo sin dejar una forma de
+verlo entero convierte un filtro en un agujero: nadie echa de menos lo que no
+sabe que falta.
+
+**La lección.** Cuando una pantalla pase a poder filtrarse, comprobar en el
+mismo momento que sigue existiendo la vista sin filtro **y que es la de
+partida**. Y en cualquier pantalla que enseñe dinero, contrastar al menos una
+vez la cifra de la pantalla contra la suma en crudo de la base de datos: es la
+única comprobación que detecta lo que falta, porque las pruebas solo miran lo
+que se les ocurrió mirar.
+
+Lo encontré yo, no Fernando, y solo porque comparé pantalla contra base de
+datos en vez de dar la pantalla por buena. Esa comparación es la que hay que
+repetir.

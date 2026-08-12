@@ -48,6 +48,36 @@ export function porQueNoPuede(modalidad: Modalidad): string {
 }
 
 /**
+ * Qué economía se está mirando: la del negocio entera o la de uno.
+ *
+ * **Sin nadie elegido, TODOS** (Fernando, 2026-08-12). Al entrar, el
+ * administrador tiene que ver primero el total real de su negocio. Antes se
+ * abría en la suya y el trabajo de los demás no salía en ninguna pantalla: la
+ * sesión de 80 € de un cliente de Rafa no estaba en ningún total que se pudiera
+ * mirar, y ese es justo el dinero que descuadra el mes contra su Excel.
+ *
+ * Un identificador que no exista —inventado, escrito a mano, de un profesional
+ * borrado— cae también en «todos». No devuelve error ni, mucho menos, la
+ * economía de otro.
+ *
+ * `esAdministrador` decide si entran las cosas que no son de ningún cliente
+ * (CrossFit, ajustes, Kids). En «todos» entran siempre: son producción del
+ * negocio.
+ */
+export function alcanceEconomico(
+  pedido: string | null | undefined,
+  profesionales: ReadonlyArray<{ id: string; rol: "admin" | "entrenador" }>,
+): { profesionalId: string | null; esAdministrador: boolean; adminId: string | null } {
+  const adminId = profesionales.find((p) => p.rol === "admin")?.id ?? null;
+  const elegido = profesionales.find((p) => p.id === pedido) ?? null;
+  return {
+    profesionalId: elegido?.id ?? null,
+    esAdministrador: elegido ? elegido.rol === "admin" : true,
+    adminId,
+  };
+}
+
+/**
  * De quién es una sesión, con las tres reglas en orden.
  *
  *   1. Si guardó a su profesional al firmarse, es de ese. Siempre. Cambiar

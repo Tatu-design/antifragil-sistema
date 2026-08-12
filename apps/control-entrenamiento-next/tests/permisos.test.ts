@@ -406,14 +406,17 @@ describe("ninguna puerta se queda abierta", () => {
   it("el profesional de la dirección se comprueba contra la lista real", () => {
     // Sin esto, `/economia?profesional=<lo-que-sea>` seria una puerta: bastaria
     // con escribir un identificador para consultar la economia de otro. El
-    // codigo NO puede usar el parametro tal cual.
+    // codigo NO puede usar el parametro tal cual: pasa por `alcanceEconomico`,
+    // que lo contrasta con la lista real y, si no cuadra, devuelve el total del
+    // negocio — nunca la economia de otro ni un error.
     const pagina = readFileSync(path.join(RAIZ, "economia", "page.tsx"), "utf8");
     expect(pagina).toContain("listarProfesionales()");
-    expect(pagina).toMatch(/profesionales\.find\(\(p\) => p\.id === pedido\)/);
-    // Y si no cuadra, se cae en el propio administrador, no en un error ni en
-    // la economia de otro.
-    expect(pagina).toContain("?? usuario");
+    expect(pagina).toMatch(/alcanceEconomico\(pedido, profesionales\)/);
     expect(pagina).not.toMatch(/profesionalId: pedido/);
+    // Y la comprobacion de verdad, en el dominio: lo pedido se busca en la
+    // lista antes de usarse. Lo prueba con datos `tests/economia-todos.test.ts`.
+    const dominio = readFileSync(path.join(RAIZ, "..", "domain", "atribucion.ts"), "utf8");
+    expect(dominio).toMatch(/profesionales\.find\(\(p\) => p\.id === pedido\)/);
   });
 
   it("borrar clientes es SOLO del administrador", () => {
