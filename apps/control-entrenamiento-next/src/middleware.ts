@@ -14,9 +14,18 @@ import { NextResponse, type NextRequest } from "next/server";
  * navegador acabaría haciendo un refresco de un segundo.
  */
 
-/** `/mi/...` es el enlace del cliente: entra sin cuenta y lo que protege es
- *  su token. `/login` tiene que ser accesible por definición. */
-const PUBLICAS = ["/login", "/mi/"];
+/**
+ * Lo que se abre sin cuenta.
+ *
+ *   `/login`   — la puerta, por definición.
+ *   `/mi/`     — el enlace del cliente: lo que protege es su token.
+ *   `/perfil/` — las fotos de los profesionales. **Es una imagen**, y esa
+ *                misma foto se le enseña al cliente en su enlace, donde entra
+ *                sin cuenta. Sin esto el filtro la redirigía al login y el
+ *                navegador recibía una página HTML donde esperaba una foto:
+ *                todos los avatares salían rotos (2026-08-12).
+ */
+const PUBLICAS = ["/login", "/mi/", "/perfil/"];
 
 export function middleware(peticion: NextRequest) {
   const { pathname } = peticion.nextUrl;

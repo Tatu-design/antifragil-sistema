@@ -440,6 +440,20 @@ describe("ninguna puerta se queda abierta", () => {
     expect(datos).toContain("Borrar este cliente");
   });
 
+  it("las fotos de perfil se sirven sin pedir cuenta", () => {
+    // Son imágenes, y la misma foto se le enseña al cliente en su enlace. Si
+    // pasaran por el filtro de sesión, el navegador recibiría una página HTML
+    // donde espera una foto y todos los avatares saldrían rotos (2026-08-12).
+    const middleware = readFileSync(path.join(process.cwd(), "src", "middleware.ts"), "utf8");
+    expect(middleware).toContain('"/perfil/"');
+
+    // Y esa ruta NO devuelve nada más que la imagen.
+    const ruta = readFileSync(path.join(RAIZ, "perfil", "[id]", "foto", "route.ts"), "utf8");
+    expect(ruta).toContain("Content-Type");
+    expect(ruta).not.toContain("correo");
+    expect(ruta).not.toContain("nombre");
+  });
+
   it("el enlace público del cliente sigue sin pedir cuenta", () => {
     // Si alguien le pusiera un candado, todos los QR repartidos dejarían de
     // funcionar de golpe.
