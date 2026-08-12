@@ -2023,6 +2023,41 @@ Dos consultas para la economía de un entrenador, cinco para la del
 administrador (lleva además CrossFit y ajustes). **No crece** con el número de
 clientes ni de profesionales, y no se calcula la de todos para enseñar una.
 
+## Una mensualidad es un mes natural (2026-08-12)
+
+Julio va **del 1 al 31 de julio**. Aunque el ciclo se cierre antes por lo que
+sea, una sesión hecha el 27 pertenece a la mensualidad de julio.
+
+### El fallo que lo destapó
+
+La mensualidad de julio de un cliente se cerró el día 23 y la de agosto empezó
+el 3. Entre medias entrenaron el lunes 27 y el miércoles 29, y **esas dos horas
+no se pudieron registrar**: al firmar se usaba siempre «el ciclo actual del
+cliente», que para una mensualidad es el mes en curso.
+
+Desapareció trabajo real sin que nadie se enterara. Lo encontró Fernando
+cuadrando su Excel, no el sistema.
+
+### El arreglo
+
+`cicloDeLaFecha()` en `domain/modalidades.ts`: al firmar, la sesión va al ciclo
+**del mes de su fecha**, no al ciclo en curso. Solo aplica a las modalidades
+mensuales — un bono no va por meses. Si ese mes no tuvo mensualidad, se queda
+en el actual: no se inventa un programa que no existió.
+
+Y el contador «X sesiones este mes» no se toca cuando la sesión va a un mes
+anterior: habla del periodo en curso.
+
+Lo protegen 11 pruebas en `tests/mes-natural.test.ts`, comprobadas
+reintroduciendo el fallo a propósito.
+
+### Lo que NO cambia
+
+En una mensualidad, **la facturación del mes es la cuota**, hagan seis sesiones
+o nueve. Las sesiones cuentan como horas trabajadas y no añaden dinero. Añadir
+las dos horas perdidas movió el € / hora de julio de 42,91 € a 41,40 €, y la
+facturación ni un céntimo.
+
 ## Principios de arquitectura (de SYSTEM_VISION.md)
 
 - Módulos independientes: Calendar, base de datos de clientes, resumen

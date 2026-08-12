@@ -190,3 +190,42 @@ export function validarCondiciones(modalidad: Modalidad, entrada: EntradaCondici
     sesionesReferencia: null,
   };
 }
+
+/**
+ * A qué programa pertenece una sesión, según su fecha.
+ *
+ * **Una mensualidad es un MES NATURAL**: julio va del 1 al 31 de julio, punto
+ * (regla de Fernando, 2026-08-12). Da igual cuándo se cerrara
+ * administrativamente el ciclo: si la sesión se hizo en julio, es de la
+ * mensualidad de julio.
+ *
+ * POR QUÉ EXISTE ESTO
+ *
+ * Antes se usaba siempre «el ciclo actual del cliente». Con una mensualidad
+ * eso es el mes en curso, así que las sesiones de los últimos días de un mes
+ * —cuando el ciclo ya se había cerrado y el siguiente aún no había
+ * empezado— no cabían en ninguna parte y desaparecían. A Felipe y Javi les
+ * pasó con el 27 y el 29 de julio: dos horas trabajadas que no llegaron a
+ * registrarse nunca.
+ *
+ * Un bono no tiene esta pregunta: no va por meses, así que siempre es el suyo
+ * en curso.
+ */
+export function cicloDeLaFecha<T extends { ciclo: number; modalidad: Modalidad; anio: number | null; mes: number | null }>(
+  ciclos: T[],
+  actual: T | null,
+  fecha: string,
+): T | null {
+  if (!actual || !esMensual(actual.modalidad)) return actual;
+
+  const anio = Number(fecha.slice(0, 4));
+  const mes = Number(fecha.slice(5, 7));
+
+  const delMes = ciclos.find(
+    (c) => esMensual(c.modalidad) && c.anio === anio && c.mes === mes,
+  );
+
+  // Si ese mes no tuvo mensualidad, se queda en el actual: no se inventa un
+  // programa que no existió.
+  return delMes ?? actual;
+}

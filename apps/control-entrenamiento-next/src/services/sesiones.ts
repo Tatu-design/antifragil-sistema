@@ -12,7 +12,7 @@
 
 import { randomUUID } from "node:crypto";
 
-import { ErrorDeNegocio, MENSUALIDAD, consumeSesiones, tarifaDeLaSesion } from "@/domain/modalidades";
+import { ErrorDeNegocio, MENSUALIDAD, cicloDeLaFecha, consumeSesiones, tarifaDeLaSesion } from "@/domain/modalidades";
 import { datosQueFaltan, puedeFirmarse } from "@/domain/ficha";
 import { procesarUnaSesion } from "@/domain/programas";
 import type { Ciclo, ResultadoFirma, Sesion } from "@/domain/tipos";
@@ -43,8 +43,17 @@ export async function firmarSesion(clienteId: string, opciones: OpcionesFirma = 
     const cliente = await repo.obtenerCliente(clienteId);
     if (!cliente) throw new ErrorDeNegocio("Ese cliente ya no existe");
 
-    const ciclo = await repo.cicloActual(clienteId);
+    // El programa al que pertenece ESTA sesión, por su fecha. Una mensualidad
+    // es un mes natural: una sesión del 27 de julio es de la mensualidad de
+    // julio aunque el ciclo se cerrara el 23 (2026-08-12).
+    const ciclos = await repo.listarCiclos(clienteId);
+    const enCurso = ciclos.find((c) => c.ciclo === cliente.cicloActual) ?? null;
+    const ciclo = cicloDeLaFecha(ciclos, enCurso, fecha);
     if (!ciclo) throw new ErrorDeNegocio(`«${cliente.nombre}» no tiene un servicio asignado`);
+
+    // Si la sesión va a un mes anterior, el contador del cliente —que habla
+    // del periodo EN CURSO— no se toca.
+    const enElPeriodoActual = ciclo.ciclo === cliente.cicloActual;
 
     // Las mismas tres condiciones que la interfaz, comprobadas también aquí:
     // esconder un botón no impide llamar a la acción, y esta operación
@@ -99,7 +108,7 @@ export async function firmarSesion(clienteId: string, opciones: OpcionesFirma = 
       // Mensualidad y cuenta: no hay saldo que gastar ni renovación que
       // disparar. La sesión es simplemente la siguiente de este periodo.
       numeroSesion = (await repo.contarSesionesDelCiclo(clienteId, ciclo.ciclo)) + 1;
-      cliente.sesionesCompletadas += 1;
+      if (enElPeriodoActual) cliente.sesionesCompletadas += 1;
     }
 
     const sesion: Sesion = {
