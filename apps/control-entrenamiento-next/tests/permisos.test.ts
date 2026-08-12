@@ -416,6 +416,30 @@ describe("ninguna puerta se queda abierta", () => {
     expect(pagina).not.toMatch(/profesionalId: pedido/);
   });
 
+  it("borrar clientes es SOLO del administrador", () => {
+    // La pantalla y la accion, las dos. Y ademas el boton no se le enseña a un
+    // entrenador: antes lo veia y al pulsarlo se le echaba, que es peor que no
+    // verlo (2026-08-12).
+    const pantalla = readFileSync(path.join(RAIZ, "clientes", "[id]", "eliminar", "page.tsx"), "utf8");
+    expect(pantalla).toContain("exigirAdmin(");
+
+    const acciones = readFileSync(path.join(RAIZ, "actions.ts"), "utf8");
+    const bloque = acciones.slice(acciones.indexOf("export async function accionBorrarCliente"));
+    expect(bloque.slice(0, 400)).toContain("exigirAdmin()");
+
+    const datos = readFileSync(path.join(RAIZ, "clientes", "[id]", "datos", "page.tsx"), "utf8");
+    expect(datos).toMatch(/esAdmin\(usuario\) && \(/);
+  });
+
+  it("y el administrador puede borrar aunque el cliente tenga sesiones", () => {
+    // Es el caso real: un cliente de prueba con una sesion firmada. Antes el
+    // boton desaparecia y no habia forma de quitarlo.
+    const datos = readFileSync(path.join(RAIZ, "clientes", "[id]", "datos", "page.tsx"), "utf8");
+    // El enlace ya NO cuelga de «no tiene historial».
+    expect(datos).not.toMatch(/tieneHistorial \? \([\s\S]{0,400}\) : \([\s\S]{0,200}Borrar este cliente/);
+    expect(datos).toContain("Borrar este cliente");
+  });
+
   it("el enlace público del cliente sigue sin pedir cuenta", () => {
     // Si alguien le pusiera un candado, todos los QR repartidos dejarían de
     // funcionar de golpe.

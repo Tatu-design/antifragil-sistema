@@ -42,7 +42,8 @@ export default async function PaginaDatos({
 
   // Con sesiones ya firmadas no se borra: se cancela, que archiva sin perder
   // nada. Es la misma regla que en Flask.
-  const tieneHistorial = servicios.some((s) => s.sesiones.length > 0);
+  const sesiones = servicios.reduce((n, s) => n + s.sesiones.length, 0);
+  const tieneHistorial = sesiones > 0;
 
   return (
     <>
@@ -63,27 +64,32 @@ export default async function PaginaDatos({
           profesionales={profesionales}
         />
 
-        <div className="zona-peligrosa">
-          <p className="zona-peligrosa-titulo">Zona peligrosa</p>
-          {tieneHistorial ? (
+        {/* Borrar es cosa del administrador y de nadie más. Un entrenador ni
+            siquiera ve esta parte: antes veía el botón y al pulsarlo se le
+            echaba, que es peor que no verlo (2026-08-12). */}
+        {esAdmin(usuario) && (
+          <div className="zona-peligrosa">
+            <p className="zona-peligrosa-titulo">Zona peligrosa</p>
             <p className="meta">
-              Este cliente tiene sesiones y datos económicos, así que no se puede borrar sin perderlos. Si
-              ha dejado de entrenar, ponlo como <strong>Cancelado</strong> aquí arriba: desaparece de la
-              lista de activos y conserva todo su historial.
+              {tieneHistorial ? (
+                <>
+                  Este cliente tiene <strong>{sesiones} sesiones</strong> y su facturación se restará de la
+                  economía. Si ha dejado de entrenar pero fue un cliente de verdad, es mejor ponerlo como{" "}
+                  <strong>Cancelado</strong> aquí arriba: desaparece de la lista y conserva su historial.
+                  Borrar es para las pruebas y los errores.
+                </>
+              ) : (
+                <>
+                  Este cliente no tiene ninguna sesión registrada, así que se borra sin perder nada.
+                </>
+              )}
             </p>
-          ) : (
-            <>
-              <p className="meta">
-                Este cliente no tiene ninguna sesión registrada, así que puede borrarse definitivamente. Si
-                ya ha entrenado alguna vez, es preferible cancelarlo para no perder su historial.
-              </p>
-              <Link className="boton-secundario boton-peligro" href={`/clientes/${cliente.id}/eliminar`}>
-                <Icono nombre="i-trash-2" pequeno />
-                Borrar este cliente
-              </Link>
-            </>
-          )}
-        </div>
+            <Link className="boton-secundario boton-peligro" href={`/clientes/${cliente.id}/eliminar`}>
+              <Icono nombre="i-trash-2" pequeno />
+              Borrar este cliente
+            </Link>
+          </div>
+        )}
       </div>
     </>
   );
