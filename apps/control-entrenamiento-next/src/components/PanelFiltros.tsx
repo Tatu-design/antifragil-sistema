@@ -5,7 +5,7 @@ import { useEffect, useRef } from "react";
 import { FILTROS_INICIALES, type Filtros } from "@/domain/filtros";
 import { ETIQUETAS, MODALIDADES } from "@/domain/modalidades";
 import type { Estado } from "@/domain/tipos";
-import type { Perfil } from "@/repositories/tipos";
+import type { PerfilVisible } from "@/lib/foto-perfil";
 import { Icono } from "./Iconos";
 
 /**
@@ -45,7 +45,7 @@ export function PanelFiltros({
   filtros: Filtros;
   alCambiar: (filtros: Filtros) => void;
   /** Vacío para un entrenador: solo tiene clientes suyos que filtrar. */
-  profesionales: Perfil[];
+  profesionales: PerfilVisible[];
   /** Cuántos clientes quedan con lo elegido. Se ve antes de cerrar. */
   cuantos: number;
 }) {

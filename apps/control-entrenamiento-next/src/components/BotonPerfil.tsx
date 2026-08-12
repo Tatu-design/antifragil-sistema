@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import type { Perfil } from "@/repositories/tipos";
+import type { PerfilVisible } from "@/lib/foto-perfil";
 import { Avatar, PanelPerfil } from "./PanelPerfil";
 
 /**
@@ -13,7 +13,7 @@ import { Avatar, PanelPerfil } from "./PanelPerfil";
  * cabecera — cerrar sesión también vive ahora dentro del panel, que es lo que
  * corresponde: es una acción sobre tu cuenta, no sobre la lista.
  */
-export function BotonPerfil({ usuario }: { usuario: Perfil }) {
+export function BotonPerfil({ usuario }: { usuario: PerfilVisible & { correo: string } }) {
   const [abierto, setAbierto] = useState(false);
 
   return (
@@ -24,7 +24,7 @@ export function BotonPerfil({ usuario }: { usuario: Perfil }) {
         onClick={() => setAbierto(true)}
         aria-label={`Mi perfil, ${usuario.nombre}`}
       >
-        <Avatar nombre={usuario.nombre} foto={usuario.foto} />
+        <Avatar nombre={usuario.nombre} foto={usuario.fotoUrl} />
       </button>
 
       <PanelPerfil abierto={abierto} alCerrar={() => setAbierto(false)} usuario={usuario} />

@@ -146,7 +146,7 @@ describe("la pantalla del cliente", () => {
     expect(perfil!.profesional).not.toBeNull();
     expect(perfil!.profesional!.nombre).toBe("Administrador");
     // NI el correo NI el rol: esta pantalla la abre cualquiera con el enlace.
-    expect(Object.keys(perfil!.profesional!).sort()).toEqual(["foto", "nombre"]);
+    expect(Object.keys(perfil!.profesional!).sort()).toEqual(["fotoUrl", "nombre"]);
   });
 
   it("un cliente sin profesional asignado no rompe la pantalla", async () => {

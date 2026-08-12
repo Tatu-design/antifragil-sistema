@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { BarraInferior } from "@/components/BarraInferior";
 import { BotonPerfil } from "@/components/BotonPerfil";
+import { paraLaInterfaz, type PerfilVisible } from "@/lib/foto-perfil";
 import { Iconos, Icono } from "@/components/Iconos";
 import { ListaClientes } from "@/components/ListaClientes";
 import { SinConexion } from "@/components/SinConexion";
@@ -13,7 +14,6 @@ import { listarClientes } from "@/services/clientes";
 
 import { esAdmin, exigirUsuario } from "@/lib/permisos";
 import { listarProfesionales } from "@/repositories/perfiles";
-import type { Perfil } from "@/repositories/tipos";
 import type { FichaClase } from "@/domain/clases";
 
 export const dynamic = "force-dynamic";
@@ -31,7 +31,7 @@ export default async function PaginaClientes({
   let clientes;
   let cuentas: FichaClase[] = [];
   let sinLeer = 0;
-  let profesionales: Perfil[] = [];
+  let profesionales: PerfilVisible[] = [];
   try {
     // Las cuatro lecturas van a la vez: contra Supabase cada consulta es un
     // viaje de red, y esta es la pantalla que más se abre.
@@ -48,7 +48,9 @@ export default async function PaginaClientes({
       clientes = lista;
       sinLeer = avisos;
       cuentas = [lidomare.ficha, kids.ficha];
-      profesionales = await listarProfesionales();
+      // Sin foto: el filtro solo enseña nombres, y la foto pesaba 18 KB
+      // por profesional dentro de la propia página (2026-08-12).
+      profesionales = (await listarProfesionales()).map(paraLaInterfaz);
     } else {
       // El entrenador tampoco pide las cuentas de CrossFit —no son suyas—
       // pero sí sus avisos: necesita el punto rojo de la barra.
@@ -76,7 +78,7 @@ export default async function PaginaClientes({
             <Image src="/logo-marca.png" alt="Antifrágil" className="logo-nav" width={120} height={32} priority />
             {/* Tu foto abre «lo tuyo»: nombre, foto, contraseña y cerrar
                 sesión. Antes eran dos chips sueltos aquí mismo. */}
-            <BotonPerfil usuario={usuario} />
+            <BotonPerfil usuario={{ ...paraLaInterfaz(usuario), correo: usuario.correo }} />
           </div>
         </header>
 

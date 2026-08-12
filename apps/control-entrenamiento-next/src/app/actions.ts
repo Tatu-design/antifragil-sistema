@@ -522,10 +522,16 @@ export async function accionGuardarPerfil(
   }
 
   try {
-    await repositorio().actualizarPerfil(quien.id, {
-      nombre: validado.data.nombre,
-      foto: validado.data.foto || null,
-    });
+    // Vacío significa «no la toques», no «bórrala»: la foto actual ya no se
+    // manda al navegador, así que no puede reenviarla en cada guardado.
+    const foto =
+      validado.data.foto === ""
+        ? (quien.foto ?? null)
+        : validado.data.foto === "quitar"
+          ? null
+          : validado.data.foto;
+
+    await repositorio().actualizarPerfil(quien.id, { nombre: validado.data.nombre, foto });
   } catch {
     return { ok: false, mensaje: "No se ha podido guardar ahora mismo.", tono: "error" };
   }

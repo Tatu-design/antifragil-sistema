@@ -170,9 +170,19 @@ export const esquemaClave = z
  */
 export const esquemaPerfil = z.object({
   nombre: z.string().trim().min(1, "Tu nombre no puede estar vacío").max(40),
+  /**
+   * Qué hacer con la foto:
+   *
+   *   ""        → no la toques (lo normal)
+   *   "quitar"  → bórrala
+   *   data:…    → guarda esta
+   *
+   * Así la foto actual NO viaja al navegador en cada carga: ocupa 18 KB y se
+   * enseña por su dirección (2026-08-12).
+   */
   foto: z
     .string()
     .max(300_000, "La foto es demasiado grande")
-    .refine((v) => v === "" || v.startsWith("data:image/"), "Eso no es una imagen")
+    .refine((v) => v === "" || v === "quitar" || v.startsWith("data:image/"), "Eso no es una imagen")
     .default(""),
 });

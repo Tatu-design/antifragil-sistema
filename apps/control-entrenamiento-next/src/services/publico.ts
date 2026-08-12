@@ -17,6 +17,7 @@
  */
 
 import { fichaServicio } from "@/domain/ficha";
+import { urlDeFoto } from "@/lib/foto-perfil";
 import type { Ciclo, FichaServicio, Sesion } from "@/domain/tipos";
 import { hoyNegocio, horaNegocio } from "@/lib/fechas";
 import { repositorio } from "@/repositories";
@@ -61,12 +62,16 @@ export interface ProgramaPublico {
 export interface PerfilPublico {
   nombre: string;
   /**
-   * Quién le entrena: solo su nombre y su foto.
+   * Quién le entrena: solo su nombre y la DIRECCIÓN de su foto.
    *
    * NO va el correo ni el rol. Esta pantalla la abre cualquiera que tenga el
    * enlace, así que sale lo justo para que el cliente sepa con quién trata.
+   *
+   * `fotoUrl` y no la foto: incrustarla serían 18 KB dentro de la página cada
+   * vez que el cliente la abre, y son muchos clientes abriéndola desde el
+   * móvil (2026-08-12).
    */
-  profesional: { nombre: string; foto: string | null } | null;
+  profesional: { nombre: string; fotoUrl: string | null } | null;
   ficha: FichaServicio;
   /**
    * Su historial, agrupado por programa: primero el que tiene en curso y
@@ -105,7 +110,11 @@ export async function obtenerPerfilPublico(token: string): Promise<PerfilPublico
 
   return {
     nombre: cliente.nombre,
-    profesional: profesional ? { nombre: profesional.nombre, foto: profesional.foto ?? null } : null,
+    // La foto va por su DIRECCIÓN, no incrustada: son 18 KB que si no
+    // viajarían dentro de la página cada vez que el cliente la abre.
+    profesional: profesional
+      ? { nombre: profesional.nombre, fotoUrl: urlDeFoto(profesional) }
+      : null,
     ficha: fichaServicio({
       ciclo,
       sesionesDelCiclo: sesiones.filter((s) => s.ciclo === cliente.cicloActual).length,

@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import type { Perfil } from "@/repositories/tipos";
+import type { PerfilVisible } from "@/lib/foto-perfil";
 
 /**
  * De qué profesional se está mirando la economía.
@@ -21,7 +21,7 @@ export function SelectorProfesional({
   profesionales,
   elegido,
 }: {
-  profesionales: Perfil[];
+  profesionales: PerfilVisible[];
   elegido: string;
 }) {
   return (

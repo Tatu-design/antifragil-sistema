@@ -4,7 +4,7 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 
 import { accionCambiarClave, accionGuardarPerfil } from "@/app/actions";
-import type { Perfil } from "@/repositories/tipos";
+import type { PerfilVisible } from "@/lib/foto-perfil";
 import { Icono } from "./Iconos";
 
 /**
@@ -29,7 +29,7 @@ export function PanelPerfil({
 }: {
   abierto: boolean;
   alCerrar: () => void;
-  usuario: Perfil;
+  usuario: PerfilVisible & { correo: string };
 }) {
   const panel = useRef<HTMLDivElement>(null);
   const [seccion, setSeccion] = useState<"datos" | "clave">("datos");
@@ -99,31 +99,54 @@ export function PanelPerfil({
 
 // ---------------------------------------------------------------------------
 
-function Datos({ usuario, alIrAClave }: { usuario: Perfil; alIrAClave: () => void }) {
+function Datos({
+  usuario,
+  alIrAClave,
+}: {
+  usuario: PerfilVisible & { correo: string };
+  alIrAClave: () => void;
+}) {
   const [resultado, enviar] = useActionState(accionGuardarPerfil, null);
   const [nombre, setNombre] = useState(usuario.nombre);
-  const [foto, setFoto] = useState(usuario.foto ?? "");
+
+  /**
+   * Qué se manda en el campo `foto`:
+   *
+   *   ""        → no la toques (lo normal: se abre el panel y no se cambia)
+   *   "quitar"  → bórrala
+   *   data:…    → esta nueva
+   *
+   * Así **la foto actual no viaja al navegador**: se ve por su dirección, que
+   * ocupa cuarenta caracteres en vez de 18 KB.
+   */
+  const [cambioDeFoto, setCambioDeFoto] = useState("");
+
+  // Lo que se ve: la nueva si acaba de elegir una, ninguna si la ha quitado, y
+  // si no, la que ya tenía.
+  const enPantalla =
+    cambioDeFoto === "quitar" ? null : cambioDeFoto || usuario.fotoUrl;
+  const tieneFoto = enPantalla !== null && enPantalla !== "";
 
   return (
     <form action={enviar} className="perfil-form">
       <div className="perfil-foto-fila">
-        <Avatar nombre={nombre} foto={foto} grande />
+        <Avatar nombre={nombre} foto={enPantalla} grande />
         <div className="perfil-foto-acciones">
           <label className="boton-secundario boton-foto">
-            {foto ? "Cambiar foto" : "Poner foto"}
+            {tieneFoto ? "Cambiar foto" : "Poner foto"}
             <input
               type="file"
               accept="image/*"
               onChange={async (e) => {
                 const archivo = e.target.files?.[0];
-                if (archivo) setFoto(await encoger(archivo));
+                if (archivo) setCambioDeFoto(await encoger(archivo));
                 // Permite volver a elegir el mismo archivo si se arrepiente.
                 e.target.value = "";
               }}
             />
           </label>
-          {foto && (
-            <button type="button" className="boton-texto" onClick={() => setFoto("")}>
+          {tieneFoto && (
+            <button type="button" className="boton-texto" onClick={() => setCambioDeFoto("quitar")}>
               Quitar
             </button>
           )}
@@ -143,7 +166,7 @@ function Datos({ usuario, alIrAClave }: { usuario: Perfil; alIrAClave: () => voi
         <span className="meta">Es el que se ve en el filtro por profesional.</span>
       </label>
 
-      <input type="hidden" name="foto" value={foto} />
+      <input type="hidden" name="foto" value={cambioDeFoto} />
 
       <p className="meta">{usuario.correo}</p>
 
@@ -222,6 +245,15 @@ export function Avatar({
   grande = false,
 }: {
   nombre: string;
+  /**
+   * La DIRECCIÓN de la foto (`/perfil/<id>/foto?v=…`), no la foto entera.
+   *
+   * Incrustarla costaba 18 KB en cada carga de cada pantalla (2026-08-12).
+   * Así la descarga el navegador una vez y la guarda.
+   *
+   * La única excepción es mientras se está eligiendo una nueva: ahí sí llega
+   * la imagen recién leída del móvil, para poder verla antes de guardar.
+   */
   foto?: string | null;
   grande?: boolean;
 }) {

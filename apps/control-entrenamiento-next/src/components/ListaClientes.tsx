@@ -5,7 +5,7 @@ import { useState } from "react";
 
 import type { FichaClase } from "@/domain/clases";
 import { FILTROS_INICIALES, coincide, filtrosPuestos, normalizar, type Filtros } from "@/domain/filtros";
-import type { Perfil } from "@/repositories/tipos";
+import type { PerfilVisible } from "@/lib/foto-perfil";
 import type { ClienteEnLista } from "@/services/clientes";
 import { Icono } from "./Iconos";
 import { PanelFiltros } from "./PanelFiltros";
@@ -42,7 +42,7 @@ export function ListaClientes({
   cuentas?: FichaClase[];
   /** Para el filtro por profesional. Llega vacío para un entrenador: solo
    *  tiene clientes suyos, así que no habría nada que separar. */
-  profesionales?: Perfil[];
+  profesionales?: PerfilVisible[];
 }) {
   // Se abre en «activos», que es lo que se mira casi siempre. Un cancelado de
   // hace medio año no debe aparecer sin haberlo pedido.

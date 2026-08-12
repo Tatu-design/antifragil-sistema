@@ -178,6 +178,35 @@ describe("presupuesto de consultas por pantalla", () => {
     expect(contador.total()).toBeLessThanOrEqual(PRESUPUESTO.economía);
   });
 
+  it("ninguna pantalla incrusta la foto de un perfil", async () => {
+    // La foto pesa unos 18 KB. Incrustada en la página viajaba dos o tres
+    // veces en CADA carga —el 62 % del peso de la lista de clientes— y se
+    // volvía a descargar en cada visita (2026-08-12). Va por su dirección.
+    const { readFileSync, readdirSync } = await import("node:fs");
+    const path = await import("node:path");
+
+    const raiz = path.join(process.cwd(), "src");
+    const archivos: string[] = [];
+    const recorrer = (dir: string) => {
+      for (const e of readdirSync(dir, { withFileTypes: true })) {
+        const completo = path.join(dir, e.name);
+        if (e.isDirectory()) recorrer(completo);
+        else if (/\.tsx?$/.test(e.name)) archivos.push(completo);
+      }
+    };
+    recorrer(raiz);
+
+    // Nadie pasa `foto` de un perfil a un componente salvo el propio panel,
+    // que necesita enseñar la que se acaba de elegir del móvil.
+    const permitidos = ["PanelPerfil.tsx", "foto-perfil.ts", "route.ts", "postgres.ts", "staging.ts", "tipos.ts", "actions.ts"];
+    const culpables = archivos.filter((f) => {
+      if (permitidos.some((p) => f.endsWith(p))) return false;
+      return /foto=\{(usuario|perfil|profesional)\.foto\}/.test(readFileSync(f, "utf8"));
+    });
+
+    expect(culpables.map((f) => path.basename(f))).toEqual([]);
+  });
+
   it("economía no se hace más lenta según pasan los meses", async () => {
     // Esta es la prueba que de verdad importa. Un presupuesto fijo se puede
     // cumplir hoy y romperse solo en diciembre si el coste depende de cuántos

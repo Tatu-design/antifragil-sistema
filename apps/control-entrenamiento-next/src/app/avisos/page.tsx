@@ -3,6 +3,7 @@ import Image from "next/image";
 import { accionResolverAviso, accionResolverTipo } from "@/app/actions";
 import { BarraInferior } from "@/components/BarraInferior";
 import { BotonPerfil } from "@/components/BotonPerfil";
+import { paraLaInterfaz } from "@/lib/foto-perfil";
 import { Iconos } from "@/components/Iconos";
 import { SinConexion } from "@/components/SinConexion";
 import { BaseNoDisponible } from "@/repositories/postgres";
@@ -47,7 +48,7 @@ export default async function PaginaAvisos() {
             <Image src="/logo-marca.png" alt="Antifrágil" className="logo-nav" width={120} height={32} priority />
             {/* Tu foto abre «lo tuyo»: nombre, foto, contraseña y cerrar
                 sesión. Antes eran dos chips sueltos aquí mismo. */}
-            <BotonPerfil usuario={usuario} />
+            <BotonPerfil usuario={{ ...paraLaInterfaz(usuario), correo: usuario.correo }} />
           </div>
         </header>
 

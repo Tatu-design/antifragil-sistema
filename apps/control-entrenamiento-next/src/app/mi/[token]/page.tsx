@@ -134,7 +134,7 @@ export default async function PaginaMiPerfil({ params }: { params: Promise<{ tok
           para que el cliente sepa con quién trata. */}
       {profesional && (
         <div className="tarjeta-profesional">
-          <Avatar nombre={profesional.nombre} foto={profesional.foto} grande />
+          <Avatar nombre={profesional.nombre} foto={profesional.fotoUrl} grande />
           <div>
             <div className="etiqueta-suave">Tu profesional</div>
             <div className="nombre-profesional">{profesional.nombre}</div>

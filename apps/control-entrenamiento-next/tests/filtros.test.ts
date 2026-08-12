@@ -184,8 +184,10 @@ describe("cuántos filtros dice que hay puestos", () => {
 const perfil = (id: string, nombre: string, rol: "admin" | "entrenador" = "entrenador") => ({
   id,
   nombre,
-  correo: `${id}@pruebas.local`,
   rol,
+  // La foto va por su dirección, no incrustada: pesaba 18 KB por profesional
+  // dentro de la propia página (2026-08-12).
+  fotoUrl: null,
 });
 
 const pintar = (props: Partial<Parameters<typeof PanelFiltros>[0]> = {}) =>
