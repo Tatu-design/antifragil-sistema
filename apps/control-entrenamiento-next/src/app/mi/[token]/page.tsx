@@ -10,6 +10,28 @@ import { obtenerPerfilPublico } from "@/services/publico";
 export const dynamic = "force-dynamic";
 
 /**
+ * Lo que se instala cuando el cliente añade su enlace a la pantalla de inicio.
+ *
+ * **Su manifiesto, no el del panel** (2026-08-14). El global dice
+ * `start_url: "/clientes"`, así que el icono instalado desde aquí arrancaba en
+ * el panel interno y el cliente acababa viendo una pantalla de correo y
+ * contraseña. Ver `manifest.webmanifest/route.ts`.
+ *
+ * El título también se corrige: heredaba «Antifrágil — Clientes», que es el
+ * nombre de la lista de Fernando y no significa nada para quien entra a ver
+ * cómo va su bono.
+ */
+export function generateMetadata({ params }: { params: Promise<{ token: string }> }) {
+  // No se consulta nada: si el token no vale, la propia página devuelve «no
+  // encontrado» y el manifiesto, un 404.
+  return params.then(({ token }) => ({
+    title: "Antifrágil",
+    manifest: `/mi/${encodeURIComponent(token)}/manifest.webmanifest`,
+    appleWebApp: { capable: true, title: "Antifrágil", statusBarStyle: "default" as const },
+  }));
+}
+
+/**
  * El perfil que ve el propio cliente con su enlace. Copia de
  * `webapp/templates/mi_perfil.html`.
  *

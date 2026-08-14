@@ -2103,3 +2103,35 @@ dirección cae en Todos, nunca en la economía de otro.
 Comprobado contra producción: Todos 21 h / 1.417,50 €; administrador 20 h /
 1.337,50 €; entrenador 1 h / 80,00 €. La suma cuadra con Todos y Todos cuadra
 con la base de datos en crudo. Cinco consultas para el total.
+
+### Cada cliente instala SU enlace, no el panel (2026-08-14)
+
+Tres clientes añadieron su enlace a la pantalla de inicio del iPhone y, al
+pulsar el icono, les salía la pantalla de correo y contraseña del panel
+interno.
+
+No fallaba su enlace ni la protección de Vercel: fallaba el manifiesto. La
+aplicación declara uno global (`src/app/manifest.ts`) para que el panel se
+comporte como una app de verdad, y dentro pone `start_url: "/clientes"`. La
+pantalla del cliente lo heredaba —solo hay un layout raíz—, así que al
+instalarla el iPhone guardaba esa dirección y no la que el cliente tenía
+abierta. Al abrir el icono arrancaba en `/clientes`, que no es pública, y el
+middleware lo mandaba al login.
+
+La corrección es un manifiesto por enlace:
+`/mi/<token>/manifest.webmanifest`, con `start_url`, `scope` e `id` propios. La
+página del cliente enlaza ese, no el global.
+
+- El panel interno **no cambia**: su manifiesto sigue con `start_url:
+  "/clientes"` y `scope: "/"`.
+- El manifiesto **no lleva el nombre del cliente**. Se puede pedir sin abrir la
+  página; el icono pone «Antifrágil» y nada más.
+- Un token que no existe devuelve 404: no se instala un icono que luego lleve a
+  cualquier sitio.
+- iOS anterior a 16.4 no lee manifiestos y guarda la dirección abierta, que es
+  la correcta. Esos nunca tuvieron el problema.
+- Android y Chrome tenían exactamente el mismo fallo, y se corrige igual.
+
+**Una webapp ya instalada no se arregla sola**: el móvil guardó la `start_url`
+en el momento de instalar. Quien tenga el icono malo debe borrarlo, abrir otra
+vez su enlace y volver a añadirlo.

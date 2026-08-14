@@ -837,3 +837,28 @@ que se les ocurrió mirar.
 Lo encontré yo, no Fernando, y solo porque comparé pantalla contra base de
 datos en vez de dar la pantalla por buena. Esa comparación es la que hay que
 repetir.
+
+---
+
+## Un arreglo para el panel llegó también al cliente (2026-08-14)
+
+**Qué pasó.** El 2026-08-04 declaré un manifiesto para que a Fernando y a Rafa
+no les saliera la barra del navegador dentro de la app instalada. Puse
+`start_url: "/clientes"`, que es por donde ellos trabajan.
+
+Diez días después, tres clientes —Nikki, Neha y Sunil— añadieron su enlace a la
+pantalla de inicio y al abrir el icono les salió nuestra pantalla de correo y
+contraseña. Delante de ellos.
+
+**La causa raíz.** Solo hay un layout raíz, así que la pantalla pública hereda
+la metadata del panel. Cambié algo pensando en las dos personas que usan el
+panel sin preguntarme qué pasaba con las nueve que usan la pantalla pública, y
+esa pantalla es justo la que ve gente de fuera.
+
+**La lección.** Antes de tocar cualquier cosa que viva en el layout raíz
+—manifiesto, título, iconos, metadata— comprobar explícitamente cómo queda la
+pantalla del cliente. Es la única que ve alguien que no es Fernando, y un fallo
+ahí no se descubre en su ordenador: se descubre cuando un cliente le escribe.
+
+Y una regla concreta que no tenía: **lo que arranca la app instalada del
+cliente tiene que empezar por `/mi/`.** Ahora hay una prueba que lo exige.
