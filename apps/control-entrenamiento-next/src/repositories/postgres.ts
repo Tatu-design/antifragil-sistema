@@ -31,6 +31,8 @@ import "server-only";
 
 import pg, { Pool, type PoolClient } from "pg";
 
+import { conConexion, conexionEnCurso } from "./conexion-en-curso";
+
 /**
  * Una fecha se lee tal cual está escrita, sin convertirla a nada.
  *
@@ -88,6 +90,16 @@ function pool(): Pool {
       // conexiones del plan gratuito (2026-08-08).
       idleTimeoutMillis: 60_000,
       connectionTimeoutMillis: 15_000,
+      // NINGUNA CONSULTA PUEDE ESPERAR PARA SIEMPRE (2026-08-24). Sin esto,
+      // una conexión que muere en silencio deja la promesa colgada: la
+      // pantalla se queda en «Guardando…» y no hay nada que la despierte. Con
+      // solo tres conexiones, tres cuelgues bloquean la aplicación entera.
+      //
+      // Ocho segundos son muchísimo —una consulta normal tarda medio segundo—
+      // y quedan por debajo del límite de la propia página, así que si algo va
+      // mal se ve un error, que se entiende, en vez de una espera infinita.
+      statement_timeout: 8_000,
+      query_timeout: 8_000,
       // Que la red no dé por muerta una conexión que solo está en silencio.
       keepAlive: true,
     });
@@ -95,8 +107,15 @@ function pool(): Pool {
   return g.pool;
 }
 
-/** Dentro de una transacción se usa su conexión; fuera, el pool. */
-let enCurso: PoolClient | null = null;
+/**
+ * Dentro de una transacción se usa su conexión; fuera, el pool.
+ *
+ * **Es por petición, no del módulo** (2026-08-24). Cuando era una variable
+ * suelta, dos peticiones a la vez compartían la misma nota y la segunda
+ * acababa mandando sus consultas por la conexión de la primera; ver
+ * `conexion-en-curso.ts`.
+ */
+const conexionDeLaTransaccion = () => conexionEnCurso<PoolClient>();
 
 /**
  * Fallos de red, no del código.
@@ -133,11 +152,12 @@ function esTransitorio(error: unknown): boolean {
 async function consultar<T = Record<string, unknown>>(sql: string, valores: unknown[] = []): Promise<T[]> {
   // Dentro de una transacción NO se reintenta: la conexión ya está en un
   // estado concreto y repetir una sentencia a medias sería peor que fallar.
-  const intentos = enCurso ? 1 : 3;
+  const dentroDeTransaccion = conexionDeLaTransaccion();
+  const intentos = dentroDeTransaccion ? 1 : 3;
 
   for (let intento = 1; ; intento += 1) {
     try {
-      const ejecutor = enCurso ?? pool();
+      const ejecutor = dentroDeTransaccion ?? pool();
       const resultado = await ejecutor.query(sql, valores);
       return resultado.rows as T[];
     } catch (error) {
@@ -1018,21 +1038,25 @@ export class RepositorioPostgres implements Repositorio {
    * repartida entre varias conexiones del pool no sería una transacción.
    */
   async transaccion<T>(operacion: () => Promise<T>): Promise<T> {
-    if (enCurso) return operacion(); // Ya estamos dentro de una.
+    // Ya estamos dentro de una: se comprueba en ESTA petición, no en una
+    // variable que ven todas.
+    if (conexionDeLaTransaccion()) return operacion();
 
     const conexion = await pool().connect();
-    enCurso = conexion;
-    try {
-      await conexion.query("begin");
-      const resultado = await operacion();
-      await conexion.query("commit");
-      return resultado;
-    } catch (error) {
-      await conexion.query("rollback").catch(() => undefined);
-      throw error;
-    } finally {
-      enCurso = null;
-      conexion.release();
-    }
+    // Todo lo que pase dentro de `conConexion` —y solo eso— usa esta conexión.
+    // Otra petición que llegue mientras tanto no la ve.
+    return conConexion(conexion, async () => {
+      try {
+        await conexion.query("begin");
+        const resultado = await operacion();
+        await conexion.query("commit");
+        return resultado;
+      } catch (error) {
+        await conexion.query("rollback").catch(() => undefined);
+        throw error;
+      } finally {
+        conexion.release();
+      }
+    });
   }
 }

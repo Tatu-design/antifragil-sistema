@@ -862,3 +862,32 @@ ahí no se descubre en su ordenador: se descubre cuando un cliente le escribe.
 
 Y una regla concreta que no tenía: **lo que arranca la app instalada del
 cliente tiene que empezar por `/mi/`.** Ahora hay una prueba que lo exige.
+
+---
+
+## Estado global en un servidor que atiende a varios a la vez (2026-08-24)
+
+**Qué pasó.** Fernando firmó una sesión y la aplicación se quedó en
+«Guardando…». Dos veces. La sesión se había guardado, pero la pantalla no
+volvía.
+
+**La causa raíz.** `let enCurso` en `postgres.ts`: una variable del módulo que
+decía cuál era la conexión de la transacción en curso. Un servidor atiende
+varias peticiones a la vez en el mismo proceso, así que esa variable la ven
+todas. La segunda petición usaba la conexión de la primera y acababa colgada.
+
+Lo escribí yo, y en su momento pasó todas las pruebas: porque las pruebas
+hacían una cosa cada vez. **El fallo no estaba en la lógica, estaba en asumir
+que solo pasa una cosa a la vez.**
+
+**La lección.** En el servidor, cualquier `let` de módulo que guarde algo de
+«la petición actual» —conexión, usuario, transacción, lo que sea— es un fallo
+esperando a que haya dos personas usando la aplicación. Lo que es de una
+petición se guarda con `AsyncLocalStorage`, no en el módulo.
+
+Y la segunda mitad: **nada que espere a la red puede esperar sin límite.** Sin
+`statement_timeout`, una conexión muerta no da error, simplemente no vuelve, y
+por fuera eso se ve como una aplicación colgada sin ninguna pista de por qué.
+
+Para probarlo hace falta lanzar dos cosas a la vez a propósito: una prueba
+secuencial nunca lo habría visto (`tests/conexiones-a-la-vez.test.ts`).

@@ -2135,3 +2135,42 @@ página del cliente enlaza ese, no el global.
 **Una webapp ya instalada no se arregla sola**: el móvil guardó la `start_url`
 en el momento de instalar. Quien tenga el icono malo debe borrarlo, abrir otra
 vez su enlace y volver a añadirlo.
+
+### Dos cosas a la vez ya no se pisan la conexión (2026-08-24)
+
+A Fernando se le quedó la aplicación en «Guardando…» dos veces al firmar una
+sesión. La sesión **sí se había guardado** —la lista ya decía 7 de 16— pero la
+ficha seguía en 6 y el botón no volvía nunca.
+
+La causa era una variable suelta del módulo `postgres.ts`:
+
+```ts
+let enCurso: PoolClient | null = null;   // «la conexión de la transacción»
+```
+
+Vale mientras solo pasa una cosa a la vez. Deja de valer en cuanto hay dos, que
+es lo normal: mientras se guarda la sesión, el navegador ya está pidiendo la
+lista de clientes. La segunda petición leía esa nota, mandaba sus consultas por
+la conexión de la primera y acababa dentro de una transacción ajena. Cuando la
+primera terminaba y devolvía la conexión al montón, la segunda se quedaba
+hablando con una conexión que ya no era suya: la consulta no volvía nunca.
+
+Con `max: 3` conexiones, tres cuelgues dejan la aplicación entera parada.
+
+Dos cambios:
+
+- **`conexion-en-curso.ts`** — la conexión de la transacción pasa a guardarse
+  con `AsyncLocalStorage`, que es «para esta petición y lo que salga de ella».
+  Cada petición tiene su propia respuesta a «¿estoy dentro de una
+  transacción?». Las transacciones anidadas siguen compartiendo conexión, que
+  es lo que debe pasar: guardar una sesión son varias escrituras y van juntas o
+  no va ninguna.
+- **`statement_timeout` y `query_timeout` de 8 segundos** — red de seguridad.
+  Sin límite, una conexión que muere en silencio deja la promesa colgada para
+  siempre. Una consulta normal tarda medio segundo, así que ocho son muchísimo,
+  y quedan por debajo del límite de la página: si algo va mal se ve un error,
+  que se entiende, en vez de una espera infinita.
+
+Comprobado contra la base de datos real: 13 pantallas a la vez responden todas
+en 528 ms, ninguna colgada, y la segunda tanda va en 258 ms porque las
+conexiones se devuelven bien.
