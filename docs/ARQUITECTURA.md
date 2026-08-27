@@ -2254,8 +2254,20 @@ el error a quien está firmando. Se reconoce por su mensaje (`max clients
 reached`), no por su código `XX000`, que es el cajón de sastre de PostgreSQL y
 taparlo entero escondería errores de verdad.
 
-**Queda pendiente una decisión de Fernando:** el registro dice «session mode»,
-así que la dirección de base de datos configurada en Vercel apunta al pooler en
-modo sesión, que es el que solo admite 15 clientes. La de desarrollo usa el
-puerto 6543 (modo transacción), que admite muchísimos más. Cambiar esa variable
-en Vercel quitaría el techo de raíz.
+**Y se quitó el techo de raíz** (mismo día, con el visto bueno de Fernando). El
+registro decía «session mode»: la dirección de base de datos configurada en
+Vercel apuntaba al pooler en **modo sesión**, el que solo admite 15 clientes.
+Ahora usa el **puerto 6543, modo transacción**, igual que la de desarrollo.
+
+Antes de cambiarla se comprobó que ese modo aguanta todo lo que la aplicación
+necesita: consultas con parámetros, transacciones completas (`begin` … `commit`)
+y el límite de tiempo por consulta. Y 20 conexiones a la vez sin un fallo,
+donde el modo sesión se plantaba en 15.
+
+**Cómo volver atrás si hiciera falta:** es la misma dirección con el puerto
+`5432` en vez de `6543`. Se cambia con `vercel env rm DATABASE_URL production`
+y `vercel env add`, y hace falta **redesplegar** después: las variables solo se
+aplican en despliegues nuevos.
+
+Medido después del cambio: 15 pantallas a la vez, tres tandas seguidas, 45 de
+45 correctas (2,8 s → 1,2 s → 1,0 s) y **cero errores** en el registro.
