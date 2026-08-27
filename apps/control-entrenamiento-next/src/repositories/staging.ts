@@ -20,7 +20,7 @@ import path from "node:path";
 import { TARIFA_LIDOMARE, type TipoClase } from "@/domain/economia";
 import { duenioDeLaSesion } from "@/domain/atribucion";
 import { BONO, CUENTA, MENSUALIDAD } from "@/domain/modalidades";
-import type { CargoMensual, Ciclo, Cliente, Sesion } from "@/domain/tipos";
+import type { CargoMensual, Ciclo, Cliente, Sesion, SesionDelCalendario } from "@/domain/tipos";
 import { rangoSemana } from "@/lib/fechas";
 import type { Aviso, ClaseGrupo, DatosDeLaLista, Perfil, Repositorio, SemanaEconomica } from "./tipos";
 
@@ -283,6 +283,45 @@ export class RepositorioStaging implements Repositorio {
     return clonar(datos.sesiones.filter((s) => s.clienteId === clienteId)).sort((a, b) =>
       a.fecha === b.fecha ? b.id.localeCompare(a.id, "es", { numeric: true }) : b.fecha.localeCompare(a.fecha),
     );
+  }
+
+  async sesionesEntre(
+    desde: string,
+    hasta: string,
+    alcance: { soloDe?: string | null; adminId?: string | null } = {},
+  ): Promise<SesionDelCalendario[]> {
+    const datos = await cargar();
+    const soloDe = alcance.soloDe ?? null;
+    const nombreDe = new Map(datos.clientes.map((c) => [c.id, c.nombre]));
+    const responsableDe = new Map(datos.clientes.map((c) => [c.id, c.profesionalId ?? null]));
+
+    // Las mismas reglas que en Postgres, escritas una sola vez en
+    // `domain/atribucion.ts`. Si las dos implementaciones divergieran, el
+    // calendario diría una cosa en pruebas y otra en producción.
+    return datos.sesiones
+      .filter((s) => s.fecha >= desde && s.fecha <= hasta)
+      .map((s) => ({
+        id: s.id,
+        clienteId: s.clienteId,
+        cliente: nombreDe.get(s.clienteId) ?? "",
+        fecha: s.fecha,
+        hora: s.hora ?? null,
+        servicio: s.servicio,
+        profesionalId: duenioDeLaSesion({
+          profesionalId: s.profesionalId,
+          fecha: s.fecha,
+          responsableActual: responsableDe.get(s.clienteId) ?? null,
+          adminId: alcance.adminId ?? null,
+        }),
+      }))
+      .filter((s) => !soloDe || s.profesionalId === soloDe)
+      .sort(
+        (a, b) =>
+          a.fecha.localeCompare(b.fecha) ||
+          // Las que no tienen hora van al final del día, no al principio.
+          (a.hora ?? "99:99").localeCompare(b.hora ?? "99:99") ||
+          a.cliente.localeCompare(b.cliente, "es"),
+      );
   }
 
   async contarSesionesDelCiclo(clienteId: string, ciclo: number): Promise<number> {

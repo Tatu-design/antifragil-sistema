@@ -152,3 +152,25 @@ export interface ResultadoFirma {
   anio: number;
   mes: number;
 }
+
+/**
+ * Una sesión vista desde el calendario: lo justo para reconocerla.
+ *
+ * No es una `Sesion` recortada, es otra cosa: lleva el nombre del cliente y de
+ * quién es la sesión, que están en otras tablas. Se queda fuera todo lo que no
+ * ayuda a decir «esta sesión fue esta» —número de sesión, ciclo, tarifa—.
+ * La tarifa, además, no tiene por qué viajar hasta el navegador para pintar un
+ * calendario.
+ */
+export interface SesionDelCalendario {
+  id: string;
+  clienteId: string;
+  cliente: string;
+  /** `AAAA-MM-DD`, día de Madrid. */
+  fecha: string;
+  /** `HH:MM`, o `null`: la mitad del histórico no la tiene y no se inventa. */
+  hora: string | null;
+  servicio: string;
+  /** De quién es la producción, ya resuelto con las reglas de atribución. */
+  profesionalId: string | null;
+}

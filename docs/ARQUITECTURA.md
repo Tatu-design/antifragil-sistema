@@ -2174,3 +2174,44 @@ Dos cambios:
 Comprobado contra la base de datos real: 13 pantallas a la vez responden todas
 en 528 ms, ninguna colgada, y la segunda tanda va en 258 ms porque las
 conexiones se devuelven bien.
+
+### Calendario de sesiones firmadas (2026-08-24)
+
+Una cuarta pestaña: **Calendario**. Responde a una sola pregunta —qué sesiones
+se firmaron cada día— y no es una agenda: no hay citas, ni sesiones previstas,
+ni recordatorios, ni una tabla nueva. Es otra forma de mirar las sesiones que
+ya existen.
+
+**No hay ninguna tabla de calendario.** Se piden las sesiones del mes en una
+sola consulta (`sesionesEntre`, del día 1 al último) y se cuentan por día. La
+fuente de verdad sigue siendo `sesiones`.
+
+**De quién es cada sesión: la misma atribución que Economía**, no quién pulsó
+el botón. El sistema distingue las dos cosas —`firmadaPor` es trazabilidad,
+`profesionalId` es propiedad— y aquí se usa la propiedad, por dos razones:
+
+- Coherencia. Si Fernando firma una sesión de un cliente de Rafa, esa sesión es
+  trabajo de Rafa en Economía, en su lista de clientes y también aquí. Con
+  `firmadaPor` el calendario contradiría al resto de la aplicación.
+- Cobertura. Solo un tercio del histórico tiene guardado quién firmó —la
+  columna se añadió el 2026-08-09—, así que junio y julio saldrían en blanco.
+
+**Permisos.** `alcanceDelCalendario` (en `domain/atribucion.ts`) devuelve a un
+entrenador SIEMPRE su propio identificador, escriba lo que escriba en la
+dirección; y el filtro se aplica dentro de la consulta, así que las sesiones de
+otro no llegan a salir de la base. Esconderle el selector es cortesía, no
+seguridad.
+
+**Cómo se navega.** El mes y el profesional viajan en la dirección
+(`?mes=2026-08&profesional=…`) y el día se elige en el navegador. Cambiar de
+mes recarga —y recargar mantiene lo que estabas mirando—; tocar un día es
+instantáneo, porque las sesiones del mes entero ya viajaron con la página. Son
+unas decenas de líneas de texto: 46 KB la pantalla completa, sin tarifas.
+
+**Sin versión de escritorio, a propósito.** La aplicación entera es una columna
+de 430px también en el ordenador —no hay una sola consulta de medios en la hoja
+de estilos—. Poner el mes y el día en dos columnas metería dos columnas de
+215px dentro de esa misma franja.
+
+No se ha creado ningún índice: `sesiones_por_fecha (fecha)` ya existía y es el
+que usa la consulta del mes.

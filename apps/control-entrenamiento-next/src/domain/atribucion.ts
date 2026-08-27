@@ -78,6 +78,34 @@ export function alcanceEconomico(
 }
 
 /**
+ * Qué calendario se está mirando, y de quién puede ser.
+ *
+ * **La barrera está aquí, no en la pantalla** (2026-08-24). A un entrenador se
+ * le devuelve SIEMPRE su propio identificador, mire lo que mire y escriba lo
+ * que escriba en la dirección: `?profesional=<el de otro>` no le cambia nada.
+ * No es que el selector no se le enseñe —eso es cortesía—; es que aquí no hay
+ * forma de que salga otro.
+ *
+ * Un administrador sí elige: sin nada, todo el equipo; con alguien de la lista
+ * real, ese. Un identificador inventado cae en «todos», nunca en la agenda de
+ * otro.
+ */
+export function alcanceDelCalendario(
+  usuario: { id: string; rol: "admin" | "entrenador" },
+  pedido: string | null | undefined,
+  profesionales: ReadonlyArray<{ id: string; rol: "admin" | "entrenador" }>,
+): { profesionalId: string | null; puedeElegir: boolean; adminId: string | null } {
+  const adminId = profesionales.find((p) => p.rol === "admin")?.id ?? null;
+
+  if (usuario.rol !== "admin") {
+    return { profesionalId: usuario.id, puedeElegir: false, adminId };
+  }
+
+  const elegido = profesionales.find((p) => p.id === pedido) ?? null;
+  return { profesionalId: elegido?.id ?? null, puedeElegir: true, adminId };
+}
+
+/**
  * De quién es una sesión, con las tres reglas en orden.
  *
  *   1. Si guardó a su profesional al firmarse, es de ese. Siempre. Cambiar

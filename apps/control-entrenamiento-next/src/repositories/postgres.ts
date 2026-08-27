@@ -52,7 +52,7 @@ pg.types.setTypeParser(1114, (valor) => valor);
 import type { TipoClase } from "@/domain/economia";
 import { DESDE_QUE_HAY_PROFESIONALES } from "@/domain/atribucion";
 import { MENSUALIDAD, type Modalidad } from "@/domain/modalidades";
-import type { CargoMensual, Ciclo, Cliente, Estado, Sesion } from "@/domain/tipos";
+import type { CargoMensual, Ciclo, Cliente, Estado, Sesion, SesionDelCalendario } from "@/domain/tipos";
 import { TARIFA_LIDOMARE } from "@/domain/economia";
 import { rangoSemana } from "@/lib/fechas";
 import type { Aviso, ClaseGrupo, DatosDeLaLista, DatosMes, Perfil, Repositorio, SemanaEconomica } from "./tipos";
@@ -408,6 +408,51 @@ export class RepositorioPostgres implements Repositorio {
       [clienteId],
     );
     return filas.map(aSesion);
+  }
+
+  async sesionesEntre(
+    desde: string,
+    hasta: string,
+    alcance: { soloDe?: string | null; adminId?: string | null } = {},
+  ): Promise<SesionDelCalendario[]> {
+    const soloDe = alcance.soloDe ?? null;
+
+    // De quién es una sesión, con las MISMAS tres reglas que Economía
+    // (`domain/atribucion.ts`): lo que se guardó al firmarla; si no, del
+    // administrador cuando es anterior a que existieran los profesionales; y
+    // si no, del responsable actual del cliente.
+    //
+    // Se calcula en SQL y se filtra en SQL: cuando se pide la de alguien, la
+    // base NO devuelve las de los demás. Un entrenador que cambie el
+    // identificador en la dirección no recibe filas de otro, aunque acierte.
+    const duenio =
+      "coalesce(s.profesional_id, case when s.fecha < $3::date then $4 else cl.entrenador_id end)";
+
+    const filas = await consultar(
+      `select s.id, s.cliente_id, cl.nombre as cliente,
+              to_char(s.fecha,'YYYY-MM-DD') as fecha,
+              to_char(s.hora,'HH24:MI') as hora,
+              s.servicio,
+              ${duenio} as duenio
+         from sesiones s
+         join clientes cl on cl.id = s.cliente_id
+        where s.fecha >= $1::date and s.fecha <= $2::date
+          ${soloDe ? `and ${duenio} = $5` : ""}
+        order by s.fecha, s.hora nulls last, cl.nombre`,
+      soloDe
+        ? [desde, hasta, DESDE_QUE_HAY_PROFESIONALES, alcance.adminId ?? null, soloDe]
+        : [desde, hasta, DESDE_QUE_HAY_PROFESIONALES, alcance.adminId ?? null],
+    );
+
+    return filas.map((f) => ({
+      id: f.id as string,
+      clienteId: f.cliente_id as string,
+      cliente: f.cliente as string,
+      fecha: f.fecha as string,
+      hora: (f.hora as string | null) ?? null,
+      servicio: f.servicio as string,
+      profesionalId: (f.duenio as string | null) ?? null,
+    }));
   }
 
   async contarSesionesDelCiclo(clienteId: string, ciclo: number): Promise<number> {

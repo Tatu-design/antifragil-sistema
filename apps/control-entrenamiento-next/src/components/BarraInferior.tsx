@@ -5,6 +5,9 @@ import { Icono } from "./Iconos";
 /** Copia exacta de la barra de `webapp/templates/index.html`, con su halo. */
 const PESTANAS = [
   { clave: "clientes", href: "/clientes", texto: "Clientes", icono: "i-users" },
+  // Va la segunda a propósito: se consulta a diario, y en el móvil las dos
+  // primeras son las que caen bajo el pulgar.
+  { clave: "calendario", href: "/calendario", texto: "Calendario", icono: "i-calendar-check" },
   { clave: "economia", href: "/economia", texto: "Economía", icono: "i-euro" },
   { clave: "avisos", href: "/avisos", texto: "Avisos", icono: "i-bell" },
 ] as const;
@@ -14,7 +17,7 @@ export function BarraInferior({
   sinLeer = 0,
   soloClientes = false,
 }: {
-  activa: "clientes" | "economia" | "avisos";
+  activa: "clientes" | "calendario" | "economia" | "avisos";
   sinLeer?: number;
   /**
    * Un entrenador no tiene Economía: el dinero del negocio es del

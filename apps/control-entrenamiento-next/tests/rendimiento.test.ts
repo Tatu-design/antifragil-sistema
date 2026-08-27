@@ -23,6 +23,7 @@ import { reiniciarStagingParaPruebas } from "@/repositories/staging";
 import { listarClientes, obtenerPerfil } from "@/services/clientes";
 import { contarNoLeidos } from "@/services/avisos";
 import { obtenerCuenta } from "@/services/clases";
+import { obtenerCalendario } from "@/services/calendario";
 import { obtenerEconomia } from "@/services/economia";
 import { firmarSesion } from "@/services/sesiones";
 import { obtenerPerfilPublico } from "@/services/publico";
@@ -81,6 +82,15 @@ const PRESUPUESTO = {
    */
   economía: 1,
   "ficha de una cuenta de CrossFit": 2,
+  /**
+   * Un mes entero del calendario en UNA consulta, del día 1 al último.
+   *
+   * Es el presupuesto que importa de esta pantalla: pedir las sesiones día a
+   * día serían treinta viajes para pintar una cuadrícula, y la pantalla se
+   * haría más lenta cuanto más largo el mes. Si alguna vez sube de 1, es que
+   * ha vuelto ese problema.
+   */
+  "calendario de un mes": 1,
   /** La pantalla entera: clientes, avisos y las dos cuentas de CrossFit.
    *  Las cuatro cargas se lanzan a la vez, así que en tiempo es como una. */
   "pantalla de clientes completa": 6,
@@ -88,6 +98,24 @@ const PRESUPUESTO = {
 
 describe("presupuesto de consultas por pantalla", () => {
   beforeEach(() => reiniciarStagingParaPruebas());
+
+  it("el calendario pide el mes de una vez, no día a día", async () => {
+    const contador = contarConsultas();
+    await obtenerCalendario({ anio: 2026, mes: 8, profesionalId: null, adminId: "per-admin" });
+
+    expect(
+      contador.total(),
+      `el calendario hizo ${contador.total()} consultas: ${JSON.stringify(contador.porMetodo())}`,
+    ).toBeLessThanOrEqual(PRESUPUESTO["calendario de un mes"]);
+  });
+
+  it("y mirar el de un profesional no cuesta ni una consulta más", async () => {
+    // Es la misma consulta con una condición más, no una segunda pasada.
+    const contador = contarConsultas();
+    await obtenerCalendario({ anio: 2026, mes: 8, profesionalId: "per-rafa", adminId: "per-admin" });
+
+    expect(contador.total()).toBeLessThanOrEqual(PRESUPUESTO["calendario de un mes"]);
+  });
 
   it("la lista de clientes no crece con el número de clientes", async () => {
     const contador = contarConsultas();

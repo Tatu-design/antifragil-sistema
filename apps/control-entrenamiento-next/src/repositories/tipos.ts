@@ -12,7 +12,7 @@
  */
 
 import type { SesionEconomica, TipoClase } from "@/domain/economia";
-import type { CargoMensual, Ciclo, Cliente, Sesion } from "@/domain/tipos";
+import type { CargoMensual, Ciclo, Cliente, Sesion, SesionDelCalendario } from "@/domain/tipos";
 
 /** Un profesional que usa la aplicación. Los clientes NO son perfiles. */
 export interface Perfil {
@@ -106,6 +106,20 @@ export interface Repositorio {
   guardarCiclo(ciclo: Ciclo): Promise<void>;
 
   listarSesiones(clienteId: string): Promise<Sesion[]>;
+  /**
+   * Las sesiones firmadas de un rango de fechas, con el nombre del cliente y
+   * de quién es cada una. **Una sola consulta para todo el mes**: el
+   * calendario no puede pedir un día cada vez.
+   *
+   * `soloDe` aplica las reglas de `domain/atribucion.ts`, las mismas que
+   * Economía. Cuando viene, la base NO devuelve las de otros profesionales:
+   * el filtro no es de pantalla.
+   */
+  sesionesEntre(
+    desde: string,
+    hasta: string,
+    alcance?: { soloDe?: string | null; adminId?: string | null },
+  ): Promise<SesionDelCalendario[]>;
   contarSesionesDelCiclo(clienteId: string, ciclo: number): Promise<number>;
   guardarSesion(sesion: Sesion): Promise<void>;
   eliminarSesion(sesionId: string): Promise<Sesion | null>;
