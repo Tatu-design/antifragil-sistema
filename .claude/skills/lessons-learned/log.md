@@ -891,3 +891,31 @@ por fuera eso se ve como una aplicación colgada sin ninguna pista de por qué.
 
 Para probarlo hace falta lanzar dos cosas a la vez a propósito: una prueba
 secuencial nunca lo habría visto (`tests/conexiones-a-la-vez.test.ts`).
+
+---
+
+## Los registros del servidor primero, las hipótesis después (2026-08-27)
+
+**Qué pasó.** Fernando no pudo firmar una sesión: «Algo ha fallado». Me puse a
+medir, encontré que firmar tardaba 7 segundos y di por hecho que era eso.
+
+No era eso. Al mirar los registros de Vercel el error estaba escrito con todas
+las letras: `EMAXCONNSESSION: max clients reached — pool_size: 15`. Se habían
+agotado las conexiones a la base de datos.
+
+**La causa raíz de mi error.** Tenía acceso a los registros —`npx vercel logs`
+funciona sin pedir nada— y no los miré hasta después de una hora de medir. Un
+error de producción deja rastro; buscar la causa por deducción cuando el
+servidor ya te la ha escrito es trabajar a ciegas por gusto.
+
+**La lección.** Ante un fallo que Fernando ve en producción: **`npx vercel logs
+<url>` ANTES de formular ninguna hipótesis.** La medición sirve para confirmar
+o descartar, no para adivinar el punto de partida.
+
+Lo que sí salvó el rato de medir: el problema de las 19 consultas era real y
+alimentaba el mismo fallo —cuanto más tarda una firma, más rato retiene su
+conexión—. Pero eso fue suerte, no método.
+
+Y una segunda lección, esta de diseño: **el tamaño del pool no lo decide una
+instancia, lo decide el cupo compartido.** `max: 3` parece prudente mirando una
+instancia y es temerario cuando hay quince pidiendo de un bote de quince.

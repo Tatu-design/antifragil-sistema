@@ -121,6 +121,19 @@ export interface Repositorio {
     alcance?: { soloDe?: string | null; adminId?: string | null },
   ): Promise<SesionDelCalendario[]>;
   contarSesionesDelCiclo(clienteId: string, ciclo: number): Promise<number>;
+  /**
+   * Lo firmado en un rango de fechas, ya sumado por la base.
+   *
+   * **Una consulta, no una por cliente.** La comprobación de descuadre pedía
+   * las sesiones cliente a cliente y las filtraba en memoria: nueve consultas
+   * y ciento veintiuna sesiones descargadas para mirar las quince de una
+   * semana, y una consulta más por cada cliente nuevo. Eso son casi cuatro
+   * segundos pegados a CADA firma (2026-08-27).
+   */
+  resumenDeSesionesEntre(
+    desde: string,
+    hasta: string,
+  ): Promise<{ facturacion: number; horas: number; horasSinImporte: number }>;
   guardarSesion(sesion: Sesion): Promise<void>;
   eliminarSesion(sesionId: string): Promise<Sesion | null>;
   guardarSesionEditada(sesionId: string, fecha: string, numeroSesion: number): Promise<void>;

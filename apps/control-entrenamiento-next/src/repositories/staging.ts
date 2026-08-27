@@ -324,6 +324,22 @@ export class RepositorioStaging implements Repositorio {
       );
   }
 
+  async resumenDeSesionesEntre(desde: string, hasta: string) {
+    const datos = await cargar();
+    let facturacion = 0;
+    let horas = 0;
+    let horasSinImporte = 0;
+    for (const s of datos.sesiones) {
+      if (s.fecha < desde || s.fecha > hasta) continue;
+      if (s.tarifa === null) horasSinImporte += 1;
+      else {
+        facturacion += s.tarifa;
+        horas += 1;
+      }
+    }
+    return { facturacion, horas, horasSinImporte };
+  }
+
   async contarSesionesDelCiclo(clienteId: string, ciclo: number): Promise<number> {
     const datos = await cargar();
     return datos.sesiones.filter((s) => s.clienteId === clienteId && s.ciclo === ciclo).length;

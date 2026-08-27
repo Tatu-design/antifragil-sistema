@@ -2215,3 +2215,47 @@ de estilos—. Poner el mes y el día en dos columnas metería dos columnas de
 
 No se ha creado ningún índice: `sesiones_por_fecha (fecha)` ya existía y es el
 que usa la consulta del mes.
+
+### «Algo ha fallado» al firmar: sin conexiones libres (2026-08-27)
+
+A Fernando le salió «Algo ha fallado. No se ha guardado nada» al firmar una
+sesión. En el registro del servidor:
+
+```
+(EMAXCONNSESSION) max clients reached in session mode
+                  — max clients are limited to pool_size: 15
+   at perfilPorCorreo   ·   POST /clientes/…  →  500
+```
+
+No se había guardado nada, y el fallo saltó en `perfilPorCorreo` —lo primero
+que hace la acción, comprobar quién eres—, que está fuera del `try` que atrapa
+los errores de negocio: por eso salió la pantalla genérica y no un mensaje.
+
+Se agotaron las 15 conexiones que el pooler da a TODA la aplicación. Dos cosas
+lo provocaban:
+
+- **Cada instancia pedía hasta 3** (`max: 3`). Vercel levanta una instancia por
+  tanda de peticiones, así que con cinco a la vez el cupo estaba agotado. Ahora
+  pide **una**: caben quince instancias en vez de cinco, y no se pierde nada
+  porque cada instancia atiende de una en una.
+- **Firmar tardaba 7 segundos y hacía 19 consultas**, con una conexión ocupada
+  todo ese rato. Y crecía: la comprobación de descuadre posterior pedía las
+  sesiones **cliente a cliente** para mirar una sola semana —121 sesiones
+  descargadas para contar 15—, así que cada cliente nuevo añadía una consulta a
+  cada firma.
+
+Ahora esa comprobación suma en la base (`resumenDeSesionesEntre`) y sus tres
+consultas van a la vez: **de 19 consultas a 10, y de 7,0 a 4,0 segundos**,
+medido contra la base real. Y ya no depende del número de clientes.
+
+Además, quedarse sin cupo pasa a tratarse como lo que es —algo transitorio, en
+cuanto otra instancia termina sobra sitio— y se reintenta en vez de enseñarle
+el error a quien está firmando. Se reconoce por su mensaje (`max clients
+reached`), no por su código `XX000`, que es el cajón de sastre de PostgreSQL y
+taparlo entero escondería errores de verdad.
+
+**Queda pendiente una decisión de Fernando:** el registro dice «session mode»,
+así que la dirección de base de datos configurada en Vercel apunta al pooler en
+modo sesión, que es el que solo admite 15 clientes. La de desarrollo usa el
+puerto 6543 (modo transacción), que admite muchísimos más. Cambiar esa variable
+en Vercel quitaría el techo de raíz.

@@ -79,16 +79,31 @@ function pool(): Pool {
     g.pool = new Pool({
       connectionString: url,
       ssl: { rejectUnauthorized: false },
-      // El plan gratuito de Supabase da pocas conexiones y esto puede correr
-      // en varias instancias a la vez.
-      max: 3,
+      // UNA CONEXIÓN POR INSTANCIA (2026-08-27).
+      //
+      // Aquí no manda cuántas quiere esta instancia, manda cuántas hay para
+      // todos. El pooler de Supabase acepta 15 clientes a la vez, y Vercel
+      // levanta una instancia nueva de la aplicación por cada tanda de
+      // peticiones: con tres conexiones cada una, cinco instancias agotaban el
+      // cupo y la sexta se estrellaba. Le pasó a Fernando al firmar una
+      // sesión: «Algo ha fallado», y en el registro del servidor
+      // `EMAXCONNSESSION: max clients reached`.
+      //
+      // Con una, caben quince instancias en vez de cinco. Y no se pierde nada:
+      // cada instancia atiende de una en una, así que la segunda conexión casi
+      // nunca se usaba — solo ocupaba sitio que le hacía falta a otro.
+      max: 1,
       // Abrir una conexión nueva cuesta unos 700 ms (saludo TCP + cifrado +
       // autenticación) ANTES de la primera consulta. Con los 10 segundos de
       // antes, cualquier pausa normal —mirar un cliente, guardar el móvil,
       // volver a los dos minutos— cerraba la conexión y la siguiente pantalla
       // pagaba otra vez esos 700 ms. Un minuto cubre el uso real sin acaparar
       // conexiones del plan gratuito (2026-08-08).
-      idleTimeoutMillis: 60_000,
+      // Bajado de 60 s a 25 s (2026-08-27). Un minuto entero agarrando una
+      // conexión sin usarla es justo lo que dejaba sin cupo a los demás. A los
+      // 25 segundos sigue cubriendo el uso normal —mirar un cliente, firmar,
+      // pasar a otro— y suelta mucho antes cuando se deja el móvil.
+      idleTimeoutMillis: 25_000,
       connectionTimeoutMillis: 15_000,
       // NINGUNA CONSULTA PUEDE ESPERAR PARA SIEMPRE (2026-08-24). Sin esto,
       // una conexión que muere en silencio deja la promesa colgada: la
@@ -124,7 +139,17 @@ const conexionDeLaTransaccion = () => conexionEnCurso<PoolClient>();
  * consulta tras un rato puede llegar cortada. Volver a intentarlo suele
  * bastar; insistir con un error de datos, no.
  */
-const TRANSITORIOS = new Set(["ECONNRESET", "ETIMEDOUT", "EPIPE", "ECONNREFUSED", "57P01"]);
+const TRANSITORIOS = new Set([
+  "ECONNRESET",
+  "ETIMEDOUT",
+  "EPIPE",
+  "ECONNREFUSED",
+  "57P01",
+  // Ojo: NO se pone aquí `XX000`. Es el cajón de sastre de PostgreSQL y
+  // taparlo entero escondería errores de verdad. El caso que sí interesa —
+  // quedarse sin cupo en el pooler— se reconoce por su mensaje, unas líneas
+  // más abajo.
+]);
 
 export class BaseNoDisponible extends Error {
   constructor() {
@@ -140,6 +165,12 @@ const TEXTOS_TRANSITORIOS = [
   "server closed the connection",
   "timeout exceeded",
   "socket hang up",
+  // SIN CUPO EN EL POOLER (2026-08-27). Hay 15 conexiones para toda la
+  // aplicación y en ese instante estaban todas ocupadas. Es lo más transitorio
+  // que existe —en cuanto otra instancia termina, sobra sitio—, así que
+  // reintentar es justo lo que hay que hacer. Sin esto se le lanzaba el error
+  // a la cara del usuario a la primera: le pasó a Fernando al firmar.
+  "max clients reached",
 ];
 
 function esTransitorio(error: unknown): boolean {
@@ -453,6 +484,24 @@ export class RepositorioPostgres implements Repositorio {
       servicio: f.servicio as string,
       profesionalId: (f.duenio as string | null) ?? null,
     }));
+  }
+
+  async resumenDeSesionesEntre(desde: string, hasta: string) {
+    // Suma la base, no el servidor: no viaja ni una fila de sesión.
+    const filas = await consultar<{ facturacion: string; horas: number; sin_importe: number }>(
+      `select coalesce(sum(tarifa), 0)::float as facturacion,
+              count(*) filter (where tarifa is not null)::int as horas,
+              count(*) filter (where tarifa is null)::int as sin_importe
+         from sesiones
+        where fecha >= $1::date and fecha <= $2::date`,
+      [desde, hasta],
+    );
+    const f = filas[0];
+    return {
+      facturacion: Number(f?.facturacion ?? 0),
+      horas: Number(f?.horas ?? 0),
+      horasSinImporte: Number(f?.sin_importe ?? 0),
+    };
   }
 
   async contarSesionesDelCiclo(clienteId: string, ciclo: number): Promise<number> {

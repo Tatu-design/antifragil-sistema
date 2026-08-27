@@ -25,29 +25,28 @@ export async function verificarSemana(fechaIso: string): Promise<string[]> {
   const repo = repositorio();
   const { inicio, fin } = rangoSemana(fechaIso);
 
-  const semana = (await repo.listarSemanas()).find((s) => s.inicio === inicio);
-  if (!semana) return [];
+  // Las tres a la vez: no dependen entre sí, y esto va detrás de una firma que
+  // ya ha hecho esperar a alguien con el móvil en la mano.
+  const [semanas, real, clases] = await Promise.all([
+    repo.listarSemanas(),
+    // LO FIRMADO ESA SEMANA, SUMADO POR LA BASE (2026-08-27). Antes se pedían
+    // las sesiones cliente a cliente y se filtraban aquí: nueve consultas y
+    // ciento veintiuna sesiones descargadas para mirar las quince de una
+    // semana, con una consulta más por cada cliente nuevo. Eran casi cuatro
+    // segundos pegados a cada firma, y la firma acabó pasándose del tiempo
+    // que Vercel le da a una pantalla: a Fernando le salió «Algo ha fallado».
+    repo.resumenDeSesionesEntre(inicio, fin),
+    repo.contarClases(inicio, fin),
+  ]);
 
-  // Lo que de verdad hay firmado esa semana, cliente a cliente.
-  let facturacionReal = 0;
-  let horasReales = 0;
-  let horasSinImporteReales = 0;
-  for (const cliente of await repo.listarClientes()) {
-    for (const sesion of await repo.listarSesiones(cliente.id)) {
-      if (sesion.fecha < inicio || sesion.fecha > fin) continue;
-      if (sesion.tarifa === null) horasSinImporteReales += 1;
-      else {
-        facturacionReal += sesion.tarifa;
-        horasReales += 1;
-      }
-    }
-  }
+  const semana = semanas.find((s) => s.inicio === inicio);
+  if (!semana) return [];
 
   // Las clases de Lidomare van al mismo saco de dinero que las sesiones de PT,
   // así que hay que sumarlas antes de comparar.
-  const clases = await repo.contarClases(inicio, fin);
-  facturacionReal += clases.lidomare * TARIFA_LIDOMARE;
-  horasReales += clases.lidomare;
+  const facturacionReal = real.facturacion + clases.lidomare * TARIFA_LIDOMARE;
+  const horasReales = real.horas + clases.lidomare;
+  const horasSinImporteReales = real.horasSinImporte;
 
   const diferencias: string[] = [];
   if (Math.abs(facturacionReal - semana.facturacion) > CENTIMO) {
