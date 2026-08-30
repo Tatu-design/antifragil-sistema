@@ -45,10 +45,20 @@ describe("las reglas de la contraseña nueva", () => {
 });
 
 describe("de quién es la contraseña que se cambia", () => {
-  const ACCION = readFileSync(path.join(process.cwd(), "src", "app", "actions.ts"), "utf8");
+  // Los saltos de línea se normalizan ANTES de recortar. En Windows el archivo
+  // está en disco con saltos de Windows, así que buscar «\n}\n» no encontraba
+  // nada y el recorte se quedaba con TODO el archivo a partir de la función:
+  // la comprobación de abajo miraba también acciones que no venían al caso
+  // (2026-08-30). Pasaba por casualidad, no por estar bien.
+  const ACCION = readFileSync(path.join(process.cwd(), "src", "app", "actions.ts"), "utf8").replace(
+    /\r\n/g,
+    "\n",
+  );
   const bloque = (() => {
     const i = ACCION.indexOf("export async function accionCambiarClave");
-    return ACCION.slice(i, ACCION.indexOf("\n}\n", i));
+    const fin = ACCION.indexOf("\n}\n", i);
+    if (i === -1 || fin === -1) throw new Error("no se encuentra «accionCambiarClave» en actions.ts");
+    return ACCION.slice(i, fin);
   })();
 
   it("el correo sale de la SESIÓN, nunca del formulario", () => {

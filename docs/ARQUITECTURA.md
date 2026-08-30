@@ -2271,3 +2271,48 @@ aplican en despliegues nuevos.
 
 Medido después del cambio: 15 pantallas a la vez, tres tandas seguidas, 45 de
 45 correctas (2,8 s → 1,2 s → 1,0 s) y **cero errores** en el registro.
+
+### Dar de alta profesionales desde la aplicación (2026-08-30)
+
+Fernando ya no tiene que entrar en Supabase para incorporar a alguien al
+equipo. En su foto de perfil aparece **Profesionales**, y desde ahí: nombre,
+correo, crear.
+
+**No hay un segundo sistema de usuarios.** El alta hace exactamente lo mismo
+que hacía `scripts/crear-usuario.mjs` para Rafa, en una sola transacción:
+
+- `auth.users` con la contraseña cifrada por la propia base (`crypt` +
+  `bcrypt`), que es lo que hace Supabase al registrar a alguien. Así no hace
+  falta la clave de administrador de Supabase ni abrir el registro público.
+- `auth.identities`, sin la cual la contraseña es correcta y aun así no deja
+  entrar.
+- `public.perfiles` con rol **entrenador**, fijo: desde esa pantalla no se
+  crean administradores.
+
+**La contraseña se enseña una sola vez** y no se guarda en claro en ninguna
+parte —a la base llega ya cifrada—, así que no se puede volver a consultar. Se
+generó pensando en dictarla: doce caracteres sin los que se confunden (O/0,
+l/1, I). Si se pierde, se crea otra.
+
+Se descartó la invitación por correo porque el proyecto no tiene servidor de
+correo configurado: habría añadido una pieza que puede fallar para resolver
+algo que ya estaba resuelto.
+
+**Dar de baja usa el bloqueo de cuenta de Supabase** (`banned_until`), que es
+lo que la comprobación de acceso ya miraba desde el principio. Se eligió eso
+antes que una columna nueva porque la barrera ya existía y estaba probada: una
+menos que se puede olvidar. Dar de baja **no borra nada** —el histórico, las
+sesiones y la economía se quedan como están— y solo hace dos cosas: deja de
+poder entrar y deja de aparecer para asignarle clientes nuevos.
+
+**Nunca se reasignan clientes solos.** Si todavía lleva clientes activos, la
+pantalla lo dice antes de pulsar y la acción lo rechaza. Un cliente activo sin
+responsable es un cliente al que nadie le firma las sesiones y de quien nadie
+recibe los avisos.
+
+Las tres barreras de siempre: `exigirAdmin()` en las dos pantallas, otra vez
+dentro de cada acción que escribe —llegar a la pantalla y poder crear son dos
+permisos distintos—, y el identificador que llega en el formulario se comprueba
+contra la lista real antes de tocar nada.
+
+Sin migración: no hizo falta ninguna columna nueva.

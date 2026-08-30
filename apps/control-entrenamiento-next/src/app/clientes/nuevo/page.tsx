@@ -19,7 +19,9 @@ export default async function PaginaNuevoCliente({
   // A un entrenador se le ofrece una sola opción —él— así que el selector no
   // llega a dibujarse. La decisión de verdad no está aquí: está en la acción,
   // que ignora lo que venga en el formulario si no es administrador.
-  const profesionales = esAdmin(quien) ? await listarProfesionales() : [];
+  // Solo los que pueden entrar: a alguien de baja no se le asignan clientes
+  // nuevos (2026-08-30). Su histórico se queda, pero no recibe más trabajo.
+  const profesionales = esAdmin(quien) ? (await listarProfesionales()).filter((p) => p.activo !== false) : [];
 
   const { error: fallo } = await searchParams;
 

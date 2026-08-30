@@ -51,7 +51,7 @@ pg.types.setTypeParser(1114, (valor) => valor);
 
 import type { TipoClase } from "@/domain/economia";
 import { DESDE_QUE_HAY_PROFESIONALES } from "@/domain/atribucion";
-import { MENSUALIDAD, type Modalidad } from "@/domain/modalidades";
+import { MENSUALIDAD, type Modalidad, ErrorDeNegocio } from "@/domain/modalidades";
 import type { CargoMensual, Ciclo, Cliente, Estado, Sesion, SesionDelCalendario } from "@/domain/tipos";
 import { TARIFA_LIDOMARE } from "@/domain/economia";
 import { rangoSemana } from "@/lib/fechas";
@@ -723,8 +723,17 @@ export class RepositorioPostgres implements Repositorio {
       [correo.trim().toLowerCase()],
     );
     const f = filas[0];
+    // Si la consulta ha devuelto algo es que la cuenta no está bloqueada: lo
+    // exige ella misma. Por eso aquí `activo` es true por definición.
     return f
-      ? { id: f.id, correo: f.email, nombre: f.nombre, rol: f.rol as Perfil["rol"], foto: f.foto ?? null }
+      ? {
+          id: f.id,
+          correo: f.email,
+          nombre: f.nombre,
+          rol: f.rol as Perfil["rol"],
+          foto: f.foto ?? null,
+          activo: true,
+        }
       : null;
   }
 
@@ -738,8 +747,16 @@ export class RepositorioPostgres implements Repositorio {
 
   async perfilPorId(id: string | null): Promise<Perfil | null> {
     if (!id) return null;
-    const filas = await consultar<{ id: string; email: string; nombre: string; rol: string; foto: string | null }>(
-      `select p.id, u.email, p.nombre, p.rol, p.foto
+    const filas = await consultar<{
+      id: string;
+      email: string;
+      nombre: string;
+      rol: string;
+      foto: string | null;
+      activo: boolean;
+    }>(
+      `select p.id, u.email, p.nombre, p.rol, p.foto,
+              (u.banned_until is null or u.banned_until < now()) as activo
          from public.perfiles p
          join auth.users u on u.id = p.id
         where p.id = $1`,
@@ -747,13 +764,28 @@ export class RepositorioPostgres implements Repositorio {
     );
     const f = filas[0];
     return f
-      ? { id: f.id, correo: f.email, nombre: f.nombre, rol: f.rol as Perfil["rol"], foto: f.foto ?? null }
+      ? {
+          id: f.id,
+          correo: f.email,
+          nombre: f.nombre,
+          rol: f.rol as Perfil["rol"],
+          foto: f.foto ?? null,
+          activo: Boolean(f.activo),
+        }
       : null;
   }
 
   async listarProfesionales(): Promise<Perfil[]> {
-    const filas = await consultar<{ id: string; email: string; nombre: string; rol: string; foto: string | null }>(
-      `select p.id, u.email, p.nombre, p.rol, p.foto
+    const filas = await consultar<{
+      id: string;
+      email: string;
+      nombre: string;
+      rol: string;
+      foto: string | null;
+      activo: boolean;
+    }>(
+      `select p.id, u.email, p.nombre, p.rol, p.foto,
+              (u.banned_until is null or u.banned_until < now()) as activo
          from public.perfiles p
          join auth.users u on u.id = p.id
         order by (p.rol = 'admin') desc, p.nombre`,
@@ -764,6 +796,7 @@ export class RepositorioPostgres implements Repositorio {
       nombre: f.nombre,
       rol: f.rol as Perfil["rol"],
       foto: f.foto ?? null,
+      activo: Boolean(f.activo),
     }));
   }
 
@@ -773,6 +806,99 @@ export class RepositorioPostgres implements Repositorio {
       datos.nombre,
       datos.foto,
     ]);
+  }
+
+  /**
+   * Da de alta a un profesional con su acceso.
+   *
+   * Escribe en los tres sitios que hacen falta, y en una sola transacción: o
+   * queda todo o no queda nada. Una cuenta sin identidad acepta la contraseña
+   * pero no deja entrar, y una cuenta sin perfil entra y no puede hacer nada.
+   *
+   * ES EL MISMO CAMINO QUE SE USÓ PARA RAFA (`scripts/crear-usuario.mjs`), no
+   * uno nuevo: la contraseña la cifra la base con `crypt` + `bcrypt`, que es
+   * exactamente lo que hace Supabase al registrar a alguien. Así no hace falta
+   * la clave de administrador de Supabase ni abrir el registro público.
+   *
+   * **La contraseña en claro no se guarda, ni se registra, ni se devuelve.**
+   * Entra por aquí y solo sale de la base ya cifrada.
+   */
+  async crearProfesional(datos: { nombre: string; correo: string; clave: string }): Promise<{ id: string }> {
+    return this.transaccion(async () => {
+      const yaEsta = await consultar<{ id: string }>(
+        "select id from auth.users where lower(email) = $1",
+        [datos.correo],
+      );
+      if (yaEsta.length > 0) {
+        throw new ErrorDeNegocio(`Ya hay alguien dado de alta con el correo ${datos.correo}`);
+      }
+
+      const creado = await consultar<{ id: string }>(
+        `insert into auth.users
+           (instance_id, id, aud, role, email, encrypted_password,
+            email_confirmed_at, created_at, updated_at,
+            raw_app_meta_data, raw_user_meta_data)
+         values
+           ('00000000-0000-0000-0000-000000000000', gen_random_uuid(), 'authenticated', 'authenticated',
+            $1, crypt($2, gen_salt('bf')),
+            -- Confirmado de entrada: lo da de alta el administrador a mano, no
+            -- es un registro público que haya que verificar por correo.
+            now(), now(), now(),
+            '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb)
+         returning id`,
+        [datos.correo, datos.clave],
+      );
+      const id = creado[0].id;
+
+      // Sin la identidad, la contraseña es correcta y aun así no deja entrar.
+      await consultar(
+        `insert into auth.identities
+           (id, user_id, provider_id, identity_data, provider, last_sign_in_at, created_at, updated_at)
+         values (gen_random_uuid(), $1::uuid, $2::text,
+                 jsonb_build_object('sub', $2::text, 'email', $3::text, 'email_verified', true),
+                 'email', now(), now(), now())`,
+        [id, id, datos.correo],
+      );
+
+      // El rol va en el perfil, no en la cuenta: `auth.users` dice quién eres
+      // y `perfiles` dice qué puedes hacer. SIEMPRE entrenador — desde esta
+      // pantalla no se crean administradores.
+      await consultar(
+        "insert into public.perfiles (id, nombre, rol) values ($1, $2, 'entrenador')",
+        [id, datos.nombre],
+      );
+
+      return { id };
+    });
+  }
+
+  /**
+   * Da de baja o vuelve a dar de alta. **Nunca borra.**
+   *
+   * Se apoya en el bloqueo de cuenta de Supabase, que es lo que la
+   * comprobación de acceso ya miraba desde el principio (`banned_until`). Dar
+   * de baja no toca ni una sesión ni un cliente: el histórico sigue entero y
+   * su economía sigue estando donde estaba.
+   *
+   * La fecha es lejana a propósito: «de baja» no es «castigado hasta el
+   * viernes», es hasta que alguien lo vuelva a dar de alta.
+   */
+  async cambiarEstadoProfesional(id: string, activo: boolean): Promise<void> {
+    await consultar(
+      `update auth.users
+          set banned_until = case when $2 then null else timestamptz '2999-12-31' end,
+              updated_at = now()
+        where id = $1`,
+      [id, activo],
+    );
+  }
+
+  async contarClientesActivosDe(profesionalId: string): Promise<number> {
+    const filas = await consultar<{ n: number }>(
+      "select count(*)::int as n from clientes where entrenador_id = $1 and estado = 'activo'",
+      [profesionalId],
+    );
+    return Number(filas[0]?.n ?? 0);
   }
 
   async asignarProfesional(clienteId: string, profesionalId: string | null): Promise<void> {

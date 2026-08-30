@@ -186,3 +186,20 @@ export const esquemaPerfil = z.object({
     .refine((v) => v === "" || v === "quitar" || v.startsWith("data:image/"), "Eso no es una imagen")
     .default(""),
 });
+
+/**
+ * Dar de alta a un profesional. Solo lo mínimo para que pueda entrar.
+ *
+ * Nada de campos administrativos: nombre y correo. El rol no se pide porque
+ * no se elige — desde esa pantalla solo se crean entrenadores.
+ */
+export const esquemaProfesional = z.object({
+  nombre: z.string().trim().min(2, "Escribe el nombre del profesional").max(40),
+  correo: z.string().trim().min(1, "Escribe su correo").max(120),
+});
+
+/** Dar de baja o volver a dar de alta a alguien. */
+export const esquemaEstadoProfesional = z.object({
+  profesionalId: z.string().min(1),
+  activo: z.enum(["si", "no"]),
+});

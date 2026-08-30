@@ -22,6 +22,18 @@ export interface Perfil {
   rol: "admin" | "entrenador";
   /** Data URI ya encogida por el navegador. `null` = se enseñan sus iniciales. */
   foto?: string | null;
+  /**
+   * Si puede entrar en la aplicación.
+   *
+   * Un profesional de baja se queda `false`: no entra, y no se le ofrece para
+   * asignarle clientes nuevos. **Su histórico no se toca** —sus sesiones
+   * siguen siendo suyas y su economía sigue estando— porque nunca se le borra.
+   *
+   * Por debajo es el bloqueo de cuenta de Supabase, que la comprobación de
+   * acceso ya miraba desde el principio. No se inventó una segunda forma de
+   * decir lo mismo (2026-08-30).
+   */
+  activo?: boolean;
 }
 
 export interface SemanaEconomica {
@@ -184,6 +196,25 @@ export interface Repositorio {
   listarProfesionales(): Promise<Perfil[]>;
   /** Cambia el nombre y la foto de un perfil. Cada uno el suyo. */
   actualizarPerfil(id: string, datos: { nombre: string; foto: string | null }): Promise<void>;
+  /**
+   * Da de alta a un profesional con su acceso: cuenta, identidad y perfil.
+   *
+   * La contraseña llega en claro y **la cifra la propia base** al guardarla;
+   * de aquí no sale ni se escribe en ningún sitio. Es el mismo camino por el
+   * que se creó la cuenta de Rafa, no uno nuevo.
+   *
+   * Falla si el correo ya tiene cuenta: dos personas con el mismo correo no
+   * pueden entrar cada una a lo suyo.
+   */
+  crearProfesional(datos: {
+    nombre: string;
+    correo: string;
+    clave: string;
+  }): Promise<{ id: string }>;
+  /** Da de baja o vuelve a dar de alta a un profesional. Nunca lo borra. */
+  cambiarEstadoProfesional(id: string, activo: boolean): Promise<void>;
+  /** Cuántos clientes activos lleva. Para no dejarlos sin responsable. */
+  contarClientesActivosDe(profesionalId: string): Promise<number>;
   /** Asigna el responsable de un cliente. Solo el administrador. */
   asignarProfesional(clienteId: string, profesionalId: string | null): Promise<void>;
 

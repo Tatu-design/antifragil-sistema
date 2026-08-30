@@ -18,6 +18,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { ErrorDeNegocio } from "@/domain/modalidades";
+import { claveTemporal, normalizarCorreo, puedeDesactivarse, revisarAlta } from "@/domain/profesionales";
 import { cerrarSesion, entrar, entrarConClaveUnica } from "@/lib/auth";
 import { cambiarClave, verificarCredenciales } from "@/repositories/usuarios";
 import { esAdmin, exigirAccesoACliente, exigirAdmin, exigirUsuario } from "@/lib/permisos";
@@ -42,6 +43,8 @@ import {
   esquemaClaveUnica,
   esquemaLogin,
   esquemaServicio,
+  esquemaProfesional,
+  esquemaEstadoProfesional,
 } from "@/schemas/formularios";
 import {
   cambiarEstado,
@@ -163,7 +166,11 @@ export async function accionCrearCliente(datos: FormData): Promise<void> {
     redirect(`/clientes/nuevo?error=${encodeURIComponent(texto)}`);
   }
 
-  const profesionales = esAdmin(quien) ? await listarProfesionales() : [];
+  // Solo los que pueden entrar: a alguien de baja no se le asignan clientes
+  // nuevos. Se comprueba aquí, no solo escondiéndolo del desplegable.
+  const profesionales = esAdmin(quien)
+    ? (await listarProfesionales()).filter((p) => p.activo !== false)
+    : [];
 
   let id: string;
   try {
@@ -253,7 +260,9 @@ export async function accionGuardarDatos(datos: FormData): Promise<void> {
     const traspaso = validado.data.profesionalId;
     if (traspaso && esAdmin(quien)) {
       const profesionales = await listarProfesionales();
-      if (profesionales.some((p) => p.id === traspaso)) {
+      // Y no a alguien de baja: para devolverle clientes, primero se le
+      // devuelve el acceso.
+      if (profesionales.some((p) => p.id === traspaso && p.activo !== false)) {
         await traspasarCliente(id, traspaso);
       }
     }
@@ -541,4 +550,118 @@ export async function accionGuardarPerfil(
   revalidatePath("/avisos");
   revalidatePath("/economia");
   return { ok: true, mensaje: "Guardado.", tono: "exito" };
+}
+
+// -----------------------------------------------------------------------------
+// Administración de profesionales
+// -----------------------------------------------------------------------------
+
+/**
+ * Da de alta a un profesional y devuelve su contraseña **una sola vez**.
+ *
+ * SOLO EL ADMINISTRADOR. `exigirAdmin()` es la barrera de verdad: un
+ * entrenador que llame a esta acción a mano —sin pasar por ninguna pantalla—
+ * acaba en su lista de clientes. Que no vea el botón es cortesía.
+ *
+ * La contraseña se genera aquí, se le entrega al administrador para que se la
+ * pase, y **no se guarda en ningún sitio en claro**: a la base llega ya
+ * cifrada por ella misma. No se escribe en registros ni se vuelve a poder
+ * consultar — si se pierde, se genera otra.
+ *
+ * El profesional nace SIEMPRE como entrenador, con los mismos permisos que
+ * Rafa. Desde aquí no se crean administradores.
+ */
+export async function accionCrearProfesional(
+  _anterior: ResultadoAlta | null,
+  datos: FormData,
+): Promise<ResultadoAlta> {
+  await exigirAdmin();
+
+  const validado = esquemaProfesional.safeParse(desdeFormulario(datos));
+  if (!validado.success) {
+    return { ok: false, mensaje: validado.error.issues[0]?.message ?? "Revisa los datos", tono: "error" };
+  }
+
+  const correo = normalizarCorreo(validado.data.correo);
+  const problemas = revisarAlta({ nombre: validado.data.nombre, correo });
+  if (problemas.length > 0) {
+    return { ok: false, mensaje: problemas[0].mensaje, tono: "error" };
+  }
+
+  const clave = claveTemporal();
+  try {
+    await repositorio().crearProfesional({ nombre: validado.data.nombre, correo, clave });
+  } catch (error) {
+    return comoMensaje(error);
+  }
+
+  // Aparece solo donde haga falta: los selectores y la economía leen la lista
+  // real de profesionales, no una escrita a mano.
+  revalidatePath("/administracion/profesionales");
+  revalidatePath("/clientes");
+  revalidatePath("/economia");
+  revalidatePath("/calendario");
+
+  return {
+    ok: true,
+    mensaje: `${validado.data.nombre} ya puede entrar.`,
+    tono: "exito",
+    acceso: { correo, clave },
+  };
+}
+
+/** El alta devuelve además el acceso, para poder enseñarlo una vez. */
+export interface ResultadoAlta extends Resultado {
+  /** Solo en el momento de crearlo. Después no se puede volver a consultar. */
+  acceso?: { correo: string; clave: string };
+}
+
+/**
+ * Da de baja a un profesional, o lo vuelve a dar de alta.
+ *
+ * **Nunca borra a nadie.** Su histórico se queda entero: sus sesiones siguen
+ * siendo suyas y su economía sigue estando donde estaba.
+ *
+ * Y no se le puede dar de baja si todavía lleva clientes activos: primero se
+ * le pasan a otro. Un cliente activo sin responsable es un cliente al que
+ * nadie firma ni de quien nadie recibe avisos.
+ */
+export async function accionCambiarEstadoProfesional(
+  _anterior: Resultado | null,
+  datos: FormData,
+): Promise<Resultado> {
+  await exigirAdmin();
+
+  const validado = esquemaEstadoProfesional.safeParse(desdeFormulario(datos));
+  if (!validado.success) {
+    return { ok: false, mensaje: "Revisa los datos", tono: "error" };
+  }
+  const activo = validado.data.activo === "si";
+
+  // El identificador NO se usa tal cual: se comprueba contra la lista real.
+  const profesionales = await listarProfesionales();
+  const quien = profesionales.find((p) => p.id === validado.data.profesionalId);
+  if (!quien) return { ok: false, mensaje: "Ese profesional ya no existe", tono: "error" };
+
+  try {
+    if (!activo) {
+      const clientes = await repositorio().contarClientesActivosDe(quien.id);
+      const veredicto = puedeDesactivarse(quien, clientes);
+      if (!veredicto.puede) return { ok: false, mensaje: veredicto.porQue!, tono: "error" };
+    }
+    await repositorio().cambiarEstadoProfesional(quien.id, activo);
+  } catch (error) {
+    return comoMensaje(error);
+  }
+
+  revalidatePath("/administracion/profesionales");
+  revalidatePath("/clientes");
+  revalidatePath("/economia");
+  revalidatePath("/calendario");
+
+  return {
+    ok: true,
+    mensaje: activo ? `${quien.nombre} vuelve a tener acceso.` : `${quien.nombre} ya no puede entrar.`,
+    tono: "exito",
+  };
 }

@@ -27,7 +27,7 @@ export default async function PaginaDatos({
   // escriba la dirección a mano de un cliente ajeno recibe «no existe».
   const usuario = await exigirAccesoACliente(id);
   // Solo el administrador traspasa clientes entre profesionales.
-  const profesionales = esAdmin(usuario) ? await listarProfesionales() : [];
+  const todos = esAdmin(usuario) ? await listarProfesionales() : [];
   let perfil;
   try {
     perfil = await obtenerPerfil(id);
@@ -38,6 +38,11 @@ export default async function PaginaDatos({
   if (!perfil) notFound();
 
   const { cliente, servicios } = perfil;
+
+  // Los que pueden entrar, más —si lo estuviera— el responsable actual aunque
+  // esté de baja: si no, el selector no podría ni enseñar de quién es hoy y
+  // guardar cualquier otro cambio se lo quitaría sin querer.
+  const profesionales = todos.filter((p) => p.activo !== false || p.id === cliente.profesionalId);
   const { error: fallo } = await searchParams;
 
   // Con sesiones ya firmadas no se borra: se cancela, que archiva sin perder

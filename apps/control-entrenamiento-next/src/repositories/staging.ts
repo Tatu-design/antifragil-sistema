@@ -19,7 +19,7 @@ import path from "node:path";
 
 import { TARIFA_LIDOMARE, type TipoClase } from "@/domain/economia";
 import { duenioDeLaSesion } from "@/domain/atribucion";
-import { BONO, CUENTA, MENSUALIDAD } from "@/domain/modalidades";
+import { BONO, CUENTA, MENSUALIDAD, ErrorDeNegocio } from "@/domain/modalidades";
 import type { CargoMensual, Ciclo, Cliente, Sesion, SesionDelCalendario } from "@/domain/tipos";
 import { rangoSemana } from "@/lib/fechas";
 import type { Aviso, ClaseGrupo, DatosDeLaLista, Perfil, Repositorio, SemanaEconomica } from "./tipos";
@@ -513,7 +513,13 @@ export class RepositorioStaging implements Repositorio {
   async perfilPorCorreo(correo: string): Promise<Perfil | null> {
     const datos = await cargar();
     const buscado = correo.trim().toLowerCase();
-    return clonar(datos.perfiles.find((p) => p.correo.toLowerCase() === buscado) ?? null);
+    const perfil = datos.perfiles.find((p) => p.correo.toLowerCase() === buscado) ?? null;
+    // QUIEN ESTÁ DE BAJA NO ENTRA. La misma barrera que en Postgres, donde la
+    // consulta exige que la cuenta no esté bloqueada. Escrita también aquí
+    // para que se pueda comprobar en las pruebas: es de las cosas que no
+    // pueden fallar solo en producción.
+    if (perfil && perfil.activo === false) return null;
+    return clonar(perfil);
   }
 
   async profesionalDelCliente(clienteId: string): Promise<string | null> {
@@ -546,6 +552,34 @@ export class RepositorioStaging implements Repositorio {
       perfil.foto = datos.foto;
     }
     await volcar();
+  }
+
+  async crearProfesional(datos: { nombre: string; correo: string; clave: string }): Promise<{ id: string }> {
+    const almacen = await cargar();
+    const correo = datos.correo.trim().toLowerCase();
+    if (almacen.perfiles.some((p) => p.correo.toLowerCase() === correo)) {
+      throw new ErrorDeNegocio(`Ya hay alguien dado de alta con el correo ${correo}`);
+    }
+    // La contraseña NO se guarda: en Postgres la cifra la propia base y de
+    // aquí no sale. Guardarla en el archivo de pruebas sería justo el hábito
+    // que no se quiere coger.
+    const id = `per-${correo.split("@")[0].replace(/[^a-z0-9]/g, "")}`;
+    almacen.perfiles.push({ id, correo, nombre: datos.nombre, rol: "entrenador", foto: null, activo: true });
+    await volcar();
+    return { id };
+  }
+
+  async cambiarEstadoProfesional(id: string, activo: boolean): Promise<void> {
+    const almacen = await cargar();
+    const perfil = almacen.perfiles.find((p) => p.id === id);
+    // Nunca se borra: solo se marca. El histórico se queda como está.
+    if (perfil) perfil.activo = activo;
+    await volcar();
+  }
+
+  async contarClientesActivosDe(profesionalId: string): Promise<number> {
+    const datos = await cargar();
+    return datos.clientes.filter((c) => c.profesionalId === profesionalId && c.estado === "activo").length;
   }
 
   async asignarProfesional(clienteId: string, profesionalId: string | null): Promise<void> {

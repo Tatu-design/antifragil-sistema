@@ -85,6 +85,16 @@ export function PanelPerfil({
 
         {seccion === "datos" && (
           <div className="panel-pie">
+            {/* La zona de administración vive aquí y no en la barra de abajo:
+                se entra a ella de uvas a peras —dar de alta a alguien del
+                equipo— y la barra es para lo de todos los días. Esconderla a
+                un entrenador es cortesía; lo que le impide entrar es
+                `exigirAdmin()` en la propia pantalla. */}
+            {usuario.rol === "admin" && (
+              <a className="boton-secundario" href="/administracion/profesionales">
+                Profesionales
+              </a>
+            )}
             {/* Enlace normal, no `<Link>`: el enrutador precarga los enlaces a
                 la vista, y precargar «Salir» cerraba la sesión sola. */}
             <a className="boton-secundario" href="/salir">
