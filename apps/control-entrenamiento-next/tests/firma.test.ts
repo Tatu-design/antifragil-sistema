@@ -9,6 +9,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { BONO, CUENTA, MENSUALIDAD } from "@/domain/modalidades";
+import { hoyNegocio } from "@/lib/fechas";
 import { repositorio } from "@/repositories";
 import { reiniciarStagingParaPruebas } from "@/repositories/staging";
 import { cambiarEstado, marcarCobro, obtenerPerfil } from "@/services/clientes";
@@ -20,9 +21,7 @@ const CUENTA_CLIENTE = "cli-f"; // 35 €/sesión, sin tope. Del admin: un entre
 const PAUSADO = "cli-e";
 
 describe("firmar una sesión", () => {
-  beforeEach(() => {
-    reiniciarStagingParaPruebas();
-  });
+  beforeEach(() => reiniciarStagingParaPruebas());
 
   it("descuenta exactamente una sesión del bono", async () => {
     const antes = await obtenerPerfil(BONO_CASI_AGOTADO);
@@ -137,9 +136,7 @@ describe("firmar una sesión", () => {
 });
 
 describe("borrar una sesión deshace lo que hizo firmar", () => {
-  beforeEach(() => {
-    reiniciarStagingParaPruebas();
-  });
+  beforeEach(() => reiniciarStagingParaPruebas());
 
   it("devuelve la unidad al bono y descuenta su importe", async () => {
     await firmarSesion(BONO_CASI_AGOTADO, { fecha: "2026-08-03" });
@@ -187,9 +184,7 @@ describe("borrar una sesión deshace lo que hizo firmar", () => {
 });
 
 describe("el cobro no mueve dinero", () => {
-  beforeEach(() => {
-    reiniciarStagingParaPruebas();
-  });
+  beforeEach(() => reiniciarStagingParaPruebas());
 
   it("marcar cobrado no cambia facturación ni sesiones", async () => {
     await firmarSesion(BONO_CASI_AGOTADO, { fecha: "2026-08-03" });
@@ -212,7 +207,10 @@ describe("el cobro no mueve dinero", () => {
     await marcarCobro(MENSUAL, 1, true);
 
     const despues = await obtenerPerfil(MENSUAL);
-    const cargo = await repositorio().cargoDelMes(MENSUAL, 2026, 8);
+    // El mes en curso, no uno escrito a mano: el 1 de septiembre esta prueba
+    // se puso roja sola porque preguntaba por agosto (2026-09-02).
+    const hoy = hoyNegocio();
+    const cargo = await repositorio().cargoDelMes(MENSUAL, Number(hoy.slice(0, 4)), Number(hoy.slice(5, 7)));
     expect(despues!.ficha.pendientePago).toBe(false);
     expect(cargo!.pagado).toBe(true);
     expect(despues!.servicios[0]!.pagado).toBe(true);
@@ -226,9 +224,7 @@ describe("el cobro no mueve dinero", () => {
 });
 
 describe("la modalidad decide, no la pantalla", () => {
-  beforeEach(() => {
-    reiniciarStagingParaPruebas();
-  });
+  beforeEach(() => reiniciarStagingParaPruebas());
 
   it("las tres modalidades dejan firmar", async () => {
     for (const id of [BONO_CASI_AGOTADO, MENSUAL, CUENTA_CLIENTE]) {

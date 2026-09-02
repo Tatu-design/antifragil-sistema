@@ -24,8 +24,21 @@ import { NextResponse, type NextRequest } from "next/server";
  *                sin cuenta. Sin esto el filtro la redirigía al login y el
  *                navegador recibía una página HTML donde esperaba una foto:
  *                todos los avatares salían rotos (2026-08-12).
+ *   `/api/`    — las tareas que ejecuta el servidor solo. No tienen cookie
+ *                porque no las abre una persona; cada una comprueba su propio
+ *                secreto por dentro.
  */
-const PUBLICAS = ["/login", "/mi/", "/perfil/"];
+const PUBLICAS = [
+  "/login",
+  "/mi/",
+  "/perfil/",
+  // La tarea que abre el mes nuevo. No la llama una persona con sesión
+  // iniciada, la llama Vercel: aquí no hay cookie que valga. Lo que la
+  // protege es su secreto, comprobado dentro (`api/renovar-mes/route.ts`).
+  // Sin esto, la tarea acababa en la pantalla de entrada y no se ejecutaba
+  // nunca — y nadie se habría enterado (2026-09-02).
+  "/api/",
+];
 
 export function middleware(peticion: NextRequest) {
   const { pathname } = peticion.nextUrl;

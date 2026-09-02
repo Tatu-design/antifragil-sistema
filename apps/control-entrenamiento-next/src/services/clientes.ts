@@ -140,10 +140,13 @@ export async function confirmacionDeHoy(
 ): Promise<{ hayPendiente: boolean; confirmadas: Array<{ hora: string }> }> {
   const repo = repositorio();
   const hoy = hoyNegocio();
-  return {
-    hayPendiente: (await repo.sesionesSinConfirmarHoy(clienteId, hoy)).length > 0,
-    confirmadas: await repo.confirmacionesDeHoy(clienteId, hoy),
-  };
+  // Las dos a la vez: son independientes y así es un viaje de red en vez de
+  // dos seguidos (2026-09-02).
+  const [pendientes, confirmadas] = await Promise.all([
+    repo.sesionesSinConfirmarHoy(clienteId, hoy),
+    repo.confirmacionesDeHoy(clienteId, hoy),
+  ]);
+  return { hayPendiente: pendientes.length > 0, confirmadas };
 }
 
 export interface DatosAlta {
@@ -171,7 +174,10 @@ export async function crearCliente(datos: DatosAlta): Promise<Cliente> {
   const condiciones = validarCondiciones(datos.modalidad, datos);
   // Antes de escribir nada: un entrenador solo puede llevar bonos.
   await exigirModalidadPermitida(datos.profesionalId, condiciones.modalidad);
-  const hoy = new Date();
+  // EL MES DE MADRID, NO EL DEL SERVIDOR (2026-09-02). Vercel va en horario
+  // universal: el 1 de septiembre a la una de la madrugada en Madrid, allí
+  // todavía es 31 de agosto, y el servicio nacía con el mes equivocado.
+  const hoy = hoyNegocio();
 
   const cliente: Cliente = {
     id: randomUUID(),
@@ -199,8 +205,8 @@ export async function crearCliente(datos: DatosAlta): Promise<Cliente> {
     precioTotal: condiciones.precioTotal,
     cuotaMensual: condiciones.cuotaMensual,
     sesionesReferencia: condiciones.sesionesReferencia,
-    anio: condiciones.modalidad === "bono" ? null : hoy.getFullYear(),
-    mes: condiciones.modalidad === "bono" ? null : hoy.getMonth() + 1,
+    anio: condiciones.modalidad === "bono" ? null : Number(hoy.slice(0, 4)),
+    mes: condiciones.modalidad === "bono" ? null : Number(hoy.slice(5, 7)),
     fechaInicio: null,
     fechaFin: null,
     // Todo servicio nuevo nace PENDIENTE DE PAGO (2026-08-05), sea bono,
@@ -278,7 +284,8 @@ export async function configurarServicio(
   const cliente = await repo.obtenerCliente(clienteId);
   await exigirModalidadPermitida(cliente?.profesionalId, condiciones.modalidad);
 
-  const hoy = new Date();
+  // El mes de Madrid, no el del servidor. Ver el comentario del alta.
+  const hoy = hoyNegocio();
 
   return repo.transaccion(async () => {
     const cliente = await repo.obtenerCliente(clienteId);
@@ -289,8 +296,8 @@ export async function configurarServicio(
 
     const etiqueta = cambio.servicio.trim() || ETIQUETAS_SERVICIO[condiciones.modalidad];
     const esMensualNueva = condiciones.modalidad !== "bono";
-    const anio = esMensualNueva ? hoy.getFullYear() : null;
-    const mes = esMensualNueva ? hoy.getMonth() + 1 : null;
+    const anio = esMensualNueva ? Number(hoy.slice(0, 4)) : null;
+    const mes = esMensualNueva ? Number(hoy.slice(5, 7)) : null;
 
     const camposEconomicos = {
       servicio: etiqueta,
@@ -314,7 +321,7 @@ export async function configurarServicio(
     const ultima = sesiones.filter((s) => s.ciclo === actual.ciclo)[0]?.fecha ?? null;
     await repo.guardarCiclo({
       ...actual,
-      fechaFin: actual.fechaFin ?? ultima ?? hoy.toISOString().slice(0, 10),
+      fechaFin: actual.fechaFin ?? ultima ?? hoy,
     });
 
     const nuevo = actual.ciclo + 1;

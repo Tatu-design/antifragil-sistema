@@ -39,18 +39,22 @@ export default async function PaginaClientes({
     // Tampoco se le piden los avisos ni las cuentas de CrossFit: son del
     // administrador, así que serían dos viajes de red para nada.
     if (admin) {
-      const [lista, avisos, lidomare, kids] = await Promise.all([
+      // LAS CINCO A LA VEZ. La de los profesionales iba suelta detrás, y era
+      // un viaje de red más en fila para nada: no depende de ninguna de las
+      // otras (2026-09-02).
+      const [lista, avisos, lidomare, kids, equipo] = await Promise.all([
         listarClientes(),
         contarNoLeidos(),
         obtenerCuenta("lidomare"),
         obtenerCuenta("kids"),
+        listarProfesionales(),
       ]);
       clientes = lista;
       sinLeer = avisos;
       cuentas = [lidomare.ficha, kids.ficha];
       // Sin foto: el filtro solo enseña nombres, y la foto pesaba 18 KB
       // por profesional dentro de la propia página (2026-08-12).
-      profesionales = (await listarProfesionales()).map(paraLaInterfaz);
+      profesionales = equipo.map(paraLaInterfaz);
     } else {
       // El entrenador tampoco pide las cuentas de CrossFit —no son suyas—
       // pero sí sus avisos: necesita el punto rojo de la barra.

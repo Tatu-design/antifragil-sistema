@@ -2316,3 +2316,58 @@ permisos distintos—, y el identificador que llega en el formulario se comprueb
 contra la lista real antes de tocar nada.
 
 Sin migración: no hizo falta ninguna columna nueva.
+
+### Tres arreglos: lentitud, «Guardando…» y el cambio de mes (2026-09-02)
+
+**1. La aplicación iba lenta porque el pool tenía UNA conexión.** Se puso así el
+2026-08-27, cuando la base iba en modo sesión y solo había 15 conexiones para
+toda la aplicación. El 2026-08-30 pasó a modo transacción —que aguanta 45 a la
+vez, medido— y quedarse en una salió caro: con una sola conexión, todas las
+consultas de una pantalla van **en fila** aunque el código las lance a la vez.
+Los `Promise.all` de toda la aplicación no servían de nada.
+
+Medido con las conexiones ya abiertas, siete consultas como las de la lista:
+
+    max: 1 → 332 ms      max: 4 → 95 ms      max: 7 → 51 ms
+
+Ahora `max: 5`. Y se paralelizó lo que iba suelto: la carga de profesionales de
+la lista (iba detrás del resto), y la confirmación de hoy en la ficha.
+
+**2. «Guardando…» eterno: la comprobación de cuadre iba antes de contestar.** La
+sesión ya estaba guardada —la transacción había confirmado— y la pantalla
+seguía esperando a una comprobación que no cambia nada de lo recién escrito. Si
+tardaba o se cortaba la red, quedaba el peor estado posible: guardada por
+dentro, «no guardada» por fuera.
+
+Ahora esa comprobación va con `after()` de Next 15, que ejecuta el trabajo
+**después** de enviar la respuesta y en Vercel se apoya en el mecanismo del
+propio servidor. No es una promesa suelta: esas sí las corta Vercel al
+contestar, y la comprobación no se haría nunca sin que nadie se enterara. Ver
+`lib/despues.ts`.
+
+De paso, el código QR solo se dibuja cuando se va a enseñar —justo después de
+firmar—, no en cada visita a la ficha.
+
+Medido contra la base real: lista 1.023 → 200 ms, ficha 614 → 97 ms, firmar
+3.974 → 689 ms.
+
+**3. Nadie abría el mes nuevo.** `domain/modalidades.ts` decía desde el
+principio que una mensualidad o una cuenta se cierran al cambiar de mes. Lo
+decía y no lo hacía nadie: el ciclo del mes nuevo solo aparecía si alguien
+entraba a configurar el servicio a mano. El 1 de septiembre no lo hizo nadie.
+
+Ahora hay una tarea (`/api/renovar-mes`) que Vercel llama **todos los días** a
+las 01:30 UTC, protegida por un secreto. Se ejecuta a diario y no solo el día 1
+a propósito: como no hace nada cuando ya está hecho, un fallo el día 1 se
+arregla solo el día 2. Cada cliente va en su propia transacción, así que uno
+que falle no deja a los demás sin su mes. Con más de un mes de retraso **no
+inventa los meses de en medio**: lo marca para que lo mire una persona.
+
+De paso se corrigió un fallo de zona horaria real: al dar de alta o cambiar un
+servicio, el mes salía de `new Date()` —la hora del servidor, que en Vercel es
+universal—. El 1 de septiembre a la una de la madrugada en Madrid allí todavía
+era 31 de agosto, y el servicio nacía en el mes equivocado. Ahora sale de
+`hoyNegocio()`, como el resto.
+
+Y los datos de pruebas tenían agosto de 2026 escrito a mano: el 1 de septiembre
+cinco pruebas se pusieron rojas solas. Ahora envejecen con el calendario.

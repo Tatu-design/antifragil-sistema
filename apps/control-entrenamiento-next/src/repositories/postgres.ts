@@ -79,20 +79,28 @@ function pool(): Pool {
     g.pool = new Pool({
       connectionString: url,
       ssl: { rejectUnauthorized: false },
-      // UNA CONEXIÓN POR INSTANCIA (2026-08-27).
+      // CINCO CONEXIONES POR INSTANCIA (2026-09-02).
       //
-      // Aquí no manda cuántas quiere esta instancia, manda cuántas hay para
-      // todos. El pooler de Supabase acepta 15 clientes a la vez, y Vercel
-      // levanta una instancia nueva de la aplicación por cada tanda de
-      // peticiones: con tres conexiones cada una, cinco instancias agotaban el
-      // cupo y la sexta se estrellaba. Le pasó a Fernando al firmar una
-      // sesión: «Algo ha fallado», y en el registro del servidor
-      // `EMAXCONNSESSION: max clients reached`.
+      // Estuvo en 1 desde el 2026-08-27, cuando el pooler iba en modo sesión y
+      // solo aceptaba 15 clientes para TODA la aplicación: con tres por
+      // instancia, cinco instancias agotaban el cupo. Bajarlo a una arregló
+      // aquello.
       //
-      // Con una, caben quince instancias en vez de cinco. Y no se pierde nada:
-      // cada instancia atiende de una en una, así que la segunda conexión casi
-      // nunca se usaba — solo ocupaba sitio que le hacía falta a otro.
-      max: 1,
+      // Pero el 2026-08-30 la base pasó a modo transacción, donde ya no hay
+      // ese techo —medido: 45 conexiones a la vez sin un fallo—, y quedarse en
+      // una salió caro: con una sola conexión, todas las consultas de una
+      // pantalla van EN FILA aunque el código las lance a la vez. Los
+      // `Promise.all` de toda la aplicación no servían de nada.
+      //
+      // Medido contra la base real, siete consultas como las de la lista de
+      // clientes, con las conexiones ya abiertas:
+      //
+      //     max: 1 → 332 ms     max: 4 → 95 ms     max: 7 → 51 ms
+      //
+      // Cinco cubre de sobra la pantalla más pesada y deja margen: aunque
+      // hubiera seis instancias a la vez serían treinta conexiones, muy por
+      // debajo de lo que aguanta el pooler.
+      max: 5,
       // Abrir una conexión nueva cuesta unos 700 ms (saludo TCP + cifrado +
       // autenticación) ANTES de la primera consulta. Con los 10 segundos de
       // antes, cualquier pausa normal —mirar un cliente, guardar el móvil,
