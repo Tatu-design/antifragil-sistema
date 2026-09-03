@@ -154,23 +154,41 @@ export interface ResultadoFirma {
 }
 
 /**
- * Una sesión vista desde el calendario: lo justo para reconocerla.
+ * Qué clase de actividad es. Son las tres cosas que se firman.
  *
- * No es una `Sesion` recortada, es otra cosa: lleva el nombre del cliente y de
- * quién es la sesión, que están en otras tablas. Se queda fuera todo lo que no
- * ayuda a decir «esta sesión fue esta» —número de sesión, ciclo, tarifa—.
- * La tarifa, además, no tiene por qué viajar hasta el navegador para pintar un
- * calendario.
+ * Las sesiones de cliente viven en `sesiones` y las clases de CrossFit en
+ * `clases_grupo`: **dos tablas distintas, y así se quedan**. El calendario las
+ * junta al leer, no copiando unas dentro de otras (2026-09-03).
  */
-export interface SesionDelCalendario {
+export type ClaseDeActividad = "sesion_cliente" | "crossfit_kids" | "crossfit_lidomare";
+
+/**
+ * Una actividad firmada, vista desde el calendario: lo justo para reconocerla.
+ *
+ * Vale para las tres: la sesión de un cliente, una clase de CrossFit Kids y una
+ * de CrossFit Lidomare. Se queda fuera todo lo que no ayuda a decir «esto fue
+ * esto» —número de sesión, ciclo, tarifa—. La tarifa, además, no tiene por qué
+ * viajar hasta el navegador para pintar un calendario.
+ *
+ * NACE DE UN FALLO (2026-09-03): el calendario solo miraba `sesiones`, así que
+ * las clases de CrossFit se firmaban, contaban en Economía y **no aparecían**.
+ */
+export interface ActividadDelCalendario {
   id: string;
-  clienteId: string;
-  cliente: string;
+  clase: ClaseDeActividad;
   /** `AAAA-MM-DD`, día de Madrid. */
   fecha: string;
   /** `HH:MM`, o `null`: la mitad del histórico no la tiene y no se inventa. */
   hora: string | null;
-  servicio: string;
+  /** Lo que se lee: el nombre del cliente, o «CrossFit Kids». */
+  titulo: string;
+  /** La segunda línea: su programa. Vacía en las clases de grupo. */
+  detalle: string;
+  /**
+   * A quién lleva al tocarla. **`null` en las clases de CrossFit**: no son de
+   * ningún cliente y no pueden enlazar a una ficha que no existe.
+   */
+  clienteId: string | null;
   /** De quién es la producción, ya resuelto con las reglas de atribución. */
   profesionalId: string | null;
 }

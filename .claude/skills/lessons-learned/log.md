@@ -949,3 +949,31 @@ frías y abrir una cuesta 385 ms, que se comía toda la ganancia. Con el pool ya
 caliente, que es el caso normal, la diferencia era de 332 ms a 51 ms. **Medir
 en frío una cosa que en producción está caliente da el resultado contrario al
 verdadero.**
+
+---
+
+## Una fuente de actividad nueva tiene más consumidores de los que parece (2026-09-03)
+
+**Qué pasó.** Fernando firmó una clase de CrossFit Kids y no apareció en el
+calendario. La firma estaba guardada y la clase contaba en Economía: solo
+faltaba en esa pantalla.
+
+La causa: el calendario leía únicamente la tabla `sesiones`, y las clases de
+CrossFit viven en `clases_grupo`. Cuando construí el calendario (2026-08-24) me
+pregunté de quién era cada sesión, cómo atribuirla y cómo protegerla —y no me
+pregunté **si las sesiones eran toda la actividad que se firma**. No lo eran.
+
+**La causa raíz.** Al añadir una pantalla que consume actividad firmada, miré
+la fuente que tenía delante y no busqué las demás. Nadie lo detectó porque
+Economía sí las contaba: el sistema daba cifras correctas por un lado y una
+vista incompleta por otro, que es el fallo más difícil de ver.
+
+**La lección.** Cuando exista más de una tabla donde se registre lo mismo
+—actividad firmada, dinero, horas— y se añada o se toque una vista que la
+consuma, hay que recorrer **todas** las fuentes y **todos** los consumidores:
+calendario, economía, informes, permisos y revalidaciones. Y escribir pruebas
+cruzadas: no basta con probar que cada fuente funciona por su lado, hay que
+probar que **cada vista las ve todas**.
+
+La pregunta concreta que hay que hacerse: «¿esto es toda la actividad que
+existe, o solo la que tengo delante?».

@@ -20,7 +20,7 @@ import path from "node:path";
 import { TARIFA_LIDOMARE, type TipoClase } from "@/domain/economia";
 import { duenioDeLaSesion } from "@/domain/atribucion";
 import { BONO, CUENTA, MENSUALIDAD, ErrorDeNegocio } from "@/domain/modalidades";
-import type { CargoMensual, Ciclo, Cliente, Sesion, SesionDelCalendario } from "@/domain/tipos";
+import type { CargoMensual, Ciclo, Cliente, Sesion, ActividadDelCalendario } from "@/domain/tipos";
 import { hoyNegocio, rangoSemana } from "@/lib/fechas";
 import type { Aviso, ClaseGrupo, DatosDeLaLista, Perfil, Repositorio, SemanaEconomica } from "./tipos";
 
@@ -297,11 +297,11 @@ export class RepositorioStaging implements Repositorio {
     );
   }
 
-  async sesionesEntre(
+  async actividadEntre(
     desde: string,
     hasta: string,
     alcance: { soloDe?: string | null; adminId?: string | null } = {},
-  ): Promise<SesionDelCalendario[]> {
+  ): Promise<ActividadDelCalendario[]> {
     const datos = await cargar();
     const soloDe = alcance.soloDe ?? null;
     const nombreDe = new Map(datos.clientes.map((c) => [c.id, c.nombre]));
@@ -310,15 +310,16 @@ export class RepositorioStaging implements Repositorio {
     // Las mismas reglas que en Postgres, escritas una sola vez en
     // `domain/atribucion.ts`. Si las dos implementaciones divergieran, el
     // calendario diría una cosa en pruebas y otra en producción.
-    return datos.sesiones
+    const sesiones: ActividadDelCalendario[] = datos.sesiones
       .filter((s) => s.fecha >= desde && s.fecha <= hasta)
       .map((s) => ({
         id: s.id,
-        clienteId: s.clienteId,
-        cliente: nombreDe.get(s.clienteId) ?? "",
+        clase: "sesion_cliente" as const,
         fecha: s.fecha,
         hora: s.hora ?? null,
-        servicio: s.servicio,
+        titulo: nombreDe.get(s.clienteId) ?? "",
+        detalle: s.servicio,
+        clienteId: s.clienteId,
         profesionalId: duenioDeLaSesion({
           profesionalId: s.profesionalId,
           fecha: s.fecha,
@@ -326,14 +327,35 @@ export class RepositorioStaging implements Repositorio {
           adminId: alcance.adminId ?? null,
         }),
       }))
-      .filter((s) => !soloDe || s.profesionalId === soloDe)
-      .sort(
-        (a, b) =>
-          a.fecha.localeCompare(b.fecha) ||
-          // Las que no tienen hora van al final del día, no al principio.
-          (a.hora ?? "99:99").localeCompare(b.hora ?? "99:99") ||
-          a.cliente.localeCompare(b.cliente, "es"),
-      );
+      .filter((s) => !soloDe || s.profesionalId === soloDe);
+
+    // CrossFit es del administrador: solo sale mirando todo el negocio o lo
+    // suyo. A un entrenador no le corresponde.
+    const conCrossfit = !soloDe || (alcance.adminId != null && soloDe === alcance.adminId);
+    const clases: ActividadDelCalendario[] = conCrossfit
+      ? datos.clases
+          .filter((c) => c.fecha >= desde && c.fecha <= hasta)
+          .map((c) => ({
+            id: c.id,
+            clase: (c.tipo === "kids" ? "crossfit_kids" : "crossfit_lidomare") as ActividadDelCalendario["clase"],
+            fecha: c.fecha,
+            hora: null,
+            titulo: c.tipo === "kids" ? "CrossFit Kids" : "CrossFit Lidomare",
+            detalle: "",
+            // Una clase de grupo NO es de ningún cliente: no puede enlazar a
+            // una ficha que no existe.
+            clienteId: null,
+            profesionalId: alcance.adminId ?? null,
+          }))
+      : [];
+
+    return [...sesiones, ...clases].sort(
+      (a, b) =>
+        a.fecha.localeCompare(b.fecha) ||
+        // Las que no tienen hora van al final del día, no al principio.
+        (a.hora ?? "99:99").localeCompare(b.hora ?? "99:99") ||
+        a.titulo.localeCompare(b.titulo, "es"),
+    );
   }
 
   async resumenDeSesionesEntre(desde: string, hasta: string) {

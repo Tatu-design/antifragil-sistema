@@ -25,7 +25,7 @@
  *   agosto y del ciclo de agosto: aquí solo se abre uno nuevo.
  */
 
-import { decidir, llevaCuota, type Decision } from "@/domain/renovacion";
+import { decidir, llevaCuota, ultimoDiaDelMes, type Decision } from "@/domain/renovacion";
 import { MENSUALIDAD } from "@/domain/modalidades";
 import type { Ciclo } from "@/domain/tipos";
 import { hoyNegocio } from "@/lib/fechas";
@@ -139,7 +139,14 @@ export async function renovarMeses({ soloMirar = false } = {}): Promise<Resumen>
 
         // El que se cierra: se le pone fin, y **no se le toca nada más**. Sus
         // sesiones siguen siendo suyas.
-        await repo.guardarCiclo({ ...actual, fechaFin: actual.fechaFin ?? hoy });
+        //
+        // El fin es el último día de SU mes, no el día en que se ejecuta esto.
+        // Una mensualidad es un mes natural: agosto se cierra el 31 de agosto,
+        // aunque la tarea corra el 2 de septiembre (2026-09-03).
+        await repo.guardarCiclo({
+          ...actual,
+          fechaFin: actual.fechaFin ?? ultimoDiaDelMes(actual.anio!, actual.mes!),
+        });
 
         const nuevo: Ciclo = {
           ...actual,

@@ -151,6 +151,8 @@ export async function accionFirmar(datos: FormData): Promise<void> {
 
   revalidatePath(`/clientes/${id}`);
   revalidatePath("/clientes");
+  // El calendario también enseña esta sesión.
+  revalidatePath("/calendario");
   redirect(`/clientes/${id}?firmado=${encodeURIComponent(mensaje)}`);
 }
 
@@ -314,6 +316,8 @@ export async function accionBorrarSesion(datos: FormData): Promise<void> {
   revalidatePath(`/clientes/${id}`);
   revalidatePath("/clientes");
   revalidatePath("/economia");
+  // La sesión desaparece también del calendario.
+  revalidatePath("/calendario");
   redirect(`/clientes/${id}?borrado=${encodeURIComponent(aviso)}`);
 }
 
@@ -349,6 +353,9 @@ export async function accionFirmarClase(datos: FormData): Promise<void> {
   revalidatePath(destino);
   revalidatePath("/clientes");
   revalidatePath("/economia");
+  // Las clases de CrossFit salen en el calendario desde el 2026-09-03: si no
+  // se refresca, se firman y el día sigue enseñando el número de antes.
+  revalidatePath("/calendario");
   redirect(`${destino}?firmada=${encodeURIComponent(cuando)}`);
 }
 
@@ -374,6 +381,9 @@ export async function accionBorrarClase(datos: FormData): Promise<void> {
   revalidatePath(destino);
   revalidatePath("/clientes");
   revalidatePath("/economia");
+  // Las clases de CrossFit salen en el calendario desde el 2026-09-03: si no
+  // se refresca, se firman y el día sigue enseñando el número de antes.
+  revalidatePath("/calendario");
   redirect(`${destino}?borrada=${encodeURIComponent(cuando)}`);
 }
 
@@ -453,6 +463,8 @@ export async function accionEditarSesion(datos: FormData): Promise<void> {
 
   revalidatePath(`/clientes/${clienteId}`);
   revalidatePath("/economia");
+  // Cambiar la fecha de una sesión la mueve de día en el calendario.
+  revalidatePath("/calendario");
   redirect(`/clientes/${clienteId}?guardado=${encodeURIComponent("sesión corregida")}`);
 }
 

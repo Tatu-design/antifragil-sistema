@@ -81,3 +81,16 @@ export function llevaCuota(modalidad: Modalidad): boolean {
 export function vaPorMeses(modalidad: Modalidad): boolean {
   return esMensual(modalidad);
 }
+
+/**
+ * El último día del mes que se cierra.
+ *
+ * Una mensualidad **es** un mes natural, así que el mes de agosto se cierra el
+ * 31 de agosto, no el día en que a la tarea le dé por ejecutarse. Ponía la
+ * fecha de ejecución, y el ciclo de agosto acababa marcado «hasta el 2 de
+ * septiembre»: un mes que termina dentro del siguiente (2026-09-03).
+ */
+export function ultimoDiaDelMes(anio: number, mes: number): string {
+  const dias = new Date(Date.UTC(anio, mes, 0)).getUTCDate();
+  return `${anio}-${String(mes).padStart(2, "0")}-${String(dias).padStart(2, "0")}`;
+}

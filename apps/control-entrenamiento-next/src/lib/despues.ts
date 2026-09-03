@@ -41,7 +41,12 @@ export function despues(nombre: string, tarea: () => Promise<void>): void {
   };
 
   try {
-    after(protegida());
+    // SE LE PASA LA FUNCIÓN, NO LA PROMESA. `after(protegida())` la habría
+    // arrancado aquí mismo, antes de contestar, que es justo lo que se
+    // quería evitar: la tarea empezaría a competir por la conexión mientras
+    // la respuesta todavía se está enviando. Con la función, Next la llama
+    // cuando ya ha contestado (2026-09-03).
+    after(protegida);
   } catch {
     // No estamos dentro de una petición. Se hace ahora.
     tareaEnCurso = protegida();
