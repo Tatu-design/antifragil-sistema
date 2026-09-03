@@ -6,6 +6,12 @@
  * sola consulta y se cuentan por día. La fuente de verdad sigue siendo
  * `sesiones`.
  *
+ * QUÉ ENTRA. Las sesiones de clientes (`sesiones`) y las clases de CrossFit
+ * (`clases_grupo`), leídas juntas en una sola consulta. Las dos tablas siguen
+ * separadas: CrossFit no se copia dentro de `sesiones`. Se añadió el
+ * 2026-09-03, cuando se vio que una clase de Kids se firmaba, contaba en
+ * Economía y no aparecía en el calendario.
+ *
  * DE QUIÉN ES CADA SESIÓN. Se usa la misma atribución que Economía
  * (`domain/atribucion.ts`), NO quién pulsó el botón. Son dos cosas distintas y
  * el sistema ya las distingue: `firmadaPor` es trazabilidad y `profesionalId`
@@ -25,15 +31,18 @@ import {
   rangoDelMes,
   type Mes,
 } from "@/domain/calendario";
-import type { SesionDelCalendario } from "@/domain/tipos";
+import type { ActividadDelCalendario } from "@/domain/tipos";
 import { hoyNegocio } from "@/lib/fechas";
 import { repositorio } from "@/repositories";
 
 export interface VistaCalendario {
   /** La cuadrícula, con el número de sesiones de cada día. */
   mes: Mes;
-  /** Las sesiones del mes entero, ya filtradas por quien puede verlas. */
-  sesiones: SesionDelCalendario[];
+  /**
+   * TODA la actividad del mes, ya filtrada por quien puede verla: sesiones de
+   * clientes y clases de CrossFit.
+   */
+  sesiones: ActividadDelCalendario[];
   /** `AAAA-MM-DD` de hoy en Madrid. */
   hoy: string;
 }
@@ -59,9 +68,10 @@ export async function obtenerCalendario(peticion: {
   const { desde, hasta } = rangoDelMes(peticion.anio, peticion.mes);
   const hoy = hoyNegocio();
 
-  // UNA consulta para todo el mes, del día 1 al último. Ni un día suelto ni el
+  // UNA consulta para todo el mes, del día 1 al último, y para las dos fuentes
+  // de actividad a la vez. Ni un día suelto, ni una consulta por tipo, ni el
   // histórico entero.
-  const sesiones = await repositorio().sesionesEntre(desde, hasta, {
+  const sesiones = await repositorio().actividadEntre(desde, hasta, {
     soloDe: peticion.profesionalId ?? null,
     adminId: peticion.adminId ?? null,
   });

@@ -919,3 +919,61 @@ conexión—. Pero eso fue suerte, no método.
 Y una segunda lección, esta de diseño: **el tamaño del pool no lo decide una
 instancia, lo decide el cupo compartido.** `max: 3` parece prudente mirando una
 instancia y es temerario cuando hay quince pidiendo de un bote de quince.
+
+---
+
+## Un arreglo de emergencia deja deuda si no se revisa después (2026-09-02)
+
+**Qué pasó.** El 27 de agosto puse el pool de conexiones en `max: 1` para salir
+de un incendio: la base iba en modo sesión, solo daba 15 conexiones para toda
+la aplicación y Fernando no podía firmar. Funcionó.
+
+Tres días después, el 30, cambiamos la base a modo transacción, que aguanta 45.
+El techo desapareció y **`max: 1` se quedó ahí**. Con una sola conexión todas
+las consultas de una pantalla van en fila aunque el código las lance a la vez:
+los `Promise.all` de toda la aplicación dejaron de servir para nada. La lista de
+clientes tardaba nueve segundos.
+
+**La causa raíz.** Al quitar la restricción no volví a mirar lo que había puesto
+por culpa de ella. El arreglo de emergencia era correcto para su momento y se
+convirtió en el problema siguiente.
+
+**La lección.** Cuando se quita la causa de un apaño, hay que ir a buscar el
+apaño. Un comentario del tipo «esto está así porque X» es una nota para el
+futuro: el día que X deje de ser verdad, ese código hay que revisarlo. Y la
+medición que justificó el apaño hay que repetirla, no recordarla.
+
+Y una trampa de medición: la primera vez que medí el efecto del pool salió
+plano —332 ms con una conexión, 337 con seis— porque las conexiones estaban
+frías y abrir una cuesta 385 ms, que se comía toda la ganancia. Con el pool ya
+caliente, que es el caso normal, la diferencia era de 332 ms a 51 ms. **Medir
+en frío una cosa que en producción está caliente da el resultado contrario al
+verdadero.**
+
+---
+
+## Una fuente de actividad nueva tiene más consumidores de los que parece (2026-09-03)
+
+**Qué pasó.** Fernando firmó una clase de CrossFit Kids y no apareció en el
+calendario. La firma estaba guardada y la clase contaba en Economía: solo
+faltaba en esa pantalla.
+
+La causa: el calendario leía únicamente la tabla `sesiones`, y las clases de
+CrossFit viven en `clases_grupo`. Cuando construí el calendario (2026-08-24) me
+pregunté de quién era cada sesión, cómo atribuirla y cómo protegerla —y no me
+pregunté **si las sesiones eran toda la actividad que se firma**. No lo eran.
+
+**La causa raíz.** Al añadir una pantalla que consume actividad firmada, miré
+la fuente que tenía delante y no busqué las demás. Nadie lo detectó porque
+Economía sí las contaba: el sistema daba cifras correctas por un lado y una
+vista incompleta por otro, que es el fallo más difícil de ver.
+
+**La lección.** Cuando exista más de una tabla donde se registre lo mismo
+—actividad firmada, dinero, horas— y se añada o se toque una vista que la
+consuma, hay que recorrer **todas** las fuentes y **todos** los consumidores:
+calendario, economía, informes, permisos y revalidaciones. Y escribir pruebas
+cruzadas: no basta con probar que cada fuente funciona por su lado, hay que
+probar que **cada vista las ve todas**.
+
+La pregunta concreta que hay que hacerse: «¿esto es toda la actividad que
+existe, o solo la que tengo delante?».

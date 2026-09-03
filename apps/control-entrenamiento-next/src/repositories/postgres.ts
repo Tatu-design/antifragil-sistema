@@ -52,7 +52,7 @@ pg.types.setTypeParser(1114, (valor) => valor);
 import type { TipoClase } from "@/domain/economia";
 import { DESDE_QUE_HAY_PROFESIONALES } from "@/domain/atribucion";
 import { MENSUALIDAD, type Modalidad, ErrorDeNegocio } from "@/domain/modalidades";
-import type { CargoMensual, Ciclo, Cliente, Estado, Sesion, SesionDelCalendario } from "@/domain/tipos";
+import type { CargoMensual, Ciclo, Cliente, Estado, Sesion, ActividadDelCalendario } from "@/domain/tipos";
 import { TARIFA_LIDOMARE } from "@/domain/economia";
 import { rangoSemana } from "@/lib/fechas";
 import type { Aviso, ClaseGrupo, DatosDeLaLista, DatosMes, Perfil, Repositorio, SemanaEconomica } from "./tipos";
@@ -79,20 +79,28 @@ function pool(): Pool {
     g.pool = new Pool({
       connectionString: url,
       ssl: { rejectUnauthorized: false },
-      // UNA CONEXIÓN POR INSTANCIA (2026-08-27).
+      // CINCO CONEXIONES POR INSTANCIA (2026-09-02).
       //
-      // Aquí no manda cuántas quiere esta instancia, manda cuántas hay para
-      // todos. El pooler de Supabase acepta 15 clientes a la vez, y Vercel
-      // levanta una instancia nueva de la aplicación por cada tanda de
-      // peticiones: con tres conexiones cada una, cinco instancias agotaban el
-      // cupo y la sexta se estrellaba. Le pasó a Fernando al firmar una
-      // sesión: «Algo ha fallado», y en el registro del servidor
-      // `EMAXCONNSESSION: max clients reached`.
+      // Estuvo en 1 desde el 2026-08-27, cuando el pooler iba en modo sesión y
+      // solo aceptaba 15 clientes para TODA la aplicación: con tres por
+      // instancia, cinco instancias agotaban el cupo. Bajarlo a una arregló
+      // aquello.
       //
-      // Con una, caben quince instancias en vez de cinco. Y no se pierde nada:
-      // cada instancia atiende de una en una, así que la segunda conexión casi
-      // nunca se usaba — solo ocupaba sitio que le hacía falta a otro.
-      max: 1,
+      // Pero el 2026-08-30 la base pasó a modo transacción, donde ya no hay
+      // ese techo —medido: 45 conexiones a la vez sin un fallo—, y quedarse en
+      // una salió caro: con una sola conexión, todas las consultas de una
+      // pantalla van EN FILA aunque el código las lance a la vez. Los
+      // `Promise.all` de toda la aplicación no servían de nada.
+      //
+      // Medido contra la base real, siete consultas como las de la lista de
+      // clientes, con las conexiones ya abiertas:
+      //
+      //     max: 1 → 332 ms     max: 4 → 95 ms     max: 7 → 51 ms
+      //
+      // Cinco cubre de sobra la pantalla más pesada y deja margen: aunque
+      // hubiera seis instancias a la vez serían treinta conexiones, muy por
+      // debajo de lo que aguanta el pooler.
+      max: 5,
       // Abrir una conexión nueva cuesta unos 700 ms (saludo TCP + cifrado +
       // autenticación) ANTES de la primera consulta. Con los 10 segundos de
       // antes, cualquier pausa normal —mirar un cliente, guardar el móvil,
@@ -441,11 +449,11 @@ export class RepositorioPostgres implements Repositorio {
     return filas.map(aSesion);
   }
 
-  async sesionesEntre(
+  async actividadEntre(
     desde: string,
     hasta: string,
     alcance: { soloDe?: string | null; adminId?: string | null } = {},
-  ): Promise<SesionDelCalendario[]> {
+  ): Promise<ActividadDelCalendario[]> {
     const soloDe = alcance.soloDe ?? null;
 
     // De quién es una sesión, con las MISMAS tres reglas que Economía
@@ -459,17 +467,43 @@ export class RepositorioPostgres implements Repositorio {
     const duenio =
       "coalesce(s.profesional_id, case when s.fecha < $3::date then $4 else cl.entrenador_id end)";
 
+    // LAS CLASES DE CROSSFIT SON DEL ADMINISTRADOR, igual que en Economía. Se
+    // piden cuando se mira todo el negocio o cuando se mira la suya; a un
+    // entrenador no le corresponden y ni siquiera salen de la base.
+    const conCrossfit = !soloDe || (alcance.adminId !== null && soloDe === alcance.adminId);
+
+    // UNA SOLA CONSULTA para las dos tablas. `clases_grupo` sigue siendo la
+    // fuente de verdad de CrossFit: aquí se lee junto con `sesiones`, no se
+    // copia dentro (2026-09-03).
     const filas = await consultar(
-      `select s.id, s.cliente_id, cl.nombre as cliente,
+      `select s.id::text as id,
+              'sesion_cliente' as clase,
               to_char(s.fecha,'YYYY-MM-DD') as fecha,
               to_char(s.hora,'HH24:MI') as hora,
-              s.servicio,
+              cl.nombre as titulo,
+              s.servicio as detalle,
+              s.cliente_id::text as cliente_id,
               ${duenio} as duenio
          from sesiones s
          join clientes cl on cl.id = s.cliente_id
         where s.fecha >= $1::date and s.fecha <= $2::date
           ${soloDe ? `and ${duenio} = $5` : ""}
-        order by s.fecha, s.hora nulls last, cl.nombre`,
+       ${
+         conCrossfit
+           ? `union all
+       select g.id::text as id,
+              case when g.tipo::text = 'kids' then 'crossfit_kids' else 'crossfit_lidomare' end as clase,
+              to_char(g.fecha,'YYYY-MM-DD') as fecha,
+              null as hora,
+              case when g.tipo::text = 'kids' then 'CrossFit Kids' else 'CrossFit Lidomare' end as titulo,
+              '' as detalle,
+              null as cliente_id,
+              $4 as duenio
+         from clases_grupo g
+        where g.fecha >= $1::date and g.fecha <= $2::date`
+           : ""
+       }
+        order by fecha, hora nulls last, titulo`,
       soloDe
         ? [desde, hasta, DESDE_QUE_HAY_PROFESIONALES, alcance.adminId ?? null, soloDe]
         : [desde, hasta, DESDE_QUE_HAY_PROFESIONALES, alcance.adminId ?? null],
@@ -477,11 +511,12 @@ export class RepositorioPostgres implements Repositorio {
 
     return filas.map((f) => ({
       id: f.id as string,
-      clienteId: f.cliente_id as string,
-      cliente: f.cliente as string,
+      clase: f.clase as ActividadDelCalendario["clase"],
       fecha: f.fecha as string,
       hora: (f.hora as string | null) ?? null,
-      servicio: f.servicio as string,
+      titulo: f.titulo as string,
+      detalle: (f.detalle as string | null) ?? "",
+      clienteId: (f.cliente_id as string | null) ?? null,
       profesionalId: (f.duenio as string | null) ?? null,
     }));
   }

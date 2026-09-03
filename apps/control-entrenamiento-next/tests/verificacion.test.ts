@@ -97,6 +97,14 @@ describe("detecta un descuadre de verdad", () => {
     await repositorio().sumarASemana("2026-08-03", 300, 3);
     await firmarSesion(BONO, { fecha: "2026-08-03" });
 
+    // LA COMPROBACIÓN VA DETRÁS DE LA RESPUESTA (2026-09-02). Firmar ya no
+    // espera a que se compruebe el cuadre: eso era lo que dejaba la pantalla
+    // en «Guardando…» con la sesión ya guardada. El aviso sigue saliendo, pero
+    // un instante después, así que aquí hay que esperarlo — en la aplicación
+    // de verdad lo espera el servidor, no la persona.
+    const { tareaEnCurso } = await import("@/lib/despues");
+    await tareaEnCurso;
+
     const avisos = await listarAvisos();
     expect(avisos.some((a) => a.tipo === "descuadre")).toBe(true);
   });

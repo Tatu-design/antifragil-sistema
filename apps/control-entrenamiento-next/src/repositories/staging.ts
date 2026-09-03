@@ -20,9 +20,21 @@ import path from "node:path";
 import { TARIFA_LIDOMARE, type TipoClase } from "@/domain/economia";
 import { duenioDeLaSesion } from "@/domain/atribucion";
 import { BONO, CUENTA, MENSUALIDAD, ErrorDeNegocio } from "@/domain/modalidades";
-import type { CargoMensual, Ciclo, Cliente, Sesion, SesionDelCalendario } from "@/domain/tipos";
-import { rangoSemana } from "@/lib/fechas";
+import type { CargoMensual, Ciclo, Cliente, Sesion, ActividadDelCalendario } from "@/domain/tipos";
+import { hoyNegocio, rangoSemana } from "@/lib/fechas";
 import type { Aviso, ClaseGrupo, DatosDeLaLista, Perfil, Repositorio, SemanaEconomica } from "./tipos";
+
+/**
+ * El mes en curso, no uno escrito a mano.
+ *
+ * Los datos de pruebas tenían agosto de 2026 clavado, y el 1 de septiembre
+ * cinco pruebas se pusieron rojas sin que nadie tocara una línea: hablaban del
+ * «mes actual» contra unos datos que ya eran del mes pasado. Con esto, los
+ * datos de pruebas envejecen con el calendario (2026-09-02).
+ */
+const ANIO_EN_CURSO = Number(hoyNegocio().slice(0, 4));
+const MES_EN_CURSO = Number(hoyNegocio().slice(5, 7));
+
 
 interface Almacen {
   perfiles: Perfil[];
@@ -73,10 +85,10 @@ function semilla(): Almacen {
   const ciclos: Ciclo[] = [
     // Un bono a punto de agotarse: firmar dos veces enseña la renovación.
     { clienteId: "cli-a", ciclo: 1, modalidad: BONO, servicio: "Bono 8 sesiones", tarifa: 45, sesionesTotales: 8, precioTotal: 360, cuotaMensual: null, sesionesReferencia: null, anio: null, mes: null, fechaInicio: "2026-07-13", fechaFin: null, pagado: true },
-    { clienteId: "cli-b", ciclo: 1, modalidad: MENSUALIDAD, servicio: "Mensualidad", tarifa: null, sesionesTotales: 0, precioTotal: null, cuotaMensual: 720, sesionesReferencia: 12, anio: 2026, mes: 8, fechaInicio: null, fechaFin: null, pagado: false },
+    { clienteId: "cli-b", ciclo: 1, modalidad: MENSUALIDAD, servicio: "Mensualidad", tarifa: null, sesionesTotales: 0, precioTotal: null, cuotaMensual: 720, sesionesReferencia: 12, anio: ANIO_EN_CURSO, mes: MES_EN_CURSO, fechaInicio: null, fechaFin: null, pagado: false },
     { clienteId: "cli-c", ciclo: 1, modalidad: BONO, servicio: "Bono pareja 10", tarifa: 60, sesionesTotales: 10, precioTotal: 600, cuotaMensual: null, sesionesReferencia: null, anio: null, mes: null, fechaInicio: "2026-07-20", fechaFin: null, pagado: true },
     // Una cuenta de cliente, que solo puede llevar el administrador.
-    { clienteId: "cli-f", ciclo: 1, modalidad: CUENTA, servicio: "Cuenta de cliente", tarifa: 35, sesionesTotales: 0, precioTotal: null, cuotaMensual: null, sesionesReferencia: null, anio: 2026, mes: 8, fechaInicio: null, fechaFin: null, pagado: false },
+    { clienteId: "cli-f", ciclo: 1, modalidad: CUENTA, servicio: "Cuenta de cliente", tarifa: 35, sesionesTotales: 0, precioTotal: null, cuotaMensual: null, sesionesReferencia: null, anio: ANIO_EN_CURSO, mes: MES_EN_CURSO, fechaInicio: null, fechaFin: null, pagado: false },
     // El cliente de Rafa es un BONO: un entrenador no puede llevar otra
     // cosa (regla de Fernando, 2026-08-11).
     { clienteId: "cli-d", ciclo: 1, modalidad: BONO, servicio: "Bono 8 sesiones", tarifa: 35, sesionesTotales: 8, precioTotal: 280, cuotaMensual: null, sesionesReferencia: null, anio: null, mes: null, fechaInicio: "2026-08-10", fechaFin: null, pagado: false },
@@ -97,7 +109,7 @@ function semilla(): Almacen {
   ["2026-06-15", "2026-06-17"].forEach((f, i) => anotar("cli-e", f, i + 1, 4, 50, "Bono 4 sesiones"));
 
   const cargos: CargoMensual[] = [
-    { clienteId: "cli-b", anio: 2026, mes: 8, concepto: "mensualidad", ciclo: 1, importe: 720, pagado: false },
+    { clienteId: "cli-b", anio: ANIO_EN_CURSO, mes: MES_EN_CURSO, concepto: "mensualidad", ciclo: 1, importe: 720, pagado: false },
   ];
 
   const semanas: SemanaEconomica[] = [];
@@ -285,11 +297,11 @@ export class RepositorioStaging implements Repositorio {
     );
   }
 
-  async sesionesEntre(
+  async actividadEntre(
     desde: string,
     hasta: string,
     alcance: { soloDe?: string | null; adminId?: string | null } = {},
-  ): Promise<SesionDelCalendario[]> {
+  ): Promise<ActividadDelCalendario[]> {
     const datos = await cargar();
     const soloDe = alcance.soloDe ?? null;
     const nombreDe = new Map(datos.clientes.map((c) => [c.id, c.nombre]));
@@ -298,15 +310,16 @@ export class RepositorioStaging implements Repositorio {
     // Las mismas reglas que en Postgres, escritas una sola vez en
     // `domain/atribucion.ts`. Si las dos implementaciones divergieran, el
     // calendario diría una cosa en pruebas y otra en producción.
-    return datos.sesiones
+    const sesiones: ActividadDelCalendario[] = datos.sesiones
       .filter((s) => s.fecha >= desde && s.fecha <= hasta)
       .map((s) => ({
         id: s.id,
-        clienteId: s.clienteId,
-        cliente: nombreDe.get(s.clienteId) ?? "",
+        clase: "sesion_cliente" as const,
         fecha: s.fecha,
         hora: s.hora ?? null,
-        servicio: s.servicio,
+        titulo: nombreDe.get(s.clienteId) ?? "",
+        detalle: s.servicio,
+        clienteId: s.clienteId,
         profesionalId: duenioDeLaSesion({
           profesionalId: s.profesionalId,
           fecha: s.fecha,
@@ -314,14 +327,35 @@ export class RepositorioStaging implements Repositorio {
           adminId: alcance.adminId ?? null,
         }),
       }))
-      .filter((s) => !soloDe || s.profesionalId === soloDe)
-      .sort(
-        (a, b) =>
-          a.fecha.localeCompare(b.fecha) ||
-          // Las que no tienen hora van al final del día, no al principio.
-          (a.hora ?? "99:99").localeCompare(b.hora ?? "99:99") ||
-          a.cliente.localeCompare(b.cliente, "es"),
-      );
+      .filter((s) => !soloDe || s.profesionalId === soloDe);
+
+    // CrossFit es del administrador: solo sale mirando todo el negocio o lo
+    // suyo. A un entrenador no le corresponde.
+    const conCrossfit = !soloDe || (alcance.adminId != null && soloDe === alcance.adminId);
+    const clases: ActividadDelCalendario[] = conCrossfit
+      ? datos.clases
+          .filter((c) => c.fecha >= desde && c.fecha <= hasta)
+          .map((c) => ({
+            id: c.id,
+            clase: (c.tipo === "kids" ? "crossfit_kids" : "crossfit_lidomare") as ActividadDelCalendario["clase"],
+            fecha: c.fecha,
+            hora: null,
+            titulo: c.tipo === "kids" ? "CrossFit Kids" : "CrossFit Lidomare",
+            detalle: "",
+            // Una clase de grupo NO es de ningún cliente: no puede enlazar a
+            // una ficha que no existe.
+            clienteId: null,
+            profesionalId: alcance.adminId ?? null,
+          }))
+      : [];
+
+    return [...sesiones, ...clases].sort(
+      (a, b) =>
+        a.fecha.localeCompare(b.fecha) ||
+        // Las que no tienen hora van al final del día, no al principio.
+        (a.hora ?? "99:99").localeCompare(b.hora ?? "99:99") ||
+        a.titulo.localeCompare(b.titulo, "es"),
+    );
   }
 
   async resumenDeSesionesEntre(desde: string, hasta: string) {
@@ -880,6 +914,14 @@ export class RepositorioStaging implements Repositorio {
 }
 
 /** Solo para las pruebas: vuelve al estado de partida. */
-export function reiniciarStagingParaPruebas(): void {
+export async function reiniciarStagingParaPruebas(): Promise<void> {
+  // ESPERA A LO QUE QUEDÓ EN MARCHA (2026-09-02). Desde que la comprobación de
+  // cuadre se hace después de contestar, una prueba puede terminar con esa
+  // tarea todavía a medias. Fuera de una petición se ejecuta aquí mismo, y si
+  // se reiniciaran los datos mientras corre, al terminar volcaría el estado
+  // viejo encima del recién reiniciado y la prueba siguiente empezaría con
+  // datos de la anterior. Pasó nada más desacoplarla.
+  const { tareaEnCurso } = await import("@/lib/despues");
+  await tareaEnCurso.catch(() => undefined);
   estado().cache = semilla();
 }

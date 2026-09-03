@@ -18,9 +18,13 @@
 
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
 import { repositorio } from "@/repositories";
 import { reiniciarStagingParaPruebas } from "@/repositories/staging";
-import { listarClientes, obtenerPerfil } from "@/services/clientes";
+import { confirmacionDeHoy, listarClientes, obtenerPerfil } from "@/services/clientes";
+import { listarProfesionales } from "@/repositories/perfiles";
 import { contarNoLeidos } from "@/services/avisos";
 import { obtenerCuenta } from "@/services/clases";
 import { obtenerCalendario } from "@/services/calendario";
@@ -91,9 +95,24 @@ const PRESUPUESTO = {
    * ha vuelto ese problema.
    */
   "calendario de un mes": 1,
-  /** La pantalla entera: clientes, avisos y las dos cuentas de CrossFit.
-   *  Las cuatro cargas se lanzan a la vez, así que en tiempo es como una. */
-  "pantalla de clientes completa": 6,
+  /**
+   * La pantalla entera: clientes, avisos, las dos cuentas de CrossFit **y la
+   * lista de profesionales**, que es la del filtro.
+   *
+   * Subió de 6 a 7 el 2026-09-02, y no porque la pantalla haga más: porque la
+   * prueba hacía menos. Se dejaba fuera la carga de profesionales, que la
+   * pantalla sí hacía —y encima suelta, detrás de las otras—, así que el
+   * presupuesto daba tranquilidad sobre una ruta que no era la real. Ahora se
+   * miden las cinco, y van todas a la vez.
+   */
+  "pantalla de clientes completa": 7,
+  /**
+   * La ficha: el perfil, los avisos y la confirmación de hoy.
+   *
+   * La confirmación son dos consultas y antes iba detrás del perfil, no a la
+   * vez. El código QR ya no cuenta: solo se dibuja cuando se va a enseñar.
+   */
+  "ficha de un cliente completa": 8,
 };
 
 describe("presupuesto de consultas por pantalla", () => {
@@ -270,20 +289,60 @@ describe("presupuesto de consultas por pantalla", () => {
     expect(porMetodo.contarClases ?? 0).toBe(0);
   });
 
-  it("la pantalla de clientes entera, con sus dos cuentas de CrossFit", async () => {
+  it("la pantalla de clientes entera, tal y como la carga la página", async () => {
     const contador = contarConsultas();
-    // Lo mismo que carga `app/clientes/page.tsx`, y en paralelo igual que allí.
+    // Lo mismo que carga `app/clientes/page.tsx`, y a la vez igual que allí.
     await Promise.all([
       listarClientes(),
       contarNoLeidos(),
       obtenerCuenta("lidomare"),
       obtenerCuenta("kids"),
+      listarProfesionales(),
     ]);
 
     expect(
       contador.total(),
       `la pantalla hizo ${contador.total()} consultas: ${JSON.stringify(contador.porMetodo())}`,
     ).toBeLessThanOrEqual(PRESUPUESTO["pantalla de clientes completa"]);
+  });
+
+  it("y la prueba carga lo MISMO que la página, sin dejarse nada", () => {
+    // La red de seguridad de la red de seguridad. Esta prueba simula la
+    // pantalla, y una simulación que se queda corta da tranquilidad falsa:
+    // estuvo midiendo seis consultas de una ruta que hacía siete porque se
+    // dejaba fuera la carga de profesionales (2026-09-02).
+    const pagina = readFileSync(
+      path.join(process.cwd(), "src", "app", "clientes", "page.tsx"),
+      "utf8",
+    );
+    const aqui = readFileSync(path.join(process.cwd(), "tests", "rendimiento.test.ts"), "utf8");
+
+    for (const carga of ["listarClientes(", "contarNoLeidos(", "obtenerCuenta(", "listarProfesionales("]) {
+      if (!pagina.includes(carga)) continue;
+      expect(aqui, `la página llama a «${carga}» y la prueba no lo cuenta`).toContain(carga);
+    }
+  });
+
+  it("la ficha de un cliente, tal y como la carga la página", async () => {
+    // El perfil y la confirmación de hoy van a la vez desde el 2026-09-02:
+    // antes la confirmación esperaba a que terminara el perfil.
+    const contador = contarConsultas();
+    await Promise.all([obtenerPerfil("cli-a"), contarNoLeidos(), confirmacionDeHoy("cli-a")]);
+
+    expect(
+      contador.total(),
+      `la ficha hizo ${contador.total()} consultas: ${JSON.stringify(contador.porMetodo())}`,
+    ).toBeLessThanOrEqual(PRESUPUESTO["ficha de un cliente completa"]);
+  });
+
+  it("el código QR NO se dibuja si no se va a enseñar", () => {
+    // Se enseña justo después de firmar. El resto de las veces se generaba
+    // igual y se tiraba: 40 ms y 6 KB por visita (2026-09-02).
+    const ficha = readFileSync(
+      path.join(process.cwd(), "src", "app", "clientes", "[id]", "page.tsx"),
+      "utf8",
+    );
+    expect(ficha).toMatch(/const qr = firmado \?/);
   });
 
   it("la ficha de una cuenta de CrossFit", async () => {

@@ -232,9 +232,9 @@ describe("el calendario con sesiones reales", () => {
     const deAdmin = await obtenerCalendario({ anio: 2026, mes: 9, profesionalId: ADMIN.id, adminId: ADMIN.id });
 
     expect(deRafa.sesiones).toHaveLength(1);
-    expect(deRafa.sesiones[0].cliente).toBe("Cliente D");
+    expect(deRafa.sesiones[0].titulo).toBe("Cliente D");
     expect(deAdmin.sesiones).toHaveLength(1);
-    expect(deAdmin.sesiones[0].cliente).toBe("Cliente A");
+    expect(deAdmin.sesiones[0].titulo).toBe("Cliente A");
   });
 
   it("las de un profesional NO llegan al navegador de otro", async () => {
@@ -264,7 +264,7 @@ describe("el calendario con sesiones reales", () => {
     const { sesiones } = await delMes();
 
     expect(Object.keys(sesiones[0]).sort()).toEqual(
-      ["cliente", "clienteId", "fecha", "hora", "id", "profesionalId", "servicio"].sort(),
+      ["clase", "cliente" + "Id", "detalle", "fecha", "hora", "id", "profesionalId", "titulo"].sort(),
     );
   });
 
@@ -335,20 +335,22 @@ describe("el calendario dibujado", () => {
   const sesiones = [
     {
       id: "s1",
+      clase: "sesion_cliente" as const,
       clienteId: "cli-a",
-      cliente: "Cliente A",
+      titulo: "Cliente A",
       fecha: "2026-08-24",
       hora: "09:00",
-      servicio: "Bono 8 sesiones",
+      detalle: "Bono 8 sesiones",
       profesionalId: "per-admin",
     },
     {
       id: "s2",
+      clase: "sesion_cliente" as const,
       clienteId: "cli-d",
-      cliente: "Cliente D",
+      titulo: "Cliente D",
       fecha: "2026-08-24",
       hora: null,
-      servicio: "Bono 8 sesiones",
+      detalle: "Bono 8 sesiones",
       profesionalId: "per-rafa",
     },
   ];

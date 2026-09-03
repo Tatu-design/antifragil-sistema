@@ -24,8 +24,27 @@ import { NextResponse, type NextRequest } from "next/server";
  *                sin cuenta. Sin esto el filtro la redirigía al login y el
  *                navegador recibía una página HTML donde esperaba una foto:
  *                todos los avatares salían rotos (2026-08-12).
+ *   `/api/renovar-mes`
+ *              — la tarea que abre el mes nuevo. No tiene cookie porque no la
+ *                abre una persona: comprueba su propio secreto por dentro. Va
+ *                nombrada entera, no como «/api/», para no dejar abierta
+ *                ninguna ruta futura sin querer.
  */
-const PUBLICAS = ["/login", "/mi/", "/perfil/"];
+const PUBLICAS = [
+  "/login",
+  "/mi/",
+  "/perfil/",
+  // La tarea que abre el mes nuevo, y SOLO ella. No la llama una persona con
+  // sesión iniciada, la llama Vercel: aquí no hay cookie que valga. Lo que la
+  // protege es su secreto, comprobado dentro
+  // (`api/renovar-mes/route.ts`). Sin esto, la tarea acababa en la pantalla de
+  // entrada y no se ejecutaba nunca (2026-09-02).
+  //
+  // Se nombra la ruta entera a propósito. Poner «/api/» dejaba abierta de par
+  // en par cualquier ruta que se creara ahí dentro en el futuro, y la que la
+  // creara no se enteraría (2026-09-03).
+  "/api/renovar-mes",
+];
 
 export function middleware(peticion: NextRequest) {
   const { pathname } = peticion.nextUrl;

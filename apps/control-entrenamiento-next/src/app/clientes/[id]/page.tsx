@@ -45,9 +45,13 @@ export default async function PaginaPerfil({
   //     entrenador ve lo que paga su cliente —el precio del bono, la cuota—
   //     pero no a cuánto sale la hora.
   const verLtv = esAdmin(usuario);
+  // Las dos a la vez: no dependen entre sí. Iban una detrás de otra, y con
+  // una sola conexión en el pool eso eran seis viajes de red en fila
+  // (2026-09-02).
   let perfil;
+  let confirmacion;
   try {
-    perfil = await obtenerPerfil(id);
+    [perfil, confirmacion] = await Promise.all([obtenerPerfil(id), confirmacionDeHoy(id)]);
   } catch (error) {
     if (error instanceof BaseNoDisponible) return <SinConexion />;
     throw error;
@@ -56,8 +60,6 @@ export default async function PaginaPerfil({
 
   const { cliente, ficha, servicios, ltv } = perfil;
   const { firmado, borrado, cobro, guardado } = await searchParams;
-
-  const confirmacion = await confirmacionDeHoy(cliente.id);
 
   // El enlace del cliente NO se saca de la petición. En Vercel la misma
   // aplicación responde en varias direcciones y las de despliegue están
@@ -68,11 +70,16 @@ export default async function PaginaPerfil({
     cliente.token,
     cabeceras.get("x-forwarded-host") ?? cabeceras.get("host"),
   );
-  const qr = await QRCode.toDataURL(`${enlace}/confirmar`, {
+  // EL CÓDIGO QR SOLO SE DIBUJA SI SE VA A ENSEÑAR (2026-09-02).
+  //
+  // Se enseña justo después de firmar, para que el cliente lo escanee. El
+  // resto de las veces —que son casi todas— se generaba igualmente y se tiraba:
+  // unos 40 ms de dibujo y 6 KB de imagen en cada visita a la ficha.
+  const qr = firmado ? await QRCode.toDataURL(`${enlace}/confirmar`, {
     width: 190,
     margin: 1,
     color: { dark: "#0f172a", light: "#ffffff" },
-  });
+  }) : "";
 
   const estado = cliente.estado[0]!.toUpperCase() + cliente.estado.slice(1);
 

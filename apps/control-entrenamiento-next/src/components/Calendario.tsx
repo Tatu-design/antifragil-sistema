@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { DIAS_SEMANA, tituloDelDia, type Dia, type Mes } from "@/domain/calendario";
-import type { SesionDelCalendario } from "@/domain/tipos";
+import type { ActividadDelCalendario } from "@/domain/tipos";
 
 /**
  * El mes, y debajo —o al lado, si hay sitio— el día que se toque.
@@ -26,7 +26,7 @@ export function Calendario({
   agruparPorProfesional,
 }: {
   mes: Mes;
-  sesiones: SesionDelCalendario[];
+  sesiones: ActividadDelCalendario[];
   hoy: string;
   /** `id → nombre`, para poder decir de quién es cada sesión. */
   nombresDeProfesionales: Record<string, string>;
@@ -122,7 +122,7 @@ function DetalleDelDia({
   agruparPorProfesional,
 }: {
   fecha: string;
-  sesiones: SesionDelCalendario[];
+  sesiones: ActividadDelCalendario[];
   nombresDeProfesionales: Record<string, string>;
   agruparPorProfesional: boolean;
 }) {
@@ -161,8 +161,8 @@ function DetalleDelDia({
 }
 
 /** Por profesional, y dentro de cada uno en el orden que ya traían. */
-function agrupar(sesiones: SesionDelCalendario[]): Array<[string, SesionDelCalendario[]]> {
-  const grupos = new Map<string, SesionDelCalendario[]>();
+function agrupar(sesiones: ActividadDelCalendario[]): Array<[string, ActividadDelCalendario[]]> {
+  const grupos = new Map<string, ActividadDelCalendario[]>();
   for (const sesion of sesiones) {
     const clave = sesion.profesionalId ?? "";
     const suyas = grupos.get(clave);
@@ -172,18 +172,35 @@ function agrupar(sesiones: SesionDelCalendario[]): Array<[string, SesionDelCalen
   return [...grupos.entries()];
 }
 
-function Fila({ sesion }: { sesion: SesionDelCalendario }) {
+function Fila({ sesion }: { sesion: ActividadDelCalendario }) {
+  const contenido = (
+    <>
+      {/* La mitad del histórico no tiene hora guardada, y las clases de grupo
+          no la tienen nunca. No se inventa. */}
+      <span className="calendario-hora">{sesion.hora ?? "—"}</span>
+      <span className="calendario-sesion-quien">
+        <span className="calendario-cliente">{sesion.titulo}</span>
+        {sesion.detalle && <span className="calendario-servicio">{sesion.detalle}</span>}
+      </span>
+    </>
+  );
+
+  // UNA CLASE DE GRUPO NO ES DE NADIE: no puede llevar a la ficha de un cliente
+  // que no existe. Se pinta igual, pero sin enlace (2026-09-03).
+  if (!sesion.clienteId) {
+    return (
+      <li>
+        <div className="calendario-sesion es-grupo">{contenido}</div>
+      </li>
+    );
+  }
+
   return (
     <li>
       {/* Lleva a la ficha del cliente: desde el calendario lo que se quiere
           saber es quién es y cómo va, no editar la sesión. */}
       <Link href={`/clientes/${sesion.clienteId}`} className="calendario-sesion">
-        {/* La mitad del histórico no tiene hora guardada y no se inventa. */}
-        <span className="calendario-hora">{sesion.hora ?? "—"}</span>
-        <span className="calendario-sesion-quien">
-          <span className="calendario-cliente">{sesion.cliente}</span>
-          <span className="calendario-servicio">{sesion.servicio}</span>
-        </span>
+        {contenido}
       </Link>
     </li>
   );

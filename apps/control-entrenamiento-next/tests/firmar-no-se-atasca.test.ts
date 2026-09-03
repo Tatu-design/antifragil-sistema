@@ -103,7 +103,7 @@ describe("firmar una sesión", () => {
     await firmarSesion("cli-a", { fecha: "2026-08-27" });
     const conPocos = antes.total();
 
-    reiniciarStagingParaPruebas();
+    await reiniciarStagingParaPruebas();
     await crearClientes(20);
 
     const despues = contarConsultas();
@@ -185,11 +185,23 @@ describe("las conexiones a la base de datos", () => {
     "utf8",
   );
 
-  it("cada instancia pide UNA, no tres", () => {
-    // Hay 15 para toda la aplicación. Con tres por instancia, cinco instancias
-    // agotaban el cupo y la sexta se estrellaba.
-    expect(fuente).toMatch(/max:\s*1,/);
-    expect(fuente).not.toMatch(/max:\s*3,/);
+  it("pide unas pocas conexiones: ni una ni un montón", () => {
+    // Estuvo en 1 mientras la base iba en modo sesión, donde solo había 15
+    // conexiones para TODA la aplicación: con tres por instancia, cinco
+    // instancias agotaban el cupo y la sexta se estrellaba.
+    //
+    // Desde el 2026-08-30 la base va en modo transacción —medido: aguanta 45 a
+    // la vez— y quedarse en una salía caro: con una sola conexión todas las
+    // consultas de una pantalla van EN FILA aunque el código las lance a la
+    // vez. Medido con las conexiones ya abiertas, siete consultas como las de
+    // la lista de clientes: 332 ms con una, 95 ms con cuatro, 51 ms con siete.
+    //
+    // Lo que se vigila es el rango, no el número exacto: ni 1, que serializa,
+    // ni tantas que un puñado de instancias vuelva a dejar sin sitio a las
+    // demás.
+    const max = Number(/max:\s*(\d+),/.exec(fuente)?.[1]);
+    expect(max, "hay que declarar cuántas conexiones pide cada instancia").toBeGreaterThanOrEqual(3);
+    expect(max, "demasiadas por instancia vuelven a agotar el cupo compartido").toBeLessThanOrEqual(8);
   });
 
   it("no se queda una conexión agarrada un minuto sin usarla", () => {

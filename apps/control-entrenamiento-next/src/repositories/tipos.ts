@@ -12,7 +12,7 @@
  */
 
 import type { SesionEconomica, TipoClase } from "@/domain/economia";
-import type { CargoMensual, Ciclo, Cliente, Sesion, SesionDelCalendario } from "@/domain/tipos";
+import type { CargoMensual, Ciclo, Cliente, Sesion, ActividadDelCalendario } from "@/domain/tipos";
 
 /** Un profesional que usa la aplicación. Los clientes NO son perfiles. */
 export interface Perfil {
@@ -119,19 +119,24 @@ export interface Repositorio {
 
   listarSesiones(clienteId: string): Promise<Sesion[]>;
   /**
-   * Las sesiones firmadas de un rango de fechas, con el nombre del cliente y
-   * de quién es cada una. **Una sola consulta para todo el mes**: el
-   * calendario no puede pedir un día cada vez.
+   * TODA la actividad firmada de un rango de fechas: las sesiones de clientes
+   * y las clases de CrossFit, juntas y con el nombre del cliente cuando lo
+   * hay. **Una sola consulta para todo el mes**: el calendario no puede pedir
+   * un día cada vez, ni una consulta por tipo de actividad.
+   *
+   * Las dos tablas siguen separadas —`sesiones` y `clases_grupo`—: aquí se
+   * leen juntas, no se copia una dentro de otra (2026-09-03).
    *
    * `soloDe` aplica las reglas de `domain/atribucion.ts`, las mismas que
-   * Economía. Cuando viene, la base NO devuelve las de otros profesionales:
-   * el filtro no es de pantalla.
+   * Economía. Cuando viene, la base NO devuelve las de otros profesionales, y
+   * las clases de CrossFit solo salen si se está mirando todo el negocio o la
+   * del administrador, de quien son.
    */
-  sesionesEntre(
+  actividadEntre(
     desde: string,
     hasta: string,
     alcance?: { soloDe?: string | null; adminId?: string | null },
-  ): Promise<SesionDelCalendario[]>;
+  ): Promise<ActividadDelCalendario[]>;
   contarSesionesDelCiclo(clienteId: string, ciclo: number): Promise<number>;
   /**
    * Lo firmado en un rango de fechas, ya sumado por la base.

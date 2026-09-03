@@ -222,6 +222,49 @@ El objetivo: en 6 meses, Claude no comete los mismos errores dos veces.
 
 ---
 
+## 🚪 Puerta de salida después de cualquier cambio
+
+> **Nada se da por terminado sin pasar por aquí.** Da igual lo pequeño que
+> parezca el cambio: los tres fallos peores de este proyecto —la aplicación
+> colgada en «Guardando…», la lentitud de septiembre y el calendario sin
+> CrossFit— venían de cambios que parecían inofensivos y no se comprobaron
+> enteros.
+
+Antes de decir «listo», **todo** esto:
+
+1. **Las cuatro comprobaciones completas**, sin excepción:
+   `npm test`, `npm run lint`, `npm run type-check` y `npm run build`.
+   Verde en las cuatro, no en tres.
+
+2. **Probar el flujo que se ha tocado Y los de al lado.** Un cambio en la
+   firma toca el calendario y la economía; uno en los permisos toca todas las
+   pantallas. Si no está claro a qué afecta, se prueban todos.
+
+3. **Recorrido de humo, entero:** entrar, lista de clientes, ficha, firmar una
+   sesión, ver la confirmación, ver el QR, confirmar desde el enlace del
+   cliente, calendario, CrossFit Kids, CrossFit Lidomare, Economía, renovación
+   mensual y permisos de entrenador.
+
+4. **Ningún botón puede quedarse bloqueado.** Comprobar expresamente que no
+   queda nada en «Guardando…» ni en «Firmando…». Una operación que se guarda y
+   deja la pantalla diciendo que no es peor que un error.
+
+5. **Medir antes y después** las rutas y consultas que toca el cambio. Número
+   de consultas y milisegundos, contra la base de verdad. «Parece igual de
+   rápido» no es una medición.
+
+6. **Probar la concurrencia** siempre que haya escrituras o trabajo en segundo
+   plano: dos cosas a la vez, a propósito. Una prueba secuencial no ve nunca
+   los fallos de concurrencia.
+
+7. **Desplegar primero en Preview**, nunca directo a producción.
+
+8. **No se dice «terminado»** si hay una regresión, algo va más lento, algo se
+   congela o queda un flujo crítico sin probar. Si algo no se ha podido probar,
+   se dice cuál y por qué — no se omite.
+
+---
+
 ## 🛑 Reglas innegociables
 
 1. **Siempre leer `SYSTEM_VISION.md`** antes de empezar a trabajar en una sesión nueva.

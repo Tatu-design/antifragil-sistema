@@ -18,6 +18,7 @@ import { procesarUnaSesion } from "@/domain/programas";
 import type { Ciclo, ResultadoFirma, Sesion } from "@/domain/tipos";
 import { anioDe, hoyNegocio, horaNegocio, mesDe, rangoSemana } from "@/lib/fechas";
 import { repositorio } from "@/repositories";
+import { despues } from "@/lib/despues";
 import { comprobarYAvisar } from "./verificacion";
 
 export interface OpcionesFirma {
@@ -188,9 +189,16 @@ export async function firmarSesion(clienteId: string, opciones: OpcionesFirma = 
     } satisfies ResultadoFirma;
   });
 
-  // Ya está guardado: ahora se comprueba que la economía de esa semana sigue
-  // cuadrando con lo firmado. Si no, deja un aviso — nunca corrige sola.
-  await comprobarYAvisar(fecha);
+  // Ya está guardado. La comprobación de que la economía de esa semana sigue
+  // cuadrando se hace DESPUÉS de contestar, no antes.
+  //
+  // Antes se esperaba a ella, y era justo lo que dejaba la pantalla en
+  // «Guardando…» con la sesión ya guardada: si tardaba o se cortaba la red,
+  // quedaba el peor estado posible —guardada por dentro, «no guardada» por
+  // fuera—. No cambia nada de lo que se acaba de escribir: solo mira y, si algo
+  // no cuadra, deja un aviso. Puede esperar diez segundos; la persona que está
+  // firmando con el móvil en la mano, no (2026-09-02).
+  despues("comprobar el cuadre de la semana", () => comprobarYAvisar(fecha));
   return resultado;
 }
 
@@ -262,7 +270,8 @@ export async function eliminarSesion(clienteId: string, sesionId: string): Promi
     await repo.actualizarCliente(cliente);
   });
 
-  if (cuando) await comprobarYAvisar(cuando);
+  // Igual que al firmar: la comprobación va detrás de la respuesta.
+  if (cuando) despues("comprobar el cuadre tras borrar", () => comprobarYAvisar(cuando));
 }
 
 /**
@@ -326,9 +335,12 @@ export async function editarSesion(
     });
   });
 
-  // Las dos semanas: la que pierde la sesión y la que la recibe.
-  if (semanaAnterior) await comprobarYAvisar(semanaAnterior);
-  if (nuevaFecha !== semanaAnterior) await comprobarYAvisar(nuevaFecha);
+  // Las dos semanas: la que pierde la sesión y la que la recibe. Las dos
+  // detrás de la respuesta, como al firmar.
+  despues("comprobar el cuadre tras editar", async () => {
+    if (semanaAnterior) await comprobarYAvisar(semanaAnterior);
+    if (nuevaFecha !== semanaAnterior) await comprobarYAvisar(nuevaFecha);
+  });
 }
 
 /**
