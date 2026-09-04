@@ -189,7 +189,9 @@ describe("firmar CrossFit no crea nada que no sea una clase", () => {
     const clase = (await delMes()).sesiones[0];
     expect(clase.clienteId, "no puede enlazar a una ficha que no existe").toBeNull();
     expect(clase.detalle, "no tiene programa").toBe("");
-    expect(clase.hora, "y no se le inventa una hora").toBeNull();
+    // La hora SÍ la tiene: es la de la firma (2026-09-03). Lo que no puede
+    // tener es un cliente detrás.
+    expect(clase.hora, "enseña a qué hora se firmó").toMatch(/^\d{2}:\d{2}$/);
   });
 });
 
@@ -319,7 +321,23 @@ describe("cómo se pinta una clase de grupo", () => {
   });
 
   it("una clase sin hora enseña una raya, no una hora inventada", () => {
+    // Las clases antiguas no tienen hora guardada, y las anotadas otro día
+    // tampoco la enseñan: no se inventa.
     expect(pintar()).toContain("—");
+  });
+
+  it("y una clase con hora la enseña", () => {
+    const conHora = renderToStaticMarkup(
+      createElement(Calendario, {
+        mes,
+        sesiones: [{ ...actividad[1], hora: "17:04" }],
+        hoy: "2026-09-03",
+        nombresDeProfesionales: { "per-admin": "Tatu" },
+        agruparPorProfesional: false,
+      }),
+    );
+    expect(conHora).toContain("17:04");
+    expect(conHora).toContain("CrossFit Kids");
   });
 });
 

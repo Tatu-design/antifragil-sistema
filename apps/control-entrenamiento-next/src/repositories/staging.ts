@@ -43,7 +43,7 @@ interface Almacen {
   sesiones: Sesion[];
   cargos: CargoMensual[];
   semanas: SemanaEconomica[];
-  clases: Array<{ id: string; fecha: string; tipo: TipoClase }>;
+  clases: Array<{ id: string; fecha: string; tipo: TipoClase; creado?: string }>;
   facturacionKids: Array<{ anio: number; mes: number; importe: number }>;
   ajustes: Array<{ anio: number; mes: number; origen: string; importe: number; horas: number; motivo: string }>;
   confirmaciones: Array<{ clienteId: string; sesionId: string; fecha: string; hora: string }>;
@@ -339,7 +339,9 @@ export class RepositorioStaging implements Repositorio {
             id: c.id,
             clase: (c.tipo === "kids" ? "crossfit_kids" : "crossfit_lidomare") as ActividadDelCalendario["clase"],
             fecha: c.fecha,
-            hora: null,
+            // La hora a la que se firmó, si se anotó el mismo día. Ver la
+            // consulta equivalente en Postgres.
+            hora: c.creado && c.creado.slice(0, 10) === c.fecha ? c.creado.slice(11, 16) : null,
             titulo: c.tipo === "kids" ? "CrossFit Kids" : "CrossFit Lidomare",
             detalle: "",
             // Una clase de grupo NO es de ningún cliente: no puede enlazar a
@@ -492,7 +494,13 @@ export class RepositorioStaging implements Repositorio {
 
   async registrarClase(fecha: string, tipo: TipoClase): Promise<void> {
     const datos = await cargar();
-    datos.clases.push({ id: `cls-${Date.now()}-${datos.clases.length}`, fecha, tipo });
+    datos.clases.push({
+      id: `cls-${Date.now()}-${datos.clases.length}`,
+      fecha,
+      tipo,
+      // Cuándo se firmó: es lo que el calendario enseña como hora de la clase.
+      creado: new Date().toISOString(),
+    });
     await volcar();
     // Lidomare tiene tarifa fija y suma a la semana como una sesión más. Kids
     // no: su dinero no se conoce hasta acabar el mes.

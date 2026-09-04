@@ -494,7 +494,14 @@ export class RepositorioPostgres implements Repositorio {
        select g.id::text as id,
               case when g.tipo::text = 'kids' then 'crossfit_kids' else 'crossfit_lidomare' end as clase,
               to_char(g.fecha,'YYYY-MM-DD') as fecha,
-              null as hora,
+              -- La hora a la que se firmo: la tabla no guarda hora de clase,
+              -- pero si cuando se registro, que es ese mismo momento. Se pasa
+              -- a la hora de Madrid porque guardada esta en horario universal.
+              -- Solo se enseña si coincide con el dia de la clase: una anotada
+              -- al dia siguiente no puede decir que fue a las 00:40.
+              case when (g.creado at time zone 'Europe/Madrid')::date = g.fecha
+                   then to_char(g.creado at time zone 'Europe/Madrid', 'HH24:MI')
+                   else null end as hora,
               case when g.tipo::text = 'kids' then 'CrossFit Kids' else 'CrossFit Lidomare' end as titulo,
               '' as detalle,
               null as cliente_id,
